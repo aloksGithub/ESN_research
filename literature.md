@@ -73,13 +73,43 @@ Testing was done on the Mackey Glass dataset
 ## Comparing Evolutionary Methods for Reservoir Computing Pretraining
 
 The objective of the study is to compare three evolutionary algorithms for finding the best reservoir in Reservoir Computing applied to time series forecasting in terms of prediction error and computational complexity. The three evolutionary approaches used in the study to find the best reservoir for time series forecasting are:
-1. RCDESIGN (Reservoir Computing Design e Training):
+1. RCDESIGN (Reservoir Computing Design e Training): RCDESIGN uses GA and simultaneously looks for the best values of parameters, topology and weight matrices. The paper describes how an ESN can be encoded as an individual in GA. The crossover is an adaptation of uniform crossover. A mask is created that dictates which gene is inherited from which parent. Mutation is applied to every gene after the first, since the first gene defines the size
 
-2. Classical Searching: This approach uses Genetic Algorithms (GA) to search for the main RC generation parameters, which include reservoir size, spectral radius, and the density of interconnections of the W matrix.
-3. Topology and Radius Searching
+2. Classical Searching: Classical Searching uses GA in order to search the principal RC generation parameters, which are the reservoir size, the spectral radius, and the density of interconnections of W.
 
-### Dataset:
+3. Topology and Radius Searching: This approach adds the search for optional connections such as feedback and bias to classical searching
+
+### Datasets:
 This research used real data from the SONDA project to create a wind power model for energy planning in Brazil. Three wind speed time series were chosen for the experiments, obtained from wind headquarters in Triunfo, Belo Jardim, and São João do Cariri.
+The performance of the models on all datasets went in the order RCDESIGN, Topology and Radius Searching, and classical searching, with RCDESIGN far exceeding the performance of classical searching
+
+## Single- and Multi-Objective Particle Swarm Optimization of Reservoir Structure in Echo State Network
+
+This paper discusses the optimization of reservoir structure in Echo State Networks (ESNs) using single- and multi-objective particle swarm optimization (PSO). During the search process, an ESN is represented using the input, reservoir and feedback connectivity rates, and the reservoir size. In Single-objective PSO, the objective is the network error (RMSE/MSE). In bi-objective PSO, the objectives are minimization of MSE and connectivity rate. For tri-objective PSO, the objectives are minimization of MSE, reservoir connectivity rate and reservoir size
+
+### Datasets:
+The proposed approaches are tested on various benchmarks, such as NARMA and Lorenz time series, and show good performance compared to other methods.
+
+| Method                  | RMSE (Lorenz) | MSE (NARMA)|
+| ----------------------- | ---------- | -----------|
+| SOPSO-ESN              | 3.50 e-003 | 1.51 e-004 |
+| MOPSO-ESN (2 objectives)| 3.24 e-002 | 3.96 e-004 |
+| MOPSO-ESN (3 objectives)| 1.44 e-002 | 2.12 e-004 |
+
+
+## Growing Echo-State Network With Multiple Subreservoirs
+
+This paper presents a growing Echo-State Network (ESN) with multiple subreservoirs. The proposed method, automatically designs the size and topology of the reservoir to match a given application. The GESN adds hidden units to the existing reservoir group by group, creating multiple subreservoirs. The algorithm starts with no subreservoirs, then, it generates a new subreservoir weight matrix using singular value decomposition. The input weight matrix is also randomly generated. The internal states of the growing reservoir are updated and collected, and the output weights are calculated using linear regression. The training error or validation error is calculated and if a stopping criterion is satisfied, the algorithm stops; otherwise, it continues to add more subreservoirs until the stopping criterion is met.
+
+GESN was evaluated on tenth order NARMA, the Mackey-glass dataset and the sunspot series. The lowest errors achieved on the datasets are as follows
+
+| Dataset               | NRMSE|
+| --------------------- | ---------- |
+| NARMA-10              | 0.0843 |
+| MG                    | 1.32 e-02 |
+| MG (noisy)            | 3.14 e-02 |
+| Sunspot               | 0.3416
+| Sunspot (smoothed)    | 0.0254
 
 # ESN ensembling
 ## Adaptive Prognostic of Fuel Cells by Implementing Ensemble Echo State Networks in Time-Varying Model Space
@@ -110,3 +140,9 @@ The models used in their experiments are as follows:
 - Proposed stacking ensemble (s-ESN) consisting of M = 10 ESN models and a combiner that is also configured as another ESN learner. The leaking rate α, number of neurons in the repository N and activation function f(·) are set to 0.3, 100 and tanh for all ESN models
 
 ## Effective energy consumption forecasting using enhanced bagged echo state network
+
+The study proposes a new enhanced optimization model based on the bagged echo state network improved by differential evolution algorithm to estimate energy consumption. The proposed model combines the merits of three techniques which are echo state network, bagging, and differential evolution algorithm. DE is a population-based algorithm that uses mutation, crossover, and selection operations to evolve a population of candidate solutions towards an optimal solution. DE is particularly effective for solving problems with continuous variables. The proposed model is applied to two comparative examples and an extended application to verify its accuracy and reliability. Results of the comparative examples show that the proposed model achieves better forecasting performance compared with basic echo state network and other existing popular models.
+
+## An ensemble quadratic echo state network for non-linear spatio-temporal forecasting
+
+This paper presents an ensemble quadratic echo state network for non-linear spatio-temporal forecasting. A quadratic echo state network (QESN) is a modification of the basic echo state network (ESN) model that includes quadratic interactions between hidden processes and the response, as well as embeddings (lagged values) of the input. These modifications allow for more effective forecasts of non-linear spatio-temporal dynamical systems.
