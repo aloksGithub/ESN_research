@@ -107,6 +107,12 @@ This paper presents a growing Echo-State Network (ESN) with multiple subreservoi
 
 The GESN approach is able to achieve competitve performance compared to other approaches, however, the major advantage of GESN is that it produces an ESN that has the least complexity needed to achieve good performance. This results in GESN producing much smaller models that can be trained faster and achieve competetive results.
 
+## Evolutionary Echo State Network: Evolving Reservoirs in the Fourier Space
+
+This paper presents a new computational model called EvoESN (EVOLutionary Echo State Network) that represents the reservoir weights of an Echo State Network (ESN) in the Fourier space and performs fine-tuning of these weights using genetic algorithms in the frequency domain. The reasoning for using the Fourier space to represent ESN weights is that a direct encoding (that is, a one-to-one mapping where every weight is represented in the gene) is unsuitable for large-scale networks, furthermore, naive crossover operations present deficiencies when used for combining recurrent networks. The reservoir weights are projected into the frequency domain using Discrete Cosine Transform. This approach allows for a dimensionality reduction transformation of the initial method, and enables the exploitation of the benefits of large recurrent structures while avoiding training problems associated with gradient-based methods. EvoESN was evaluated on the Mackey glass system, Lorenz attractor and Monthly sunspot series. Only in the case of the sunspot dataset, EvoESN was able to achieve a distinctly good performance. In the case of the first two datasets, the performance was quite close to that in H. Jaeger et al. (add this paper to review later). An anomaly in the results is that the ESN with feedback model in H. Jaeger et al achieves a much lower performance than the ESN with feedback model trained by the authors of this paper
+
+
+<br></br>
 # ESN ensembling
 ## Adaptive Prognostic of Fuel Cells by Implementing Ensemble Echo State Networks in Time-Varying Model Space
 This paper presents an adaptive data-driven prognostic strategy for fuel cells operated in different conditions. The strategy involves extracting a health indicator by identifying linear parameter varying models in sliding data segments and formulating virtual steady-state stack voltage in the identified model space. The paper proposes using an ensemble of multiple ESN models, each with different spectral radius and leakage rate parameters, to enhance the adaptability of the prognostic. The results of each ESN model are added together to get the final result. Long-term tests on a type of low power-scale proton exchange membrane fuel cell stack in different operating modes are carried out and the performance of the proposed strategy is evaluated using the experimental data. The paper concludes that the proposed strategy can provide an adaptive prediction of remaining useful life and its confidence interval even in dynamic conditions.
@@ -150,9 +156,12 @@ This paper follows a similar approach to ours, however, one limitation is that D
 This paper presents an ensemble quadratic echo state network for non-linear spatio-temporal forecasting. A quadratic echo state network (QESN) is a modification of the basic echo state network (ESN) model that includes quadratic interactions between hidden processes and the response, as well as embeddings (lagged values) of the input. These modifications allow for more effective forecasts of non-linear spatio-temporal dynamical systems.
 Testing was performed on Lorenz 40 and a real-world example for long-lead forecasting of tropical Pacific sea surface temperature (SST), showing promising results, however, it is difficult to comment on the results obtained in this paper since the performance of the ensembled QESN model was not compared with other models
 
+<br></br>
 # Research Gaps
 - Unexplored objectives in evolutionary optimization (Memory capacity, separability, generalizability)
 - Exploration of deep ESNs in evolutionary optimization
+- In evoltionary algorithms, using crossover directly on the reservoir weights is not an effective approach (Safe mutations for deep and recurrent neural networks
+through output gradients)
 - Lack of analysis of ensembling techniques for optimizing ESN performance
 - Lack of model diversity in ensemble learners (Need to see how to measure diversity and how it impacts model performance)
 - Lack of performance data on commonly used benchmarks and comparison with baseline models
