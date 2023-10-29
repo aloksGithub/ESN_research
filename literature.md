@@ -107,7 +107,7 @@ This paper presents a growing Echo-State Network (ESN) with multiple subreservoi
 
 The GESN approach is able to achieve competitve performance compared to other approaches, however, the major advantage of GESN is that it produces an ESN that has the least complexity needed to achieve good performance. This results in GESN producing much smaller models that can be trained faster and achieve competetive results.
 
-## Evolutionary Echo State Network: Evolving Reservoirs in the Fourier Space
+## Evolutionary Echo State Network: Evolving Reservoirs in the Fourier Space **
 
 This paper presents a new computational model called EvoESN (EVOLutionary Echo State Network) that represents the reservoir weights of an Echo State Network (ESN) in the Fourier space and performs fine-tuning of these weights using genetic algorithms in the frequency domain. The reasoning for using the Fourier space to represent ESN weights is that a direct encoding (that is, a one-to-one mapping where every weight is represented in the gene) is unsuitable for large-scale networks, furthermore, naive crossover operations present deficiencies when used for combining recurrent networks. The reservoir weights are projected into the frequency domain using Discrete Cosine Transform. This approach allows for a dimensionality reduction transformation of the initial method, and enables the exploitation of the benefits of large recurrent structures while avoiding training problems associated with gradient-based methods. EvoESN was evaluated on the Mackey glass system, Lorenz attractor and Monthly sunspot series. Only in the case of the sunspot dataset, EvoESN was able to achieve a distinctly good performance. In the case of the first two datasets, the performance was quite close to that in H. Jaeger et al. (add this paper to review later). An anomaly in the results is that the ESN with feedback model in H. Jaeger et al achieves a much lower performance than the ESN with feedback model trained by the authors of this paper
 
@@ -146,7 +146,7 @@ The models used in their experiments are as follows:
 
 The simulation results obtained with real data from Madrid, Spain show that the combination of stacking ensembles and reservoir computing allows their proposed model to outperform other machine learning models considered in their benchmark.
 
-## Effective energy consumption forecasting using enhanced bagged echo state network
+## Effective energy consumption forecasting using enhanced bagged echo state network **
 
 The study proposes a new enhanced optimization model based on the bagged echo state network improved by differential evolution algorithm to estimate energy consumption. The proposed model combines the merits of three techniques which are echo state network, bagging, and differential evolution algorithm. DE is a population-based algorithm that uses mutation, crossover, and selection operations to evolve a population of candidate solutions towards an optimal solution. DE is particularly effective for solving problems with continuous variables. In this research, DE is used to optimize the reservoir size, connectivity and spectral radius. Initially, Multiple repetitions of DE are used to evolve ESNs that are then trained and ensembled using bagging. The proposed model is applied to two comparative examples and an extended application to verify its accuracy and reliability. Results of the comparative examples show that the proposed model achieves better forecasting performance compared with basic echo state network and other existing popular models.
 This paper follows a similar approach to ours, however, one limitation is that DE has to be conducted multiple times based on how many models the bagging requires. Multi-objective evolutionary algorithms can remove the need to carry out DE multiple times while also improving model diversity. The results of the paper do also show that using ensembling in combination with evolutionary algorithms leads to a better performance than using only one of the two.
@@ -160,7 +160,7 @@ Testing was performed on Lorenz 40 and a real-world example for long-lead foreca
 # Research Gaps
 - Unexplored objectives in evolutionary optimization (Memory capacity, separability, generalizability)
 - Exploration of deep ESNs in evolutionary optimization
-- In evoltionary algorithms, using crossover directly on the reservoir weights is not an effective approach (Safe mutations for deep and recurrent neural networks
+- In evolutionary algorithms, using crossover directly on the reservoir weights is not an effective approach (Safe mutations for deep and recurrent neural networks
 through output gradients)
 - Lack of analysis of ensembling techniques for optimizing ESN performance
 - Lack of model diversity in ensemble learners (Need to see how to measure diversity and how it impacts model performance)
