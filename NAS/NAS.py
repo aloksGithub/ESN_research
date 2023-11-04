@@ -15,6 +15,8 @@ from deap import base, creator, tools
 from joblib import Parallel, delayed
 import copy
 from queue import Queue
+import warnings
+warnings.filterwarnings("ignore")
 
 rpy.verbosity(0)
 output_dim = 1
@@ -140,7 +142,6 @@ def generateRandomNodeParams(nodeType):
     return params
 
 def generateRandomArchitecture(sampleX, sampleY):
-    print("TESTING")
     num_nodes = random.randint(4, 7)
 
     nodes = [
