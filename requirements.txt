@@ -1,5 +1,4 @@
 reservoirpy
 tabulate
-scikit-learn
 deap
 memory_profiler

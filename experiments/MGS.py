@@ -1,7 +1,5 @@
 import reservoirpy as rpy
 import numpy as np
-from sklearn.metrics import r2_score
-import math
 from functools import partial
 import sys
 import os
@@ -49,6 +47,13 @@ def nrmse(y_true, y_pred):
     mean_norm = np.linalg.norm(np.mean(y_true))
     return rmse / mean_norm
 
+def r_squared(y_true, y_pred):
+    y_true = np.array(y_true)
+    y_pred = np.array(y_pred)
+    numerator = np.sum((y_true - y_pred)**2)
+    denominator = np.sum((y_true - np.mean(y_true))**2)
+    return 1 - (numerator / denominator)
+
 gaParams = {
     "evaluator": partial(NAS.evaluateArchitecture, trainX=trainX, trainY=trainY, valX=valX, valY=valY),
     "generator": partial(NAS.generateRandomArchitecture, sampleX=trainX[:100], sampleY=trainY[:100]),
@@ -80,7 +85,7 @@ if __name__ == "__main__":
             prevOutput = pred
             preds.append(pred[0])
         preds = np.array(preds)
-        performance_r2 = r2_score(testY, preds)
+        performance_r2 = r_squared(testY, preds)
         print("Performance", performance_r2, nrmse(testY, preds), "Time taken", time.time() - startTime)
         nrmseErrors.append(nrmse(testY, preds))
         r2Errors.append(performance_r2)
