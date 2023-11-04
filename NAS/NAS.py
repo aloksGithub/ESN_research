@@ -15,6 +15,7 @@ from deap import base, creator, tools
 from joblib import Parallel, delayed
 import copy
 from queue import Queue
+from memory_profiler import memory_usage
 
 rpy.verbosity(0)
 output_dim = 1
@@ -139,7 +140,11 @@ def generateRandomNodeParams(nodeType):
             params[parameterName] = random.random() * (parameterRange["upper"] - parameterRange["lower"]) + parameterRange["lower"]
     return params
 
-def generateRandomArchitecture(sampleX, sampleY):
+def predict_memory_usage(func, *args, **kwargs):
+    mem_usage = memory_usage((func, args, kwargs), interval=0.05)
+    return max(mem_usage) - min(mem_usage)
+
+def generateRandomArchitecture(sampleX, sampleY, maxMemory=50):
     num_nodes = random.randint(4, 7)
 
     nodes = [
@@ -178,15 +183,6 @@ def generateRandomArchitecture(sampleX, sampleY):
                 connected_nodes.add(i)
                 break
 
-        # unconnected_nodes = list((set(range(len(nodes))) - connected_nodes) - {i})
-        # if unconnected_nodes:
-        #     additional_target = random.choice(unconnected_nodes)
-        #     if [i, additional_target] not in edges and [additional_target, i] not in edges:
-        #         edges.append([i, additional_target])
-        #         print("B", [i, additional_target], connected_nodes)
-        #         connected_nodes.add(additional_target)
-
-
     # Adding the readout node
     ipExists = False
     for node in nodes:
@@ -224,13 +220,22 @@ def generateRandomArchitecture(sampleX, sampleY):
         thread.join(30)
         if thread.is_alive():
             thread.join()
+            del model
             raise TimeoutException("")
         else:
             model = q.get()
+        pred_func = lambda: (trainModel(model, sampleX, sampleY), runModel(model, sampleX))
+
+        estimated_mem_usage = predict_memory_usage(pred_func)
+        if estimated_mem_usage > maxMemory:
+            del model
+            raise Exception("Memory error")
         model = trainModel(model, sampleX, sampleY)
         preds = runModel(model, sampleX)
         performance = nrmse(sampleY, preds)
-        if math.isnan(performance) or np.isinf(performance) or performance>100: raise Exception("Bad Model")
+        if math.isnan(performance) or np.isinf(performance) or performance>100:
+            del model
+            raise Exception("Bad Model")
         del model
         return architecture
     except:
