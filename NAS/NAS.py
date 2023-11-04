@@ -1,7 +1,7 @@
 import reservoirpy as rpy
 from reservoirpy.nodes import (Reservoir, IPReservoir, NVAR, RLS, ESN, Input)
-from Ridge_parallel import Ridge
-from LMS_serializable import LMS
+from NAS.Ridge_parallel import Ridge
+from NAS.LMS_serializable import LMS
 from reservoirpy.observables import (rmse, rsquare, nrmse, mse)
 import numpy as np
 from functools import reduce
@@ -315,55 +315,18 @@ def runModel(model, x):
         return nodePreds[output_nodes[-1]]
 
 def evaluateModel(model, trainX, trainY, valX, valY):
-    model = trainModel(model, trainX, trainY)
-    preds = runModel(model, valX)
-    return nrmse(valY, preds)
+    try:
+        model = trainModel(model, trainX, trainY)
+        preds = runModel(model, valX)
+        return nrmse(valY, preds)
+    except:
+        return np.inf
 
-def evaluateMin(individual, trainX, trainY, valX, valY, numEvals = 5, returnModel=False):
+def evaluateArchitecture(individual, trainX, trainY, valX, valY):
     performances = []
-    models = []
-    for i in range(numEvals):
-        model = constructModel(individual)
-        models.append(model)
-        try:
-            performance = evaluateModel(model, trainX, trainY, valX, valY)
-            if math.isnan(performance):
-                performances.append(np.inf)
-            else:
-                performances.append(performance)
-        except TimeoutException as e:
-            return np.inf
-        except:
-            performances.append(np.inf)
-    if returnModel:
-        model = models[performances.index(min(performances))]
-        model = trainModel(model, np.concatenate((trainX, valX), axis=0), np.concatenate((trainY, valY), axis=0))
-        return model
-    else:
-        return min(performances)
-
-def evaluateMax(individual, trainX, trainY, valX, valY, numEvals = 5, returnModel=False):
-    performances = []
-    models = []
-    for i in range(numEvals):
-        model = constructModel(individual)
-        models.append(model)
-        try:
-            performance = evaluateModel(model, trainX, trainY, valX, valY)
-            if math.isnan(performance):
-                performances.append(0)
-            else:
-                performances.append(performance)
-        except TimeoutException as e:
-            return 0
-        except:
-            performances.append(0)
-    if returnModel:
-        model = models[performances.index(max(performances))]
-        model = trainModel(model, np.concatenate((trainX, valX), axis=0), np.concatenate((trainY, valY), axis=0))
-        return model
-    else:
-        return max(performances)
+    models = [constructModel(individual) for _ in range(1)]
+    performances = [evaluateModel(model, trainX, trainY, valX, valY) for model in models]
+    return min(performances), models[performances.index(min(performances))]
 
 # Crossover function
 def crossover_one_point(ind1, ind2):
@@ -423,8 +386,9 @@ def runGA(params):
         return icls(content)
 
     def initPopulation(pcls, ind_init, individuals):
-        results = Parallel(n_jobs=5)(delayed(ind_init)(c) for c in individuals)
+        results = Parallel(n_jobs=params["n_jobs"])(delayed(ind_init)(c) for c in individuals)
         return pcls(results)
+    
     
     toolbox.register("individual", tools.initIterate, creator.Individual, params["generator"])
     toolbox.register("population", tools.initRepeat, list, toolbox.individual)
@@ -439,14 +403,16 @@ def runGA(params):
     seed_population = toolbox.population_seed()
     population = seed_population + random_population
     earlyStopReached = False
+    print("TEST123")
 
-    fitnesses = map(toolbox.evaluate, population)
+    fitnesses = Parallel(n_jobs=params["n_jobs"])(delayed(params["evaluator"])(architecture) for architecture in population)
     for ind, fitness_model in zip(population, fitnesses):
         fit, model = fitness_model
         allModels.append(model)
         allFitnesses.append(fit)
         allArchitectures.append(ind)
-        if ((fit<=params['earlyStop'] and params['minimizeFitness']) or (not params['minimizeFitness'] and fit>=params['earlyStop'])):
+        if ((fit <= params['earlyStop'] and params['minimizeFitness']) or 
+            (not params['minimizeFitness'] and fit >= params['earlyStop'])):
             earlyStopReached = True
         if params["logModels"]:
             print(fit, ind)
@@ -479,7 +445,7 @@ def runGA(params):
                 del mutant.fitness.values
 
         # Evaluate offspring
-        fitnesses = map(toolbox.evaluate, offspring)
+        fitnesses = Parallel(n_jobs=params["n_jobs"])(delayed(params["evaluator"])(architecture) for architecture in offspring)
         for ind, fitness_model in zip(offspring, fitnesses):
             fit, model = fitness_model
             allModels.append(model)
@@ -501,7 +467,7 @@ def runGA(params):
                 print("Resetting population due to stagnation")
             prevFitness = defaultFitness
             newRandomPopulation = toolbox.population(n=params["populationSize"] - 1)
-            fitnesses = map(toolbox.evaluate, newRandomPopulation)
+            fitnesses = Parallel(n_jobs=params["n_jobs"])(delayed(params["evaluator"])(architecture) for architecture in newRandomPopulation)
             for ind, fitness_model in zip(newRandomPopulation, fitnesses):
                 fit, model = fitness_model
                 allModels.append(model)
