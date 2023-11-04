@@ -140,6 +140,7 @@ def generateRandomNodeParams(nodeType):
     return params
 
 def generateRandomArchitecture(sampleX, sampleY):
+    print("TESTING")
     num_nodes = random.randint(4, 7)
 
     nodes = [
@@ -366,6 +367,9 @@ def mutate(ind):
     
     return ind
 
+def generateArchitectures(generator, n, n_jobs):
+    architectures = Parallel(n_jobs=n_jobs)(delayed(generator)() for i in range(n))
+    return architectures
 
 def runGA(params):
     defaultFitness = 0
@@ -399,7 +403,7 @@ def runGA(params):
     toolbox.register("select", tools.selBest)
     toolbox.register("evaluate", params["evaluator"])
     
-    random_population = toolbox.population(n=params["populationSize"])
+    random_population = generateArchitectures(params["generator"], params["populationSize"], params["n_jobs"])
     seed_population = toolbox.population_seed()
     population = seed_population + random_population
     earlyStopReached = False
@@ -465,7 +469,7 @@ def runGA(params):
             if params["logModels"]:
                 print("Resetting population due to stagnation")
             prevFitness = defaultFitness
-            newRandomPopulation = toolbox.population(n=params["populationSize"] - 1)
+            newRandomPopulation = generateArchitectures(params["generator"], params["populationSize"] - 1, params["n_jobs"])
             fitnesses = Parallel(n_jobs=params["n_jobs"])(delayed(params["evaluator"])(architecture) for architecture in newRandomPopulation)
             for ind, fitness_model in zip(newRandomPopulation, fitnesses):
                 fit, model = fitness_model
