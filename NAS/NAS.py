@@ -323,10 +323,13 @@ def evaluateModel(model, trainX, trainY, valX, valY):
         return np.inf
 
 def evaluateArchitecture(individual, trainX, trainY, valX, valY):
-    performances = []
-    models = [constructModel(individual) for _ in range(1)]
-    performances = [evaluateModel(model, trainX, trainY, valX, valY) for model in models]
-    return min(performances), models[performances.index(min(performances))]
+    try:
+        performances = []
+        models = [constructModel(individual) for _ in range(1)]
+        performances = [evaluateModel(model, trainX, trainY, valX, valY) for model in models]
+        return min(performances), models[performances.index(min(performances))]
+    except:
+        return np.inf, constructModel(individual)
 
 # Crossover function
 def crossover_one_point(ind1, ind2):
