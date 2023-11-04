@@ -6,6 +6,7 @@ from functools import partial
 import sys
 import os
 import warnings
+import time
 current_dir = os.path.abspath(os.path.dirname(__file__))
 parent_dir = os.path.dirname(current_dir)
 sys.path.insert(0, parent_dir)
@@ -68,6 +69,7 @@ if __name__ == "__main__":
     nrmseErrors = []
     r2Errors = []
     for i in range(1):
+        startTime = time.time()
         models, performances, architectures = NAS.runGA(gaParams)
         model = NAS.Ensemble(models[:5])
         startInput = testX[0]
@@ -79,7 +81,7 @@ if __name__ == "__main__":
             preds.append(pred[0])
         preds = np.array(preds)
         performance_r2 = r2_score(testY, preds)
-        print("Performance", performance_r2, nrmse(testY, preds))
+        print("Performance", performance_r2, nrmse(testY, preds), "Time taken", time.time() - startTime)
         nrmseErrors.append(nrmse(testY, preds))
         r2Errors.append(performance_r2)
 
