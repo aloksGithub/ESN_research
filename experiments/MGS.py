@@ -52,7 +52,7 @@ def nrmse(y_true, y_pred):
 gaParams = {
     "evaluator": partial(NAS.evaluateArchitecture, trainX=trainX, trainY=trainY, valX=valX, valY=valY),
     "generator": partial(NAS.generateRandomArchitecture, sampleX=trainX[:100], sampleY=trainY[:100]),
-    "populationSize": 24,
+    "populationSize": 6,
     "eliteSize": 1,
     "stagnationReset": 5,
     "generations": 5,
