@@ -1,2 +1,4 @@
 reservoirpy
 tabulate
+scikit-learn
+deap
