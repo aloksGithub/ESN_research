@@ -403,7 +403,6 @@ def runGA(params):
     seed_population = toolbox.population_seed()
     population = seed_population + random_population
     earlyStopReached = False
-    print("TEST123")
 
     fitnesses = Parallel(n_jobs=params["n_jobs"])(delayed(params["evaluator"])(architecture) for architecture in population)
     for ind, fitness_model in zip(population, fitnesses):

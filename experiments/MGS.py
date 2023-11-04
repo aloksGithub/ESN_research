@@ -56,12 +56,12 @@ gaParams = {
     "stagnationReset": 5,
     "generations": 3,
     "minimizeFitness": True,
-    "logModels": True,
+    "logModels": False,
     "seedModels": [],
     "crossoverProbability": 0.7,
     "mutationProbability": 0.2,
     "earlyStop": 0,
-    "n_jobs": 5
+    "n_jobs": -1
 }
 
 if __name__ == "__main__":
