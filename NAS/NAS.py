@@ -15,7 +15,6 @@ from deap import base, creator, tools
 from joblib import Parallel, delayed
 import copy
 from queue import Queue
-from memory_profiler import memory_usage
 
 rpy.verbosity(0)
 output_dim = 1
@@ -140,11 +139,7 @@ def generateRandomNodeParams(nodeType):
             params[parameterName] = random.random() * (parameterRange["upper"] - parameterRange["lower"]) + parameterRange["lower"]
     return params
 
-def predict_memory_usage(func, *args, **kwargs):
-    mem_usage = memory_usage((func, args, kwargs), interval=0.05)
-    return max(mem_usage) - min(mem_usage)
-
-def generateRandomArchitecture(sampleX, sampleY, maxMemory=50):
+def generateRandomArchitecture(sampleX, sampleY):
     num_nodes = random.randint(4, 7)
 
     nodes = [
@@ -183,6 +178,15 @@ def generateRandomArchitecture(sampleX, sampleY, maxMemory=50):
                 connected_nodes.add(i)
                 break
 
+        # unconnected_nodes = list((set(range(len(nodes))) - connected_nodes) - {i})
+        # if unconnected_nodes:
+        #     additional_target = random.choice(unconnected_nodes)
+        #     if [i, additional_target] not in edges and [additional_target, i] not in edges:
+        #         edges.append([i, additional_target])
+        #         print("B", [i, additional_target], connected_nodes)
+        #         connected_nodes.add(additional_target)
+
+
     # Adding the readout node
     ipExists = False
     for node in nodes:
@@ -220,23 +224,13 @@ def generateRandomArchitecture(sampleX, sampleY, maxMemory=50):
         thread.join(30)
         if thread.is_alive():
             thread.join()
-            del model
             raise TimeoutException("")
         else:
             model = q.get()
-        print("CHECK123")
-        # pred_func = lambda: (trainModel(model, sampleX, sampleY), runModel(model, sampleX))
-
-        # estimated_mem_usage = predict_memory_usage(pred_func)
-        # if estimated_mem_usage > maxMemory:
-        #     del model
-        #     raise Exception("Memory error")
         model = trainModel(model, sampleX, sampleY)
         preds = runModel(model, sampleX)
         performance = nrmse(sampleY, preds)
-        if math.isnan(performance) or np.isinf(performance) or performance>100:
-            del model
-            raise Exception("Bad Model")
+        if math.isnan(performance) or np.isinf(performance) or performance>100: raise Exception("Bad Model")
         del model
         return architecture
     except:
@@ -329,13 +323,10 @@ def evaluateModel(model, trainX, trainY, valX, valY):
         return np.inf
 
 def evaluateArchitecture(individual, trainX, trainY, valX, valY):
-    try:
-        performances = []
-        models = [constructModel(individual) for _ in range(1)]
-        performances = [evaluateModel(model, trainX, trainY, valX, valY) for model in models]
-        return min(performances), models[performances.index(min(performances))]
-    except:
-        return np.inf, constructModel(individual)
+    performances = []
+    models = [constructModel(individual) for _ in range(1)]
+    performances = [evaluateModel(model, trainX, trainY, valX, valY) for model in models]
+    return min(performances), models[performances.index(min(performances))]
 
 # Crossover function
 def crossover_one_point(ind1, ind2):
