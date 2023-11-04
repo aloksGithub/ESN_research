@@ -403,7 +403,7 @@ def runGA(params):
     toolbox.register("select", tools.selBest)
     toolbox.register("evaluate", params["evaluator"])
     
-    random_population = generateArchitectures(params["generator"], params["populationSize"], params["n_jobs"])
+    random_population = [creator.Individual(individual) for individual in  generateArchitectures(params["generator"], params["populationSize"], params["n_jobs"])]
     seed_population = toolbox.population_seed()
     population = seed_population + random_population
     earlyStopReached = False
@@ -469,7 +469,7 @@ def runGA(params):
             if params["logModels"]:
                 print("Resetting population due to stagnation")
             prevFitness = defaultFitness
-            newRandomPopulation = generateArchitectures(params["generator"], params["populationSize"] - 1, params["n_jobs"])
+            newRandomPopulation = [creator.Individual(individual) for individual in  generateArchitectures(params["generator"], params["populationSize"] - 1, params["n_jobs"])]
             fitnesses = Parallel(n_jobs=params["n_jobs"])(delayed(params["evaluator"])(architecture) for architecture in newRandomPopulation)
             for ind, fitness_model in zip(newRandomPopulation, fitnesses):
                 fit, model = fitness_model
