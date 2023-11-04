@@ -224,12 +224,13 @@ def generateRandomArchitecture(sampleX, sampleY, maxMemory=50):
             raise TimeoutException("")
         else:
             model = q.get()
-        pred_func = lambda: (trainModel(model, sampleX, sampleY), runModel(model, sampleX))
+        print("CHECK123")
+        # pred_func = lambda: (trainModel(model, sampleX, sampleY), runModel(model, sampleX))
 
-        estimated_mem_usage = predict_memory_usage(pred_func)
-        if estimated_mem_usage > maxMemory:
-            del model
-            raise Exception("Memory error")
+        # estimated_mem_usage = predict_memory_usage(pred_func)
+        # if estimated_mem_usage > maxMemory:
+        #     del model
+        #     raise Exception("Memory error")
         model = trainModel(model, sampleX, sampleY)
         preds = runModel(model, sampleX)
         performance = nrmse(sampleY, preds)
