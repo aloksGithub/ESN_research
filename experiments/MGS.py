@@ -62,7 +62,7 @@ gaParams = {
     "stagnationReset": 5,
     "generations": 5,
     "minimizeFitness": True,
-    "logModels": False,
+    "logModels": True,
     "seedModels": [],
     "crossoverProbability": 0.7,
     "mutationProbability": 0.2,
