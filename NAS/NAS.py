@@ -1,5 +1,5 @@
 import reservoirpy as rpy
-from reservoirpy.nodes import (Reservoir, IPReservoir, NVAR, RLS, ESN, Input)
+from reservoirpy.nodes import (Reservoir, IPReservoir, NVAR, RLS, Input)
 from NAS.Ridge_parallel import Ridge
 from NAS.LMS_serializable import LMS
 from reservoirpy.observables import (rmse, rsquare, nrmse, mse)

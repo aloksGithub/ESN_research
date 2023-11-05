@@ -18,15 +18,13 @@ def _solve_ridge(XXT, YXT, ridge):
 
 
 def _accumulate(readout, xxt, yxt):
-    """Aggregate Xi.Xi^T and Yi.Xi^T matrices from a state sequence i."""
     XXT = readout.get_buffer("XXT")
     YXT = readout.get_buffer("YXT")
     XXT += xxt
     YXT += yxt
 
 
-def partial_backward(readout: Node, X_batch, Y_batch=None, lock=None):
-    """Pre-compute XXt and YXt before final fit."""
+def partial_backward(readout: Node, X_batch, Y_batch=None):
     X, Y = _prepare_inputs_for_learning(
         X_batch,
         Y_batch,
@@ -36,15 +34,7 @@ def partial_backward(readout: Node, X_batch, Y_batch=None, lock=None):
 
     xxt = X.T.dot(X)
     yxt = Y.T.dot(X)
-
-    if lock is not None:
-        # This is not thread-safe using Numpy memmap as buffers
-        # ok for parallelization then with a lock (see ESN object)
-        with lock:
-            _accumulate(readout, xxt, yxt)
-    else:
-        _accumulate(readout, xxt, yxt)
-
+    _accumulate(readout, xxt, yxt)
 
 def backward(readout: Node, *args, **kwargs):
     ridge = readout.ridge
@@ -75,19 +65,16 @@ def initialize(readout: Node, x=None, y=None, bias_init=None, Wout_init=None):
 
 
 def initialize_buffers(readout):
-    """create memmaped buffers for matrices X.X^T and Y.X^T pre-computed
-    in parallel for ridge regression
-    ! only memmap can be used ! Impossible to share Numpy arrays with
-    different processes in r/w mode otherwise (with proper locking)
-    """
     input_dim = readout.input_dim
     output_dim = readout.output_dim
 
     if readout.input_bias:
         input_dim += 1
 
-    readout.create_buffer("XXT", (input_dim, input_dim))
-    readout.create_buffer("YXT", (output_dim, input_dim))
+    # Create regular numpy arrays instead of memmapped buffers
+    readout._buffers["XXT"] = np.zeros((input_dim, input_dim), dtype=global_dtype)
+    readout._buffers["YXT"] = np.zeros((output_dim, input_dim), dtype=global_dtype)
+
 
 
 class Ridge(Node):

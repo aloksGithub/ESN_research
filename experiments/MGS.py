@@ -60,7 +60,7 @@ gaParams = {
     "populationSize": 25,
     "eliteSize": 1,
     "stagnationReset": 5,
-    "generations": 10,
+    "generations": 5,
     "minimizeFitness": True,
     "logModels": True,
     "seedModels": [],
