@@ -62,7 +62,7 @@ gaParams = {
     "stagnationReset": 5,
     "generations": 5,
     "minimizeFitness": True,
-    "logModels": True,
+    "logModels": False,
     "seedModels": [],
     "crossoverProbability": 0.7,
     "mutationProbability": 0.2,
@@ -76,7 +76,7 @@ if __name__ == "__main__":
     for i in range(1):
         startTime = time.time()
         models, performances, architectures = NAS.runGA(gaParams)
-        model = models[0]
+        model = NAS.Ensemble(models[:5])
         startInput = testX[0]
         prevOutput = testX[0]
         preds = []
