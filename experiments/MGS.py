@@ -57,17 +57,17 @@ def r_squared(y_true, y_pred):
 gaParams = {
     "evaluator": partial(NAS.evaluateArchitecture, trainX=trainX, trainY=trainY, valX=valX, valY=valY),
     "generator": partial(NAS.generateRandomArchitecture, sampleX=trainX[:100], sampleY=trainY[:100]),
-    "populationSize": 6,
+    "populationSize": 25,
     "eliteSize": 1,
     "stagnationReset": 5,
-    "generations": 5,
+    "generations": 10,
     "minimizeFitness": True,
-    "logModels": True,
+    "logModels": False,
     "seedModels": [],
     "crossoverProbability": 0.7,
     "mutationProbability": 0.2,
     "earlyStop": 0,
-    "n_jobs": 6
+    "n_jobs": 25
 }
 
 if __name__ == "__main__":
@@ -76,7 +76,7 @@ if __name__ == "__main__":
     for i in range(1):
         startTime = time.time()
         models, performances, architectures = NAS.runGA(gaParams)
-        model = NAS.Ensemble(models[:5])
+        model = models[0]
         startInput = testX[0]
         prevOutput = testX[0]
         preds = []
