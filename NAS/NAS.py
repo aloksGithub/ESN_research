@@ -326,7 +326,7 @@ def evaluateModel(model, trainX, trainY, valX, valY):
 
 def evaluateArchitecture(individual, trainX, trainY, valX, valY):
     performances = []
-    models = [constructModel(individual) for _ in range(1)]
+    models = [constructModel(individual) for _ in range(3)]
     performances = [evaluateModel(model, trainX, trainY, valX, valY) for model in models]
     return min(performances), models[performances.index(min(performances))]
 
