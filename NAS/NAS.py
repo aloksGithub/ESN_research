@@ -15,6 +15,7 @@ from deap import base, creator, tools
 from joblib import Parallel, delayed
 import copy
 from queue import Queue
+import queue
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -219,23 +220,10 @@ def generateRandomArchitecture(sampleX, sampleY):
     # Try to run the model on a small sample to see if it is a valid network
     # Otherwise generate a new architecture
     try:
-        model = constructModel(architecture)
-        q = Queue()
-        thread = threading.Thread(target=trainUnderTime, args=(q, model, sampleX, sampleY))
-        thread.start()
-        thread.join(30)
-        if thread.is_alive():
-            thread.join()
-            raise TimeoutException("")
-        else:
-            model = q.get()
-        model = trainModel(model, sampleX, sampleY)
-        preds = runModel(model, sampleX)
-        performance = nrmse(sampleY, preds)
+        performance, _ = evaluateArchitecture(architecture, sampleX, sampleY, sampleX, sampleY, 1, 40)
         if math.isnan(performance) or np.isinf(performance) or performance>100: raise Exception("Bad Model")
-        del model
         return architecture
-    except:
+    except Exception as e:
         return generateRandomArchitecture(sampleX, sampleY)
 
 def constructModel(architecture):
@@ -324,10 +312,28 @@ def evaluateModel(model, trainX, trainY, valX, valY):
     except:
         return np.inf
 
-def evaluateArchitecture(individual, trainX, trainY, valX, valY):
+def evaluateArchitecture(individual, trainX, trainY, valX, valY, numEvals=3, timeout=40):
+    q = queue.Queue()
+
+    def work():
+        model = constructModel(individual)
+        performance = evaluateModel(model, trainX, trainY, valX, valY)
+        q.put([performance, model])
+
     performances = []
-    models = [constructModel(individual) for _ in range(3)]
-    performances = [evaluateModel(model, trainX, trainY, valX, valY) for model in models]
+    models = []
+    for _ in range(numEvals):
+        thread = threading.Thread(target=work)
+        thread.start()
+        thread.join(timeout=timeout)
+        if thread.is_alive():
+            performances.append(np.inf)
+            models.append(constructModel(individual))
+        else:
+            result = q.get()
+            performance, model = result[0], result[1]
+            performances.append(performance)
+            models.append(model)
     return min(performances), models[performances.index(min(performances))]
 
 # Crossover function
