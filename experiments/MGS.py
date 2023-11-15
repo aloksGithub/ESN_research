@@ -75,7 +75,7 @@ gaParams = {
 if __name__ == "__main__":
     nrmseErrors = []
     r2Errors = []
-    for i in range(5):
+    for i in range(20):
         startTime = time.time()
         models, performances, architectures = NAS.runGA(gaParams)
         model = NAS.Ensemble([NAS.constructModel(architectures[0]) for _ in range(5)])
