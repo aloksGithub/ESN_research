@@ -56,28 +56,31 @@ def r_squared(y_true, y_pred):
 
 gaParams = {
     "evaluator": partial(NAS.evaluateArchitecture, trainX=trainX, trainY=trainY, valX=valX, valY=valY),
-    "generator": partial(NAS.generateRandomArchitecture, sampleX=trainX[:100], sampleY=trainY[:100]),
-    "populationSize": 25,
+    "generator": partial(NAS.generateRandomArchitecture, sampleX=trainX, sampleY=trainY),
+    "populationSize": 5,
     "eliteSize": 1,
     "stagnationReset": 5,
     "generations": 5,
     "minimizeFitness": True,
-    "logModels": True,
-    "seedModels": [],
+    "logModels": False,
+    "seedModels": [
+        {'nodes': [{'type': 'Input', 'params': {}}, {'type': 'Reservoir', 'params': {'units': 2048, 'rc_connectivity': 0.44, 'input_connectivity': 0.44, 'fb_connectivity': 0.44, 'lr': 0.68, 'sr': 1.406}}, {'type': 'Ridge', 'params': {'output_dim': 1, 'ridge': 6.0e-07}}], 'edges': [[0, 1], [1, 2]]}
+    ],
     "crossoverProbability": 0.7,
     "mutationProbability": 0.2,
     "earlyStop": 0,
-    "n_jobs": 25
+    "n_jobs": 5
 }
 
 if __name__ == "__main__":
     nrmseErrors = []
     r2Errors = []
-    for i in range(1):
+    for i in range(5):
         startTime = time.time()
         models, performances, architectures = NAS.runGA(gaParams)
-        model = NAS.Ensemble(models[:5])
-        startInput = testX[0]
+        model = NAS.Ensemble([NAS.constructModel(architectures[0]) for _ in range(5)])
+        model.train(np.concatenate([trainX, valX]), np.concatenate([trainY, valY]))
+        NAS.runModel(model, valX[-100:])
         prevOutput = testX[0]
         preds = []
         for j in range(len(testX)):

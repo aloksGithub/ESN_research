@@ -2,7 +2,7 @@ import reservoirpy as rpy
 from reservoirpy.nodes import (Reservoir, IPReservoir, NVAR, RLS, Input)
 from NAS.Ridge_parallel import Ridge
 from NAS.LMS_serializable import LMS
-from reservoirpy.observables import (rmse, rsquare, nrmse, mse)
+# from reservoirpy.observables import (rmse, rsquare, nrmse, mse)
 import numpy as np
 from functools import reduce
 import random
@@ -303,6 +303,27 @@ def runModel(model, x):
         return nodePreds
     else:
         return nodePreds[output_nodes[-1]]
+    
+def evaluateModelAutoRegressive(model, trainX, trainY, valX, valY):
+    try:
+        model = trainModel(model, trainX, trainY)
+        prevOutput = valX[0]
+        preds = []
+        for _ in range(len(valX)):
+            pred = runModel(model, prevOutput)
+            prevOutput = pred
+            preds.append(pred[0])
+        preds = np.array(preds)
+        return nrmse(valY, preds)
+    except:
+        return np.inf
+
+def nrmse(y_true, y_pred):
+    y_true = np.array(y_true)
+    y_pred = np.array(y_pred)
+    rmse = np.sqrt(np.mean((y_true - y_pred)**2))
+    mean_norm = np.linalg.norm(np.mean(y_true))
+    return rmse / mean_norm
 
 def evaluateModel(model, trainX, trainY, valX, valY):
     try:
@@ -327,14 +348,16 @@ def evaluateArchitecture(individual, trainX, trainY, valX, valY, numEvals=3, tim
         thread.start()
         thread.join(timeout=timeout)
         if thread.is_alive():
-            performances.append(np.inf)
-            models.append(constructModel(individual))
+            continue
         else:
             result = q.get()
             performance, model = result[0], result[1]
             performances.append(performance)
             models.append(model)
-    return min(performances), models[performances.index(min(performances))]
+    if len(performances)>0:
+        return sum(performances)/len(performances), models[performances.index(min(performances))]
+    else:
+        return np.inf, constructModel(individual)
 
 # Crossover function
 def crossover_one_point(ind1, ind2):
@@ -410,8 +433,8 @@ def runGA(params):
     toolbox.register("select", tools.selBest)
     toolbox.register("evaluate", params["evaluator"])
     
-    random_population = [creator.Individual(individual) for individual in  generateArchitectures(params["generator"], params["populationSize"], params["n_jobs"])]
-    seed_population = toolbox.population_seed()
+    random_population = [creator.Individual(individual) for individual in  generateArchitectures(params["generator"], params["populationSize"] - len(params["seedModels"]), params["n_jobs"])]
+    seed_population = [creator.Individual(individual) for individual in params["seedModels"]]
     population = seed_population + random_population
     earlyStopReached = False
 
