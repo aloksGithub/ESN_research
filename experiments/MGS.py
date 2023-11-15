@@ -57,7 +57,7 @@ def r_squared(y_true, y_pred):
 gaParams = {
     "evaluator": partial(NAS.evaluateArchitecture, trainX=trainX, trainY=trainY, valX=valX, valY=valY),
     "generator": partial(NAS.generateRandomArchitecture, sampleX=trainX, sampleY=trainY),
-    "populationSize": 5,
+    "populationSize": 25,
     "eliteSize": 1,
     "stagnationReset": 5,
     "generations": 5,
@@ -69,7 +69,7 @@ gaParams = {
     "crossoverProbability": 0.7,
     "mutationProbability": 0.2,
     "earlyStop": 0,
-    "n_jobs": 5
+    "n_jobs": 25
 }
 
 if __name__ == "__main__":
