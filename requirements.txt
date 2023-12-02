@@ -2,3 +2,4 @@ reservoirpy
 tabulate
 deap
 memory_profiler
+numpy==1.22.4

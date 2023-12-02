@@ -2,7 +2,7 @@ import reservoirpy as rpy
 from reservoirpy.nodes import (Reservoir, IPReservoir, NVAR, RLS, Input)
 from NAS.Ridge_parallel import Ridge
 from NAS.LMS_serializable import LMS
-# from reservoirpy.observables import (rmse, rsquare, nrmse, mse)
+from reservoirpy.observables import (rmse, rsquare, nrmse, mse)
 import numpy as np
 from functools import reduce
 import random
@@ -303,6 +303,16 @@ def runModel(model, x):
         return nodePreds
     else:
         return nodePreds[output_nodes[-1]]
+
+
+def nrmse2(y_true, y_pred):
+    y_true = np.array(y_true)
+    y_pred = np.array(y_pred)
+    
+    rmse = np.sqrt(np.mean((y_true - y_pred)**2))
+    mean_norm = np.linalg.norm(np.mean(y_true))
+    
+    return rmse / mean_norm
     
 def evaluateModelAutoRegressive(model, trainX, trainY, valX, valY):
     try:
@@ -314,16 +324,9 @@ def evaluateModelAutoRegressive(model, trainX, trainY, valX, valY):
             prevOutput = pred
             preds.append(pred[0])
         preds = np.array(preds)
-        return nrmse(valY, preds)
+        return nrmse2(valY, preds)
     except:
         return np.inf
-
-def nrmse(y_true, y_pred):
-    y_true = np.array(y_true)
-    y_pred = np.array(y_pred)
-    rmse = np.sqrt(np.mean((y_true - y_pred)**2))
-    mean_norm = np.linalg.norm(np.mean(y_true))
-    return rmse / mean_norm
 
 def evaluateModel(model, trainX, trainY, valX, valY):
     try:
@@ -338,7 +341,7 @@ def evaluateArchitecture(individual, trainX, trainY, valX, valY, numEvals=5, tim
 
     def work():
         model = constructModel(individual)
-        performance = evaluateModel(model, trainX, trainY, valX, valY)
+        performance = evaluateModelAutoRegressive(model, trainX, trainY, valX, valY)
         q.put([performance, model])
 
     performances = []
@@ -521,7 +524,7 @@ def runGA(params):
     else:
         sorted_data = sorted(paired_data, key=lambda x: x[1], reverse=False)
     
-    for i in range(len(sorted_data)-1, 1, -1):
+    for i in range(len(sorted_data)-1, 0, -1):
         model, performance, architecture = sorted_data[i]
         modelCopy = copy.deepcopy(model)
         try:

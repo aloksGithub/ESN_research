@@ -20,16 +20,11 @@ output_dim = 1
 # Mackey glass dataset
 
 def getData():
-    data = np.load('./data/MG17.npy')
-    data = data.reshape((data.shape[0],1))
-    data = data[:2801,:]
-    from scipy import stats
-    data = stats.zscore(data)
-    data.shape
+    data = np.load('./data/Lorenz_normed_2801.npy')
 
-    trainLen = 1800
-    valLen = 300
-    testLen = 286
+    trainLen = 1957
+    valLen = 399
+    testLen = 444
     train_in = data[0:trainLen]
     train_out = data[0+1:trainLen+1]
     val_in = data[trainLen:trainLen+valLen]
@@ -73,7 +68,7 @@ gaParams = {
 if __name__ == "__main__":
     nrmseErrors = []
     r2Errors = []
-    for i in range(20):
+    for i in range(5):
         startTime = time.time()
         models, performances, architectures = NAS.runGA(gaParams)
         model = NAS.Ensemble([NAS.constructModel(architectures[0]) for _ in range(5)])
