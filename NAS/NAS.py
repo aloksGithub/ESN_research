@@ -143,7 +143,7 @@ def generateRandomNodeParams(nodeType):
     return params
 
 def generateRandomArchitecture(sampleX, sampleY):
-    num_nodes = random.randint(4, 7)
+    num_nodes = random.randint(2, 7)
 
     nodes = [
         {"type": "Input", "params": {}}
@@ -220,7 +220,7 @@ def generateRandomArchitecture(sampleX, sampleY):
     # Try to run the model on a small sample to see if it is a valid network
     # Otherwise generate a new architecture
     try:
-        performance, _ = evaluateArchitecture(architecture, sampleX, sampleY, sampleX, sampleY, 1, 40)
+        performance, _ = evaluateArchitecture(architecture, sampleX, sampleY, sampleX, sampleY, 1, 1)
         if math.isnan(performance) or np.isinf(performance) or performance>100: raise Exception("Bad Model")
         return architecture
     except Exception as e:
@@ -336,7 +336,7 @@ def evaluateModel(model, trainX, trainY, valX, valY):
     except:
         return np.inf
 
-def evaluateArchitecture(individual, trainX, trainY, valX, valY, numEvals=5, timeout=40):
+def evaluateArchitecture(individual, trainX, trainY, valX, valY, numEvals=5, timeout=60):
     q = queue.Queue()
 
     def work():
@@ -351,16 +351,17 @@ def evaluateArchitecture(individual, trainX, trainY, valX, valY, numEvals=5, tim
         thread.start()
         thread.join(timeout=timeout)
         if thread.is_alive():
-            continue
+            performances.append(np.inf)
+            models.append(constructModel(individual))
         else:
             result = q.get()
             performance, model = result[0], result[1]
-            performances.append(performance)
+            if math.isnan(performance):
+                performances.append(np.inf)
+            else:
+                performances.append(performance)
             models.append(model)
-    if len(performances)>0:
-        return sum(performances)/len(performances), models[performances.index(min(performances))]
-    else:
-        return np.inf, constructModel(individual)
+    return min(performances), models[performances.index(min(performances))]
 
 # Crossover function
 def crossover_one_point(ind1, ind2):
@@ -525,24 +526,33 @@ def runGA(params):
         sorted_data = sorted(paired_data, key=lambda x: x[1], reverse=False)
     
     for i in range(len(sorted_data)-1, 0, -1):
-        model, performance, architecture = sorted_data[i]
-        modelCopy = copy.deepcopy(model)
-        try:
-            randomData = np.random.rand(100, sorted_data[0][0].nodes[0].input_dim)
-            modelPreds = runModel(modelCopy, randomData)
-        except:
+        _, performance, architecture = sorted_data[i]
+        if (params["minimizeFitness"] and performance>100) or (not params["minimizeFitness"] and performance<=0):
             del sorted_data[i]
-            break
-        for data in sorted_data[:i-1]:
-            betterModel, betterPerformance, betterArchitecture = data
-            try:
-                betterModelCopy = copy.deepcopy(betterModel)
-                betterModelPreds = runModel(betterModelCopy, randomData)
-                if betterArchitecture==architecture or betterPerformance==performance or modelPreds.shape[1]!=output_dim or nrmse(betterModelPreds, modelPreds)<0.05:
-                    del sorted_data[i]
-                    break
-            except:
-                pass
+            continue
+        # try:
+        #     model1 = constructModel(architecture)
+        #     randomData = np.random.rand(100, sorted_data[0][0].nodes[0].input_dim)
+        #     randomOutput = np.random.rand(100, output_dim)
+        #     model1 = trainModel(model1, randomData, randomOutput)
+        #     modelPreds = runModel(model1, randomData)
+        # except:
+        #     del sorted_data[i]
+        #     continue
+        for data in sorted_data[:i]:
+            _, betterPerformance, betterArchitecture = data
+            if betterArchitecture==architecture or betterPerformance==performance:
+                del sorted_data[i]
+                break
+            # try:
+            #     model2 = constructModel(betterArchitecture)
+            #     model2 = trainModel(model2, randomData, randomOutput)
+            #     betterModelPreds = runModel(model2, randomData)
+            #     if modelPreds.shape[1]!=output_dim or np.all(betterModelPreds==modelPreds):
+            #         del sorted_data[i]
+            #         break
+            # except:
+            #     pass
     bestModels = [model for model, _, _ in sorted_data]
     performances = [performance for _, performance, _ in sorted_data]
     sortedArchitectures = [architecture for _, _, architecture in sorted_data]

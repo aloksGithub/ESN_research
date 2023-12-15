@@ -22,13 +22,13 @@ output_dim = 1
 def getData():
     data = np.load('./data/MG17.npy')
     data = data.reshape((data.shape[0],1))
-    data = data[:2801,:]
+    data = data[:3801,:]
     from scipy import stats
     data = stats.zscore(data)
     data.shape
 
-    trainLen = 1800
-    valLen = 300
+    trainLen = 2814
+    valLen = 286
     testLen = 286
     train_in = data[0:trainLen]
     train_out = data[0+1:trainLen+1]
@@ -56,40 +56,41 @@ def r_squared(y_true, y_pred):
 
 gaParams = {
     "evaluator": partial(NAS.evaluateArchitecture, trainX=trainX, trainY=trainY, valX=valX, valY=valY),
-    "generator": partial(NAS.generateRandomArchitecture, sampleX=trainX, sampleY=trainY),
+    "generator": partial(NAS.generateRandomArchitecture, sampleX=trainX[:2], sampleY=trainY[:2]),
     "populationSize": 15,
     "eliteSize": 1,
     "stagnationReset": 5,
     "generations": 5,
     "minimizeFitness": True,
     "logModels": False,
-    "seedModels": [],
+    "seedModels": [
+        # {'nodes': [{'type': 'Input', 'params': {}}, {'type': 'Reservoir', 'params': {'units': 2048, 'input_connectivity': 0.44, 'rc_connectivity': 0.44, 'fb_connectivity': 0.44, 'sr': 1.406, 'lr': 0.68}}, {'type': 'Ridge', 'params': {'output_dim': 1, 'ridge': 6.0e-7}}, ], 'edges': [[0, 1], [1, 2]]}
+    ],
     "crossoverProbability": 0.7,
     "mutationProbability": 0.2,
     "earlyStop": 0,
     "n_jobs": 5
 }
 
-if __name__ == "__main__":
-    nrmseErrors = []
-    r2Errors = []
-    for i in range(20):
-        startTime = time.time()
-        models, performances, architectures = NAS.runGA(gaParams)
-        model = NAS.Ensemble([NAS.constructModel(architectures[0]) for _ in range(5)])
-        model.train(np.concatenate([trainX, valX]), np.concatenate([trainY, valY]))
-        NAS.runModel(model, valX[-100:])
-        prevOutput = testX[0]
-        preds = []
-        for j in range(len(testX)):
-            pred = NAS.runModel(model, prevOutput)
-            prevOutput = pred
-            preds.append(pred[0])
-        preds = np.array(preds)
-        performance_r2 = r_squared(testY, preds)
-        print("Performance", performance_r2, nrmse(testY, preds), "Time taken", time.time() - startTime)
-        nrmseErrors.append(nrmse(testY, preds))
-        r2Errors.append(performance_r2)
+nrmseErrors = []
+r2Errors = []
+for i in range(1):
+    models, performances, architectures = NAS.runGA(gaParams)
+    print(performances[:5])
+    model = models[0]
+    NAS.runModel(model, valX)
+    startInput = testX[0]
+    prevOutput = testX[0]
+    preds = []
+    for j in range(len(testX)):
+        pred = NAS.runModel(model, prevOutput)
+        prevOutput = pred
+        preds.append(pred[0])
+    preds = np.array(preds)
+    performance = r_squared(testY, preds)
+    print("Performance", performance, nrmse(testY, preds))
+    nrmseErrors.append(nrmse(testY, preds))
+    r2Errors.append(performance)
 
-    print(np.array(nrmseErrors).mean(), np.array(nrmseErrors).std())
-    print(np.array(r2Errors).mean(), np.array(r2Errors).std())
+print(np.array(nrmseErrors).mean(), np.array(nrmseErrors).std())
+print(np.array(r2Errors).mean(), np.array(r2Errors).std())
