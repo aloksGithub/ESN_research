@@ -143,7 +143,7 @@ def generateRandomNodeParams(nodeType):
     return params
 
 def generateRandomArchitecture(sampleX, sampleY):
-    num_nodes = random.randint(2, 7)
+    num_nodes = random.randint(4, 7)
 
     nodes = [
         {"type": "Input", "params": {}}

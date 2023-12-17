@@ -27,7 +27,7 @@ def getData():
     data = stats.zscore(data)
     data.shape
 
-    trainLen = 1100
+    trainLen = 3100
     valLen = 286
     testLen = 286
     train_in = data[0:trainLen]
@@ -62,7 +62,7 @@ gaParams = {
     "stagnationReset": 5,
     "generations": 20,
     "minimizeFitness": True,
-    "logModels": False,
+    "logModels": True,
     "seedModels": [],
     "crossoverProbability": 0.7,
     "mutationProbability": 0.2,
