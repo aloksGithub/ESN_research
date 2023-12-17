@@ -341,7 +341,7 @@ def evaluateArchitecture(individual, trainX, trainY, valX, valY, numEvals=3, tim
 
     def work():
         model = constructModel(individual)
-        performance = evaluateModelAutoRegressive(model, trainX, trainY, valX, valY)
+        performance = evaluateModel(model, trainX, trainY, valX, valY)
         q.put([performance, model])
 
     performances = []
