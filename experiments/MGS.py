@@ -27,7 +27,7 @@ def getData():
     data = stats.zscore(data)
     data.shape
 
-    trainLen = 2814
+    trainLen = 1100
     valLen = 286
     testLen = 286
     train_in = data[0:trainLen]
@@ -60,37 +60,45 @@ gaParams = {
     "populationSize": 15,
     "eliteSize": 1,
     "stagnationReset": 5,
-    "generations": 5,
+    "generations": 20,
     "minimizeFitness": True,
     "logModels": False,
-    "seedModels": [
-        # {'nodes': [{'type': 'Input', 'params': {}}, {'type': 'Reservoir', 'params': {'units': 2048, 'input_connectivity': 0.44, 'rc_connectivity': 0.44, 'fb_connectivity': 0.44, 'sr': 1.406, 'lr': 0.68}}, {'type': 'Ridge', 'params': {'output_dim': 1, 'ridge': 6.0e-7}}, ], 'edges': [[0, 1], [1, 2]]}
-    ],
+    "seedModels": [],
     "crossoverProbability": 0.7,
     "mutationProbability": 0.2,
     "earlyStop": 0,
-    "n_jobs": 5
+    "n_jobs": 15
 }
 
-nrmseErrors = []
-r2Errors = []
-for i in range(1):
-    models, performances, architectures = NAS.runGA(gaParams)
-    print(performances[:5])
-    model = models[0]
-    NAS.runModel(model, valX)
-    startInput = testX[0]
-    prevOutput = testX[0]
-    preds = []
-    for j in range(len(testX)):
-        pred = NAS.runModel(model, prevOutput)
-        prevOutput = pred
-        preds.append(pred[0])
-    preds = np.array(preds)
-    performance = r_squared(testY, preds)
-    print("Performance", performance, nrmse(testY, preds))
-    nrmseErrors.append(nrmse(testY, preds))
-    r2Errors.append(performance)
+if __name__ == "__main__":
+    nrmseErrors = []
+    r2Errors = []
+    for i in range(20):
+        models, performances, architectures = NAS.runGA(gaParams)
+        allPreds = []
+        for architecture in architectures[:5]:
+            for _ in range(10):
+                model = NAS.constructModel(architecture)
+                model = NAS.trainModel(model, np.concatenate([trainX, valX[:-20]]), np.concatenate([trainY, valY[:-20]]))
+                prevOutput = valX[-20]
+                preds = []
+                for j in range(20+len(testX)):
+                    pred = NAS.runModel(model, prevOutput)
+                    prevOutput = pred
+                    preds.append(pred[0])
+                preds = np.array(preds)
+                allPreds.append(preds)
+        valErrors = []
+        for pred in allPreds:
+            valError = nrmse(valY[-20:], pred[:20])
+            error = nrmse(testY, pred[-len(testY):])
+            valErrors.append(valError)
+        bestPred = allPreds[valErrors.index(min(valErrors))]
+        print(performances[0:5], min(valErrors), nrmse(testY, bestPred[-len(testY):]), r_squared(testY, bestPred[-len(testY):]))
+        if min(valErrors)>0.0003:
+            continue
+        nrmseErrors.append(nrmse(testY, bestPred[-len(testY):]))
+        r2Errors.append(r_squared(testY, bestPred[-len(testY):]))
 
-print(np.array(nrmseErrors).mean(), np.array(nrmseErrors).std())
-print(np.array(r2Errors).mean(), np.array(r2Errors).std())
+    print(np.array(nrmseErrors).mean(), np.array(nrmseErrors).std())
+    print(np.array(r2Errors).mean(), np.array(r2Errors).std())

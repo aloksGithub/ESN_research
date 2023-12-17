@@ -336,7 +336,7 @@ def evaluateModel(model, trainX, trainY, valX, valY):
     except:
         return np.inf
 
-def evaluateArchitecture(individual, trainX, trainY, valX, valY, numEvals=5, timeout=60):
+def evaluateArchitecture(individual, trainX, trainY, valX, valY, numEvals=3, timeout=60):
     q = queue.Queue()
 
     def work():
