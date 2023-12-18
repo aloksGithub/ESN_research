@@ -27,7 +27,7 @@ def getData():
     data = stats.zscore(data)
     data.shape
 
-    trainLen = 3100
+    trainLen = 2000
     valLen = 286
     testLen = 286
     train_in = data[0:trainLen]
@@ -60,7 +60,7 @@ gaParams = {
     "populationSize": 15,
     "eliteSize": 1,
     "stagnationReset": 5,
-    "generations": 20,
+    "generations": 30,
     "minimizeFitness": True,
     "logModels": True,
     "seedModels": [],
@@ -95,10 +95,10 @@ if __name__ == "__main__":
             valErrors.append(valError)
         bestPred = allPreds[valErrors.index(min(valErrors))]
         print(performances[0:5], min(valErrors), nrmse(testY, bestPred[-len(testY):]), r_squared(testY, bestPred[-len(testY):]))
-        if min(valErrors)>0.0003:
-            continue
-        nrmseErrors.append(nrmse(testY, bestPred[-len(testY):]))
-        r2Errors.append(r_squared(testY, bestPred[-len(testY):]))
+        # if min(valErrors)>0.0003:
+        #     continue
+        # nrmseErrors.append(nrmse(testY, bestPred[-len(testY):]))
+        # r2Errors.append(r_squared(testY, bestPred[-len(testY):]))
 
-    print(np.array(nrmseErrors).mean(), np.array(nrmseErrors).std())
-    print(np.array(r2Errors).mean(), np.array(r2Errors).std())
+    # print(np.array(nrmseErrors).mean(), np.array(nrmseErrors).std())
+    # print(np.array(r2Errors).mean(), np.array(r2Errors).std())

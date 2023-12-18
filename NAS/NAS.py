@@ -143,7 +143,7 @@ def generateRandomNodeParams(nodeType):
     return params
 
 def generateRandomArchitecture(sampleX, sampleY):
-    num_nodes = random.randint(4, 7)
+    num_nodes = random.randint(1, 3)
 
     nodes = [
         {"type": "Input", "params": {}}
@@ -220,7 +220,9 @@ def generateRandomArchitecture(sampleX, sampleY):
     # Try to run the model on a small sample to see if it is a valid network
     # Otherwise generate a new architecture
     try:
-        performance, _ = evaluateArchitecture(architecture, sampleX, sampleY, sampleX, sampleY, 1, 1)
+        # performance, _ = evaluateArchitecture(architecture, sampleX, sampleY, sampleX, sampleY, 1, 1)
+        model = constructModel(architecture)
+        performance = evaluateModel(model, sampleX, sampleY, sampleX, sampleY)
         if math.isnan(performance) or np.isinf(performance) or performance>100: raise Exception("Bad Model")
         return architecture
     except Exception as e:
@@ -282,11 +284,11 @@ def trainModel(model, trainX, trainY):
     outputNode = output_nodes[0]
     isOutputNodeOffline = "Ridge" in outputNode
     if hasOfflineNode:
-        model.fit(trainX, trainY, warmup=min(int(len(trainX)/10), 100))
+        model.fit(trainX, trainY, warmup=min(int(len(trainX)/10), 82))
     if hasOnlineNode:
         model.train(trainX, trainY)
     if isOutputNodeOffline:
-        model.fit(trainX, trainY, warmup=min(int(len(trainX)/10), 100))
+        model.fit(trainX, trainY, warmup=min(int(len(trainX)/10), 82))
     return model
 
 def runModel(model, x):
@@ -325,7 +327,8 @@ def evaluateModelAutoRegressive(model, trainX, trainY, valX, valY):
             preds.append(pred[0])
         preds = np.array(preds)
         return nrmse2(valY, preds)
-    except:
+    except Exception as e:
+        print(e)
         return np.inf
 
 def evaluateModel(model, trainX, trainY, valX, valY):
@@ -333,7 +336,8 @@ def evaluateModel(model, trainX, trainY, valX, valY):
         model = trainModel(model, trainX, trainY)
         preds = runModel(model, valX)
         return nrmse(valY, preds)
-    except:
+    except Exception as e:
+        print(e)
         return np.inf
 
 def evaluateArchitecture(individual, trainX, trainY, valX, valY, numEvals=3, timeout=60):
@@ -341,7 +345,7 @@ def evaluateArchitecture(individual, trainX, trainY, valX, valY, numEvals=3, tim
 
     def work():
         model = constructModel(individual)
-        performance = evaluateModel(model, trainX, trainY, valX, valY)
+        performance = evaluateModelAutoRegressive(model, trainX, trainY, valX, valY)
         q.put([performance, model])
 
     performances = []
