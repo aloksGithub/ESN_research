@@ -5,6 +5,7 @@ import sys
 import os
 import warnings
 import time
+from reservoirpy.observables import (rmse, rsquare, nrmse, mse)
 current_dir = os.path.abspath(os.path.dirname(__file__))
 parent_dir = os.path.dirname(current_dir)
 sys.path.insert(0, parent_dir)
@@ -40,13 +41,6 @@ def getData():
 
 trainX, trainY, valX, valY, testX, testY = getData()
 
-def nrmse(y_true, y_pred):
-    y_true = np.array(y_true)
-    y_pred = np.array(y_pred)
-    rmse = np.sqrt(np.mean((y_true - y_pred)**2))
-    mean_norm = np.linalg.norm(np.mean(y_true))
-    return rmse / mean_norm
-
 def r_squared(y_true, y_pred):
     y_true = np.array(y_true)
     y_pred = np.array(y_pred)
@@ -55,19 +49,19 @@ def r_squared(y_true, y_pred):
     return 1 - (numerator / denominator)
 
 gaParams = {
-    "evaluator": partial(NAS.evaluateArchitecture, trainX=trainX, trainY=trainY, valX=valX, valY=valY),
-    "generator": partial(NAS.generateRandomArchitecture, sampleX=trainX[:2], sampleY=trainY[:2]),
-    "populationSize": 15,
+    "evaluator": partial(NAS.evaluateArchitecture2, trainX=trainX, trainY=trainY, valX=valX, valY=valY),
+    "generator": partial(NAS.generateRandomArchitecture, sampleX=trainX[:2000], sampleY=trainY[:2000]),
+    "populationSize": 100,
     "eliteSize": 1,
     "stagnationReset": 5,
-    "generations": 30,
+    "generations": 100,
     "minimizeFitness": True,
-    "logModels": True,
+    "logModels": False,
     "seedModels": [],
     "crossoverProbability": 0.7,
     "mutationProbability": 0.2,
-    "earlyStop": 0,
-    "n_jobs": 15
+    "earlyStop": 0.01,
+    "n_jobs": 25
 }
 
 if __name__ == "__main__":
@@ -75,26 +69,27 @@ if __name__ == "__main__":
     r2Errors = []
     for i in range(20):
         models, performances, architectures = NAS.runGA(gaParams)
-        allPreds = []
-        for architecture in architectures[:5]:
-            for _ in range(10):
-                model = NAS.constructModel(architecture)
-                model = NAS.trainModel(model, np.concatenate([trainX, valX[:-20]]), np.concatenate([trainY, valY[:-20]]))
-                prevOutput = valX[-20]
-                preds = []
-                for j in range(20+len(testX)):
-                    pred = NAS.runModel(model, prevOutput)
-                    prevOutput = pred
-                    preds.append(pred[0])
-                preds = np.array(preds)
-                allPreds.append(preds)
-        valErrors = []
-        for pred in allPreds:
-            valError = nrmse(valY[-20:], pred[:20])
-            error = nrmse(testY, pred[-len(testY):])
-            valErrors.append(valError)
-        bestPred = allPreds[valErrors.index(min(valErrors))]
-        print(performances[0:5], min(valErrors), nrmse(testY, bestPred[-len(testY):]), r_squared(testY, bestPred[-len(testY):]))
+        print("Finsihed", min(performances))
+        # allPreds = []
+        # for architecture in architectures[:5]:
+        #     for _ in range(10):
+        #         model = NAS.constructModel(architecture)
+        #         model = NAS.trainModel(model, np.concatenate([trainX, valX[:-20]]), np.concatenate([trainY, valY[:-20]]))
+        #         prevOutput = valX[-20]
+        #         preds = []
+        #         for j in range(20+len(testX)):
+        #             pred = NAS.runModel(model, prevOutput)
+        #             prevOutput = pred
+        #             preds.append(pred[0])
+        #         preds = np.array(preds)
+        #         allPreds.append(preds)
+        # valErrors = []
+        # for pred in allPreds:
+        #     valError = nrmse(valY[-20:], pred[:20], 'mean')
+        #     error = nrmse(testY, pred[-len(testY):], 'mean')
+        #     valErrors.append(valError)
+        # bestPred = allPreds[valErrors.index(min(valErrors))]
+        # print(performances[0:5], min(valErrors), nrmse(testY, bestPred[-len(testY):], 'mean'), r_squared(testY, bestPred[-len(testY):]))
         # if min(valErrors)>0.0003:
         #     continue
         # nrmseErrors.append(nrmse(testY, bestPred[-len(testY):]))

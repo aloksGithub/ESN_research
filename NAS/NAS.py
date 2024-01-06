@@ -2,7 +2,7 @@ import reservoirpy as rpy
 from reservoirpy.nodes import (Reservoir, IPReservoir, NVAR, RLS, Input)
 from NAS.Ridge_parallel import Ridge
 from NAS.LMS_serializable import LMS
-from reservoirpy.observables import (rmse, rsquare, nrmse, mse)
+# from reservoirpy.observables import (rmse, rsquare, nrmse, mse)
 import numpy as np
 from functools import reduce
 import random
@@ -143,14 +143,18 @@ def generateRandomNodeParams(nodeType):
     return params
 
 def generateRandomArchitecture(sampleX, sampleY):
-    num_nodes = random.randint(1, 3)
+    num_nodes = random.randint(2, 3)
 
     nodes = [
         {"type": "Input", "params": {}}
     ]
 
-    for _ in range(num_nodes):
+    for i in range(num_nodes):
         available_node_types = list(nodeConstructors.keys())
+        if i==0:
+            available_node_types.remove("LMS")
+            available_node_types.remove("RLS")
+            available_node_types.remove("Ridge")
         available_node_types.remove("Input")
         for node in nodes:
             if node["type"]=="IPReservoir":
@@ -221,9 +225,9 @@ def generateRandomArchitecture(sampleX, sampleY):
     # Otherwise generate a new architecture
     try:
         # performance, _ = evaluateArchitecture(architecture, sampleX, sampleY, sampleX, sampleY, 1, 1)
-        model = constructModel(architecture)
-        performance = evaluateModel(model, sampleX, sampleY, sampleX, sampleY)
-        if math.isnan(performance) or np.isinf(performance) or performance>100: raise Exception("Bad Model")
+        # model = constructModel(architecture)
+        performance, _, _ = evaluateArchitecture2(architecture, sampleX[:1800], sampleY[:1800], sampleX[1800:], sampleY[1800:], 1)
+        if math.isnan(performance) or np.isinf(performance) or performance>1: raise Exception("Bad Model")
         return architecture
     except Exception as e:
         return generateRandomArchitecture(sampleX, sampleY)
@@ -305,9 +309,8 @@ def runModel(model, x):
         return nodePreds
     else:
         return nodePreds[output_nodes[-1]]
-
-
-def nrmse2(y_true, y_pred):
+    
+def nrmse(y_true, y_pred):
     y_true = np.array(y_true)
     y_pred = np.array(y_pred)
     
@@ -315,6 +318,28 @@ def nrmse2(y_true, y_pred):
     mean_norm = np.linalg.norm(np.mean(y_true))
     
     return rmse / mean_norm
+    
+def r_squared(y_true, y_pred):
+    y_true = np.array(y_true)
+    y_pred = np.array(y_pred)
+    numerator = np.sum((y_true - y_pred)**2)
+    denominator = np.sum((y_true - np.mean(y_true))**2)
+    return 1 - (numerator / denominator)
+
+def evaluateModelAutoRegressive2(model, trainX, trainY, valX, valY):
+    try:
+        model = trainModel(model, trainX, trainY)
+        prevOutput = valX[0]
+        preds = []
+        for _ in range(len(valX)):
+            pred = runModel(model, prevOutput)
+            prevOutput = pred
+            preds.append(pred[0])
+        preds = np.array(preds)
+        return nrmse(valY, preds), r_squared(valY, preds)
+    except Exception as e:
+        print(e)
+        return np.inf, 0
     
 def evaluateModelAutoRegressive(model, trainX, trainY, valX, valY):
     try:
@@ -326,9 +351,9 @@ def evaluateModelAutoRegressive(model, trainX, trainY, valX, valY):
             prevOutput = pred
             preds.append(pred[0])
         preds = np.array(preds)
-        return nrmse2(valY, preds)
+        return nrmse(valY, preds)
     except Exception as e:
-        print(e)
+        # print(e)
         return np.inf
 
 def evaluateModel(model, trainX, trainY, valX, valY):
@@ -337,7 +362,7 @@ def evaluateModel(model, trainX, trainY, valX, valY):
         preds = runModel(model, valX)
         return nrmse(valY, preds)
     except Exception as e:
-        print(e)
+        # print(e)
         return np.inf
 
 def evaluateArchitecture(individual, trainX, trainY, valX, valY, numEvals=3, timeout=60):
@@ -366,6 +391,37 @@ def evaluateArchitecture(individual, trainX, trainY, valX, valY, numEvals=3, tim
                 performances.append(performance)
             models.append(model)
     return min(performances), models[performances.index(min(performances))]
+
+def evaluateArchitecture2(individual, trainX, trainY, valX, valY, numEvals=3, timeout=180):
+    q = queue.Queue()
+
+    def work():
+        model = constructModel(individual)
+        nrmse, r_square = evaluateModelAutoRegressive2(model, trainX, trainY, valX, valY)
+        q.put([nrmse, r_square, model])
+
+    nrmses = []
+    r_squared_vals = []
+    models = []
+    for _ in range(numEvals):
+        thread = threading.Thread(target=work)
+        thread.start()
+        thread.join(timeout=timeout)
+        if thread.is_alive():
+            nrmses.append(np.inf)
+            r_squared_vals.append(0)
+            models.append(constructModel(individual))
+        else:
+            result = q.get()
+            nrmse, r_square, model = result[0], result[1], result[2]
+            if math.isnan(nrmse):
+                nrmses.append(np.inf)
+                r_squared_vals.append(0)
+            else:
+                nrmses.append(nrmse)
+                r_squared_vals.append(r_square)
+            models.append(model)
+    return min(nrmses), r_squared_vals[nrmses.index(min(nrmses))], models[nrmses.index(min(nrmses))]
 
 # Crossover function
 def crossover_one_point(ind1, ind2):
@@ -413,6 +469,7 @@ def runGA(params):
     defaultFitness = 0
     allModels = []
     allFitnesses = []
+    fitnesses2 = []
     allArchitectures = []
     if params['minimizeFitness']:
         defaultFitness = np.inf
@@ -448,9 +505,10 @@ def runGA(params):
 
     fitnesses = Parallel(n_jobs=params["n_jobs"])(delayed(params["evaluator"])(architecture) for architecture in population)
     for ind, fitness_model in zip(population, fitnesses):
-        fit, model = fitness_model
+        fit, fit2, model = fitness_model
         allModels.append(model)
         allFitnesses.append(fit)
+        fitnesses2.append(fit2)
         allArchitectures.append(ind)
         if ((fit <= params['earlyStop'] and params['minimizeFitness']) or 
             (not params['minimizeFitness'] and fit >= params['earlyStop'])):
@@ -488,9 +546,10 @@ def runGA(params):
         # Evaluate offspring
         fitnesses = Parallel(n_jobs=params["n_jobs"])(delayed(params["evaluator"])(architecture) for architecture in offspring)
         for ind, fitness_model in zip(offspring, fitnesses):
-            fit, model = fitness_model
+            fit, fit2, model = fitness_model
             allModels.append(model)
             allFitnesses.append(fit)
+            fitnesses2.append(fit2)
             allArchitectures.append(ind)
             if ((fit<=params['earlyStop'] and params['minimizeFitness']) or (not params['minimizeFitness'] and fit>=params['earlyStop'])):
                 earlyStopReached = True
@@ -510,9 +569,10 @@ def runGA(params):
             newRandomPopulation = [creator.Individual(individual) for individual in  generateArchitectures(params["generator"], params["populationSize"] - 1, params["n_jobs"])]
             fitnesses = Parallel(n_jobs=params["n_jobs"])(delayed(params["evaluator"])(architecture) for architecture in newRandomPopulation)
             for ind, fitness_model in zip(newRandomPopulation, fitnesses):
-                fit, model = fitness_model
+                fit, fit2, model = fitness_model
                 allModels.append(model)
                 allFitnesses.append(fit)
+                fitnesses2.append(fit2)
                 allArchitectures.append(ind)
                 if ((fit<=params['earlyStop'] and params['minimizeFitness']) or (not params['minimizeFitness'] and fit>=params['earlyStop'])):
                     earlyStopReached = True
@@ -522,6 +582,10 @@ def runGA(params):
             population[:] = toolbox.select(population, 1) + newRandomPopulation
         else:
             population[:] = elites + offspring
+        
+        bestFitness1 = min(allFitnesses)
+        bestFitness2 = fitnesses2[allFitnesses.index(min(allFitnesses))]
+        print("Best so far:", bestFitness1, bestFitness2)
 
     paired_data = list(zip(allModels, allFitnesses, allArchitectures))
     if not params['minimizeFitness']:
