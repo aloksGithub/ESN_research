@@ -227,7 +227,8 @@ def generateRandomArchitecture(sampleX, sampleY):
         # performance, _ = evaluateArchitecture(architecture, sampleX, sampleY, sampleX, sampleY, 1, 1)
         # model = constructModel(architecture)
         performance, _, _ = evaluateArchitecture2(architecture, sampleX[:-200], sampleY[:-200], sampleX[-200:], sampleY[-200:], 1)
-        if math.isnan(performance) or np.isinf(performance) or performance>1: raise Exception("Bad Model")
+        if math.isnan(performance) or np.isinf(performance) or performance>2: raise Exception("Bad Model")
+        print("Model found")
         return architecture
     except Exception as e:
         return generateRandomArchitecture(sampleX, sampleY)

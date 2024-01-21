@@ -61,7 +61,7 @@ gaParams = {
     "crossoverProbability": 0.7,
     "mutationProbability": 0.2,
     "earlyStop": 0.001,
-    "n_jobs": 27
+    "n_jobs": 13
 }
 
 if __name__ == "__main__":
