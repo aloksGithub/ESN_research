@@ -49,8 +49,8 @@ def r_squared(y_true, y_pred):
     return 1 - (numerator / denominator)
 
 gaParams = {
-    "evaluator": partial(NAS.evaluateArchitecture2, trainX=trainX, trainY=trainY, valX=valX, valY=valY, numEvals=1),
-    "generator": partial(NAS.generateRandomArchitecture, sampleX=trainX[:500], sampleY=trainY[:500]),
+    "evaluator": partial(NAS.evaluateArchitecture2, trainX=trainX, trainY=trainY, valX=valX, valY=valY),
+    "generator": partial(NAS.generateRandomArchitecture, sampleX=trainX[:2000], sampleY=trainY[:2000]),
     "populationSize": 100,
     "eliteSize": 1,
     "stagnationReset": 5,

@@ -142,6 +142,25 @@ def generateRandomNodeParams(nodeType):
             params[parameterName] = random.random() * (parameterRange["upper"] - parameterRange["lower"]) + parameterRange["lower"]
     return params
 
+def isValidArchitecture(architecture):
+    ipExists = False
+    forceExists = False
+    for i, node in enumerate(architecture["nodes"]):
+        if node["type"]=="IPReservoir":
+            ipExists = True
+        if node["type"]=="LMS" or node["type"]=="RLS":
+            forceExists = True
+        if node["type"]=="NVAR":
+            for connection in architecture["edges"]:
+                if connection[1]!=i:
+                    continue
+                prevNode = architecture["nodes"][connection[0]]
+                if prevNode["type"]=="Reservoir" or prevNode["type"]=="IPReservoir" or prevNode["type"]=="NVAR":
+                    return False
+    if ipExists and forceExists:
+        return False
+    return True
+
 def generateRandomArchitecture(sampleX, sampleY):
     num_nodes = random.randint(2, 3)
 
@@ -176,7 +195,7 @@ def generateRandomArchitecture(sampleX, sampleY):
     for i in range(1, len(nodes)):
         while (True):
             source = random.choice([node for node in list(connected_nodes) if node != i])
-            if (nodes[source]['type']=="Reservoir" or nodes[source]['type']=="IPReservoir") and nodes[i]["type"]=="NVAR":
+            if (nodes[source]['type']=="Reservoir" or nodes[source]['type']=="IPReservoir" or nodes[source]['type']=="NVAR") and nodes[i]["type"]=="NVAR":
                 continue
             if nodes[source]['type']=="IPReservoir" and (nodes[i]["type"]=="RLS" or nodes[i]["type"]=="LLS"):
                 continue
@@ -227,7 +246,7 @@ def generateRandomArchitecture(sampleX, sampleY):
         # performance, _ = evaluateArchitecture(architecture, sampleX, sampleY, sampleX, sampleY, 1, 1)
         # model = constructModel(architecture)
         performance, _, _ = evaluateArchitecture2(architecture, sampleX[:-200], sampleY[:-200], sampleX[-200:], sampleY[-200:], 1)
-        if math.isnan(performance) or np.isinf(performance) or performance>2: raise Exception("Bad Model")
+        if math.isnan(performance) or np.isinf(performance) or performance>1: raise Exception("Bad Model")
         print("Model found")
         return architecture
     except Exception as e:
@@ -367,6 +386,8 @@ def evaluateModel(model, trainX, trainY, valX, valY):
         return np.inf
 
 def evaluateArchitecture(individual, trainX, trainY, valX, valY, numEvals=3, timeout=60):
+    if not isValidArchitecture(individual):
+        return np.inf, constructModel(individual)
     q = queue.Queue()
 
     def work():
@@ -394,6 +415,8 @@ def evaluateArchitecture(individual, trainX, trainY, valX, valY, numEvals=3, tim
     return min(performances), models[performances.index(min(performances))]
 
 def evaluateArchitecture2(individual, trainX, trainY, valX, valY, numEvals=3, timeout=180):
+    if not isValidArchitecture(individual):
+        return np.inf, constructModel(individual)
     q = queue.Queue()
 
     def work():
