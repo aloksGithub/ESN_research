@@ -416,7 +416,7 @@ def evaluateArchitecture(individual, trainX, trainY, valX, valY, numEvals=3, tim
 
 def evaluateArchitecture2(individual, trainX, trainY, valX, valY, numEvals=3, timeout=180):
     if not isValidArchitecture(individual):
-        return np.inf, constructModel(individual)
+        return np.inf, 0, constructModel(individual)
     q = queue.Queue()
 
     def work():
