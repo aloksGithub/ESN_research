@@ -17,6 +17,7 @@ import copy
 from queue import Queue
 import queue
 import warnings
+import pickle
 warnings.filterwarnings("ignore")
 
 rpy.verbosity(0)
@@ -489,17 +490,40 @@ def generateArchitectures(generator, n, n_jobs):
     architectures = Parallel(n_jobs=n_jobs)(delayed(generator)() for i in range(n))
     return architectures
 
-def runGA(params):
-    defaultFitness = 0
-    allModels = []
-    allFitnesses = []
-    fitnesses2 = []
-    allArchitectures = []
+def runGA(params, useBackup = False):
+
+    if not useBackup:
+        generation = 1
+        allModels = []
+        allFitnesses = []
+        fitnesses2 = []
+        allArchitectures = []
+        generationsSinceImprovement = 0
+        earlyStopReached = False
+        if params['minimizeFitness']:
+            defaultFitness = np.inf
+        else:
+            defaultFitness = 0
+        prevFitness = defaultFitness
+    else:
+        file = open('backup/backup.obj', 'rb')
+        data = pickle.load(file)
+        
+        generation = data["generation"]
+        allModels = data["allModels"]
+        allFitnesses = data["allFitnesses"]
+        fitnesses2 = data["fitnesses2"]
+        allArchitectures = data["allArchitectures"]
+        generationsSinceImprovement = data["generationsSinceImprovement"]
+        population = data["population"]
+        earlyStopReached = data["earlyStopReached"]
+        prevFitness = data["prevFitness"]
+        params = data["params"]
+        defaultFitness = data["defaultFitness"]
+
     if params['minimizeFitness']:
-        defaultFitness = np.inf
         creator.create("Fitness", base.Fitness, weights=(-1.0,))
     else:
-        defaultFitness = 0
         creator.create("Fitness", base.Fitness, weights=(1.0,))
     creator.create("Individual", dict, fitness=creator.Fitness)
 
@@ -522,29 +546,28 @@ def runGA(params):
     toolbox.register("select", tools.selBest)
     toolbox.register("evaluate", params["evaluator"])
     
-    random_population = [creator.Individual(individual) for individual in  generateArchitectures(params["generator"], params["populationSize"] - len(params["seedModels"]), params["n_jobs"])]
-    seed_population = [creator.Individual(individual) for individual in params["seedModels"]]
-    population = seed_population + random_population
-    earlyStopReached = False
+    if not useBackup:
+        random_population = [creator.Individual(individual) for individual in  generateArchitectures(params["generator"], params["populationSize"] - len(params["seedModels"]), params["n_jobs"])]
+        seed_population = [creator.Individual(individual) for individual in params["seedModels"]]
+        population = seed_population + random_population
 
-    fitnesses = Parallel(n_jobs=params["n_jobs"])(delayed(params["evaluator"])(architecture) for architecture in population)
-    for ind, fitness_model in zip(population, fitnesses):
-        fit, fit2, model = fitness_model
-        allModels.append(model)
-        allFitnesses.append(fit)
-        fitnesses2.append(fit2)
-        allArchitectures.append(ind)
-        if ((fit <= params['earlyStop'] and params['minimizeFitness']) or 
-            (not params['minimizeFitness'] and fit >= params['earlyStop'])):
-            earlyStopReached = True
-        if params["logModels"]:
-            print(fit, ind)
-        ind.fitness.values = (fit,)
+        fitnesses = Parallel(n_jobs=params["n_jobs"])(delayed(params["evaluator"])(architecture) for architecture in population)
+        for ind, fitness_model in zip(population, fitnesses):
+            fit, fit2, model = fitness_model
+            allModels.append(model)
+            allFitnesses.append(fit)
+            fitnesses2.append(fit2)
+            allArchitectures.append(ind)
+            if ((fit <= params['earlyStop'] and params['minimizeFitness']) or 
+                (not params['minimizeFitness'] and fit >= params['earlyStop'])):
+                earlyStopReached = True
+            if params["logModels"]:
+                print(fit, ind)
+            ind.fitness.values = (fit,)
 
-    generationsSinceImprovement = 0
-    prevFitness = defaultFitness
+
     
-    for gen in range(1, params["generations"] + 1):
+    for gen in range(generation, params["generations"] + 1):
         if earlyStopReached:
             print("Early stopping criteria met")
             break
@@ -610,6 +633,24 @@ def runGA(params):
         bestFitness1 = min(allFitnesses)
         bestFitness2 = fitnesses2[allFitnesses.index(min(allFitnesses))]
         print("Best so far:", bestFitness1, bestFitness2)
+
+        checkpoint = {
+            "generation": gen+1,
+            "allModels": allModels,
+            "allFitnesses": allFitnesses,
+            "fitnesses2": fitnesses2,
+            "allArchitectures": allArchitectures,
+            "generationsSinceImprovement": generationsSinceImprovement,
+            "population": population,
+            "earlyStopReached": earlyStopReached,
+            "prevFitness": prevFitness,
+            "params": params,
+            "defaultFitness": defaultFitness
+        }
+        file = open('backup/backup.obj', 'wb')
+
+        # dump information to that file
+        pickle.dump(checkpoint, file)
 
     paired_data = list(zip(allModels, allFitnesses, allArchitectures))
     if not params['minimizeFitness']:
