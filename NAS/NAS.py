@@ -510,7 +510,7 @@ def runGA(params, useBackup = False):
         data = pickle.load(file)
         
         generation = data["generation"]
-        allModels = data["allModels"]
+        allModels = []
         allFitnesses = data["allFitnesses"]
         fitnesses2 = data["fitnesses2"]
         allArchitectures = data["allArchitectures"]
@@ -636,7 +636,7 @@ def runGA(params, useBackup = False):
 
         checkpoint = {
             "generation": gen+1,
-            "allModels": allModels,
+            "allModels": allArchitectures,
             "allFitnesses": allFitnesses,
             "fitnesses2": fitnesses2,
             "allArchitectures": allArchitectures,
