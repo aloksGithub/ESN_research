@@ -68,7 +68,7 @@ if __name__ == "__main__":
     nrmseErrors = []
     r2Errors = []
     for i in range(20):
-        models, performances, architectures = NAS.runGA(gaParams)
+        models, performances, architectures = NAS.runGA(gaParams, True)
         print("Finsihed", min(performances))
         # allPreds = []
         # for architecture in architectures[:5]:
