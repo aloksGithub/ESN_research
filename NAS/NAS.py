@@ -491,6 +491,11 @@ def generateArchitectures(generator, n, n_jobs):
     return architectures
 
 def runGA(params, useBackup = False):
+    if params['minimizeFitness']:
+        creator.create("Fitness", base.Fitness, weights=(-1.0,))
+    else:
+        creator.create("Fitness", base.Fitness, weights=(1.0,))
+    creator.create("Individual", dict, fitness=creator.Fitness)
 
     if not useBackup:
         generation = 1
@@ -515,17 +520,11 @@ def runGA(params, useBackup = False):
         fitnesses2 = data["fitnesses2"]
         allArchitectures = data["allArchitectures"]
         generationsSinceImprovement = data["generationsSinceImprovement"]
-        population = data["population"]
+        population = [creator.Individual(individual) for individual in data["population"]]
         earlyStopReached = data["earlyStopReached"]
         prevFitness = data["prevFitness"]
         params = data["params"]
         defaultFitness = data["defaultFitness"]
-
-    if params['minimizeFitness']:
-        creator.create("Fitness", base.Fitness, weights=(-1.0,))
-    else:
-        creator.create("Fitness", base.Fitness, weights=(1.0,))
-    creator.create("Individual", dict, fitness=creator.Fitness)
 
     toolbox = base.Toolbox()
 
