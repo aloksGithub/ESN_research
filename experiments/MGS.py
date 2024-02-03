@@ -9,7 +9,6 @@ current_dir = os.path.abspath(os.path.dirname(__file__))
 parent_dir = os.path.dirname(current_dir)
 sys.path.insert(0, parent_dir)
 from NAS import NAS
-import pandas as pd
 warnings.filterwarnings("ignore")
 
 rpy.verbosity(0)
@@ -18,15 +17,19 @@ output_dim = 1
 
 # https://www.sciencedirect.com/science/article/pii/S0925231222014291
 # Parameterizing echo state networks for multi-step time series prediction
-# Santafe laser dataset
+# Mackey glass dataset
 
 def getData():
-    sunspots = pd.read_csv("../data/santafelaser.csv")
-    data = np.array(sunspots)
+    data = np.load('./data/MG17.npy')
+    data = data.reshape((data.shape[0],1))
+    data = data[:3801,:]
+    from scipy import stats
+    data = stats.zscore(data)
+    data.shape
 
     trainLen = 2000
-    valLen = 100
-    testLen = 100
+    valLen = 286
+    testLen = 286
     train_in = data[0:trainLen]
     train_out = data[0+1:trainLen+1]
     val_in = data[trainLen:trainLen+valLen]

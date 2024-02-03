@@ -20,7 +20,7 @@ output_dim = 1
 # Santafe laser dataset
 
 def getData():
-    sunspots = pd.read_csv("../data/santafelaser.csv")
+    sunspots = pd.read_csv("./data/santafelaser.csv")
     data = np.array(sunspots)
 
     trainLen = 2000
