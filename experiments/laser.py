@@ -15,7 +15,6 @@ warnings.filterwarnings("ignore")
 rpy.verbosity(0)
 output_dim = 1
 
-
 # https://www.sciencedirect.com/science/article/pii/S0925231222014291
 # Parameterizing echo state networks for multi-step time series prediction
 # Santafe laser dataset
@@ -40,10 +39,10 @@ trainX, trainY, valX, valY, testX, testY = getData()
 gaParams = {
     "evaluator": partial(NAS.evaluateArchitecture2, trainX=trainX, trainY=trainY, valX=valX, valY=valY),
     "generator": partial(NAS.generateRandomArchitecture, sampleX=trainX[:2000], sampleY=trainY[:2000]),
-    "populationSize": 100,
+    "populationSize": 5,
     "eliteSize": 1,
     "stagnationReset": 5,
-    "generations": 50,
+    "generations": 10,
     "minimizeFitness": True,
     "logModels": False,
     "seedModels": [],
@@ -51,7 +50,7 @@ gaParams = {
     "mutationProbability": 0.2,
     "earlyStop": 0.001,
     "n_jobs": 13,
-    "dataset": "mgs"
+    "dataset": "laser"
 }
 
 if __name__ == "__main__":

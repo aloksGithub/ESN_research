@@ -248,7 +248,6 @@ def generateRandomArchitecture(sampleX, sampleY):
         # model = constructModel(architecture)
         performance, _, _ = evaluateArchitecture2(architecture, sampleX[:-200], sampleY[:-200], sampleX[-200:], sampleY[-200:], 1)
         if math.isnan(performance) or np.isinf(performance) or performance>1: raise Exception("Bad Model")
-        print("Model found")
         return architecture
     except Exception as e:
         return generateRandomArchitecture(sampleX, sampleY)
@@ -359,7 +358,7 @@ def evaluateModelAutoRegressive2(model, trainX, trainY, valX, valY):
         preds = np.array(preds)
         return nrmse(valY, preds), r_squared(valY, preds)
     except Exception as e:
-        print(e)
+        # print(e)
         return np.inf, 0
     
 def evaluateModelAutoRegressive(model, trainX, trainY, valX, valY):
@@ -511,10 +510,10 @@ def runGA(params, useBackup = False):
             defaultFitness = 0
         prevFitness = defaultFitness
     else:
-        file = open('backup/backup.obj', 'rb')
+        file = open('backup/{}/backup_{}.obj'.format(params["dataset"], params["experimentIndex"]), 'rb')
         data = pickle.load(file)
         
-        generation = data["generation"]
+        generation = data["generation"] + 1
         allModels = []
         allFitnesses = data["allFitnesses"]
         fitnesses2 = data["fitnesses2"]
@@ -631,10 +630,10 @@ def runGA(params, useBackup = False):
         
         bestFitness1 = min(allFitnesses)
         bestFitness2 = fitnesses2[allFitnesses.index(min(allFitnesses))]
-        print("Best so far:", bestFitness1, bestFitness2)
+        print("Generation", gen, "Best so far:", bestFitness1, bestFitness2)
 
         checkpoint = {
-            "generation": gen+1,
+            "generation": gen,
             "allModels": allArchitectures,
             "allFitnesses": allFitnesses,
             "fitnesses2": fitnesses2,
@@ -646,47 +645,51 @@ def runGA(params, useBackup = False):
             "params": params,
             "defaultFitness": defaultFitness
         }
-        file = open('backup/backup.obj', 'wb')
+        file = open('backup/{}/backup_{}.obj'.format(params["dataset"], params["experimentIndex"]), 'wb')
 
         # dump information to that file
         pickle.dump(checkpoint, file)
-
-    paired_data = list(zip(allModels, allFitnesses, allArchitectures))
-    if not params['minimizeFitness']:
-        sorted_data = sorted(paired_data, key=lambda x: x[1], reverse=True)
-    else:
-        sorted_data = sorted(paired_data, key=lambda x: x[1], reverse=False)
     
-    for i in range(len(sorted_data)-1, 0, -1):
-        _, performance, architecture = sorted_data[i]
-        if (params["minimizeFitness"] and performance>100) or (not params["minimizeFitness"] and performance<=0):
-            del sorted_data[i]
-            continue
-        # try:
-        #     model1 = constructModel(architecture)
-        #     randomData = np.random.rand(100, sorted_data[0][0].nodes[0].input_dim)
-        #     randomOutput = np.random.rand(100, output_dim)
-        #     model1 = trainModel(model1, randomData, randomOutput)
-        #     modelPreds = runModel(model1, randomData)
-        # except:
-        #     del sorted_data[i]
-        #     continue
-        for data in sorted_data[:i]:
-            _, betterPerformance, betterArchitecture = data
-            if betterArchitecture==architecture or betterPerformance==performance:
-                del sorted_data[i]
-                break
-            # try:
-            #     model2 = constructModel(betterArchitecture)
-            #     model2 = trainModel(model2, randomData, randomOutput)
-            #     betterModelPreds = runModel(model2, randomData)
-            #     if modelPreds.shape[1]!=output_dim or np.all(betterModelPreds==modelPreds):
-            #         del sorted_data[i]
-            #         break
-            # except:
-            #     pass
-    bestModels = [model for model, _, _ in sorted_data]
-    performances = [performance for _, performance, _ in sorted_data]
-    sortedArchitectures = [architecture for _, _, architecture in sorted_data]
+    bestFitness1 = min(allFitnesses)
+    bestFitness2 = fitnesses2[allFitnesses.index(min(allFitnesses))]
+    return bestFitness1, bestFitness2
 
-    return bestModels, performances, sortedArchitectures
+    # paired_data = list(zip(allModels, allFitnesses, allArchitectures))
+    # if not params['minimizeFitness']:
+    #     sorted_data = sorted(paired_data, key=lambda x: x[1], reverse=True)
+    # else:
+    #     sorted_data = sorted(paired_data, key=lambda x: x[1], reverse=False)
+    
+    # for i in range(len(sorted_data)-1, 0, -1):
+    #     _, performance, architecture = sorted_data[i]
+    #     if (params["minimizeFitness"] and performance>100) or (not params["minimizeFitness"] and performance<=0):
+    #         del sorted_data[i]
+    #         continue
+    #     # try:
+    #     #     model1 = constructModel(architecture)
+    #     #     randomData = np.random.rand(100, sorted_data[0][0].nodes[0].input_dim)
+    #     #     randomOutput = np.random.rand(100, output_dim)
+    #     #     model1 = trainModel(model1, randomData, randomOutput)
+    #     #     modelPreds = runModel(model1, randomData)
+    #     # except:
+    #     #     del sorted_data[i]
+    #     #     continue
+    #     for data in sorted_data[:i]:
+    #         _, betterPerformance, betterArchitecture = data
+    #         if betterArchitecture==architecture or betterPerformance==performance:
+    #             del sorted_data[i]
+    #             break
+    #         # try:
+    #         #     model2 = constructModel(betterArchitecture)
+    #         #     model2 = trainModel(model2, randomData, randomOutput)
+    #         #     betterModelPreds = runModel(model2, randomData)
+    #         #     if modelPreds.shape[1]!=output_dim or np.all(betterModelPreds==modelPreds):
+    #         #         del sorted_data[i]
+    #         #         break
+    #         # except:
+    #         #     pass
+    # bestModels = [model for model, _, _ in sorted_data]
+    # performances = [performance for _, performance, _ in sorted_data]
+    # sortedArchitectures = [architecture for _, _, architecture in sorted_data]
+
+    # return bestModels, performances, sortedArchitectures
