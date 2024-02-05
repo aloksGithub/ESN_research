@@ -247,9 +247,7 @@ def generateRandomArchitecture(sampleX, sampleY, validThreshold, numVal=100):
         # performance, _ = evaluateArchitecture(architecture, sampleX, sampleY, sampleX, sampleY, 1, 1)
         # model = constructModel(architecture)
         performance, _, _ = evaluateArchitecture2(architecture, sampleX[:-numVal], sampleY[:-numVal], sampleX[-numVal:], sampleY[-numVal:], 1)
-        print(performance)
         if math.isnan(performance) or np.isinf(performance) or performance>validThreshold: raise Exception("Bad Model")
-        print("Model found")
         return architecture
     except Exception as e:
         return generateRandomArchitecture(sampleX, sampleY, validThreshold, numVal)
@@ -620,7 +618,6 @@ def runGA(params, useBackup = False):
                 print(fit, ind)
             ind.fitness.values = (fit,)
 
-        print(generationsSinceImprovement)
         if generationsSinceImprovement>=params["stagnationReset"]:
             if params["logModels"]:
                 print("Resetting population due to stagnation")
@@ -675,7 +672,6 @@ def runGA(params, useBackup = False):
 
         # dump information to that file
         pickle.dump(checkpoint, file)
-        print(len(allFitnesses), len(population))
     
     bestFitness1 = min(allFitnesses)
     bestFitness2 = fitnesses2[allFitnesses.index(min(allFitnesses))]
