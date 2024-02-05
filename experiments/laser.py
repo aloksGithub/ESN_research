@@ -44,17 +44,17 @@ trainX, trainY, valX, valY, testX, testY = getData()
 gaParams = {
     "evaluator": partial(NAS.evaluateArchitecture2, trainX=trainX, trainY=trainY, valX=valX, valY=valY),
     "generator": partial(NAS.generateRandomArchitecture, sampleX=np.concatenate([trainX[:2000], valX]), sampleY=np.concatenate([trainY[:2000], valY]), validThreshold=100, numVal=100),
-    "populationSize": 4,
+    "populationSize": 100,
     "eliteSize": 1,
     "stagnationReset": 5,
-    "generations": 20,
+    "generations": 50,
     "minimizeFitness": True,
     "logModels": False,
     "seedModels": [],
     "crossoverProbability": 0.7,
     "mutationProbability": 0.2,
-    "earlyStop": 0.001,
-    "n_jobs": 4,
+    "earlyStop": 0,
+    "n_jobs": 20,
     "dataset": "laser"
 }
 
