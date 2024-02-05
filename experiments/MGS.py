@@ -42,8 +42,8 @@ trainX, trainY, valX, valY, testX, testY = getData()
 
 gaParams = {
     "evaluator": partial(NAS.evaluateArchitecture2, trainX=trainX, trainY=trainY, valX=valX, valY=valY),
-    "generator": partial(NAS.generateRandomArchitecture, sampleX=trainX[:2000], sampleY=trainY[:2000]),
-    "populationSize": 100,
+    "generator": partial(NAS.generateRandomArchitecture, sampleX=trainX[:2000], sampleY=trainY[:2000], validThreshold=1, numVal=200),
+    "populationSize": 3,
     "eliteSize": 1,
     "stagnationReset": 5,
     "generations": 50,
@@ -53,14 +53,14 @@ gaParams = {
     "crossoverProbability": 0.7,
     "mutationProbability": 0.2,
     "earlyStop": 0.001,
-    "n_jobs": 13,
+    "n_jobs": 3,
     "dataset": "mgs"
 }
 
 if __name__ == "__main__":
     nrmseErrors = []
     r2Errors = []
-    for i in range(20):
+    for i in range(1):
         error = False
         gaParams["experimentIndex"] = i
         while True:

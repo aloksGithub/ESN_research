@@ -11,6 +11,7 @@ sys.path.insert(0, parent_dir)
 from NAS import NAS
 import pandas as pd
 warnings.filterwarnings("ignore")
+import pickle
 
 rpy.verbosity(0)
 output_dim = 1
@@ -22,6 +23,10 @@ output_dim = 1
 def getData():
     sunspots = pd.read_csv("./data/santafelaser.csv")
     data = np.array(sunspots)
+    data = data.reshape((data.shape[0],1))
+    data = data[:3801,:]
+    from scipy import stats
+    data = stats.zscore(data)
 
     trainLen = 2000
     valLen = 100
@@ -38,25 +43,25 @@ trainX, trainY, valX, valY, testX, testY = getData()
 
 gaParams = {
     "evaluator": partial(NAS.evaluateArchitecture2, trainX=trainX, trainY=trainY, valX=valX, valY=valY),
-    "generator": partial(NAS.generateRandomArchitecture, sampleX=trainX[:2000], sampleY=trainY[:2000]),
-    "populationSize": 5,
+    "generator": partial(NAS.generateRandomArchitecture, sampleX=np.concatenate([trainX[:2000], valX]), sampleY=np.concatenate([trainY[:2000], valY]), validThreshold=100, numVal=100),
+    "populationSize": 4,
     "eliteSize": 1,
     "stagnationReset": 5,
-    "generations": 10,
+    "generations": 20,
     "minimizeFitness": True,
     "logModels": False,
     "seedModels": [],
     "crossoverProbability": 0.7,
     "mutationProbability": 0.2,
     "earlyStop": 0.001,
-    "n_jobs": 13,
+    "n_jobs": 4,
     "dataset": "laser"
 }
 
 if __name__ == "__main__":
     nrmseErrors = []
     r2Errors = []
-    for i in range(20):
+    for i in range(1):
         error = False
         gaParams["experimentIndex"] = i
         while True:
@@ -65,7 +70,11 @@ if __name__ == "__main__":
                 r2Errors.append(r2)
                 nrmseErrors.append(nrmse)
                 break
-            except:
+            except Exception as e:
+                print(e)
                 error = True
     print(np.array(nrmseErrors).mean(), np.array(nrmseErrors).std())
     print(np.array(r2Errors).mean(), np.array(r2Errors).std())
+    # file = open('backup/{}/backup_{}.obj'.format(gaParams["dataset"], 1), 'rb')
+    # data = pickle.load(file)
+    # print(len(data["allFitnesses"]))
