@@ -11,7 +11,8 @@ sys.path.insert(0, parent_dir)
 from NAS import NAS
 import pandas as pd
 warnings.filterwarnings("ignore")
-import pickle
+import traceback
+import sys
 
 rpy.verbosity(0)
 output_dim = 1
@@ -62,7 +63,7 @@ if __name__ == "__main__":
     nrmseErrors = []
     r2Errors = []
     for i in range(1):
-        error = False
+        error = True
         gaParams["experimentIndex"] = i
         while True:
             try:
@@ -71,7 +72,7 @@ if __name__ == "__main__":
                 nrmseErrors.append(nrmse)
                 break
             except Exception as e:
-                print(e)
+                print(traceback.format_exc())
                 error = True
     print(np.array(nrmseErrors).mean(), np.array(nrmseErrors).std())
     print(np.array(r2Errors).mean(), np.array(r2Errors).std())

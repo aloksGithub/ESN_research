@@ -10,6 +10,8 @@ parent_dir = os.path.dirname(current_dir)
 sys.path.insert(0, parent_dir)
 from NAS import NAS
 warnings.filterwarnings("ignore")
+import traceback
+import sys
 
 rpy.verbosity(0)
 output_dim = 1
@@ -70,6 +72,7 @@ if __name__ == "__main__":
                 nrmseErrors.append(nrmse)
                 break
             except:
+                print(traceback.format_exc())
                 error = True
     print(np.array(nrmseErrors).mean(), np.array(nrmseErrors).std())
     print(np.array(r2Errors).mean(), np.array(r2Errors).std())
