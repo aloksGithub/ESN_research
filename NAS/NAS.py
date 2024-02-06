@@ -498,7 +498,6 @@ def runGA(params, useBackup = False):
 
     if not useBackup:
         generation = 1
-        allModels = []
         allFitnesses = []
         fitnesses2 = []
         allArchitectures = []
@@ -515,7 +514,6 @@ def runGA(params, useBackup = False):
         data = pickle.load(file)
         
         generation = data["generation"] + 1
-        allModels = []
         allFitnesses = data["allFitnesses"]
         fitnesses2 = data["fitnesses2"]
         allArchitectures = data["allArchitectures"]
@@ -555,7 +553,6 @@ def runGA(params, useBackup = False):
         fitnesses = Parallel(n_jobs=params["n_jobs"])(delayed(params["evaluator"])(architecture) for architecture in population)
         for ind, fitness_model in zip(population, fitnesses):
             fit, fit2, model = fitness_model
-            allModels.append(model)
             allFitnesses.append(fit)
             fitnesses2.append(fit2)
             allArchitectures.append(ind)
@@ -581,12 +578,10 @@ def runGA(params, useBackup = False):
         prevFitnesses = allFitnesses[-params["populationSize"]:]
         prevFitnesses2 = fitnesses2[-params["populationSize"]:]
         prevArchitectures = allArchitectures[-params["populationSize"]:]
-        prevModels = allModels[-params["populationSize"]:]
         eliteIndices = sorted(range(len(prevFitnesses)), key=lambda i: prevFitnesses[i])[:params["eliteSize"]]
         allFitnesses+=[prevFitnesses[i] for i in eliteIndices]
         fitnesses2+=[prevFitnesses2[i] for i in eliteIndices]
         allArchitectures+=[prevArchitectures[i] for i in eliteIndices]
-        allModels+=[prevModels[i] for i in eliteIndices]
 
         # Crossover
         for child1, child2 in zip(offspring[::2], offspring[1::2]):
@@ -605,7 +600,6 @@ def runGA(params, useBackup = False):
         fitnesses = Parallel(n_jobs=params["n_jobs"])(delayed(params["evaluator"])(architecture) for architecture in offspring)
         for ind, fitness_model in zip(offspring, fitnesses):
             fit, fit2, model = fitness_model
-            allModels.append(model)
             allFitnesses.append(fit)
             fitnesses2.append(fit2)
             allArchitectures.append(ind)
@@ -624,19 +618,16 @@ def runGA(params, useBackup = False):
             prevFitnesses = allFitnesses[-params["populationSize"]:]
             prevFitnesses2 = fitnesses2[-params["populationSize"]:]
             prevArchitectures = allArchitectures[-params["populationSize"]:]
-            prevModels = allModels[-params["populationSize"]:]
             eliteIndices = sorted(range(len(prevFitnesses)), key=lambda i: prevFitnesses[i])[:1]
             allFitnesses+=[prevFitnesses[i] for i in eliteIndices]
             fitnesses2+=[prevFitnesses2[i] for i in eliteIndices]
             allArchitectures+=[prevArchitectures[i] for i in eliteIndices]
-            allModels+=[prevModels[i] for i in eliteIndices]
 
             prevFitness = defaultFitness
             newRandomPopulation = [creator.Individual(individual) for individual in  generateArchitectures(params["generator"], params["populationSize"]-1, params["n_jobs"])]
             fitnesses = Parallel(n_jobs=params["n_jobs"])(delayed(params["evaluator"])(architecture) for architecture in newRandomPopulation)
             for ind, fitness_model in zip(newRandomPopulation, fitnesses):
                 fit, fit2, model = fitness_model
-                allModels.append(model)
                 allFitnesses.append(fit)
                 fitnesses2.append(fit2)
                 allArchitectures.append(ind)
@@ -656,7 +647,6 @@ def runGA(params, useBackup = False):
 
         checkpoint = {
             "generation": gen,
-            "allModels": allArchitectures,
             "allFitnesses": allFitnesses,
             "fitnesses2": fitnesses2,
             "allArchitectures": allArchitectures,
