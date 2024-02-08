@@ -76,6 +76,4 @@ if __name__ == "__main__":
                 error = True
     print(np.array(nrmseErrors).mean(), np.array(nrmseErrors).std())
     print(np.array(r2Errors).mean(), np.array(r2Errors).std())
-    # file = open('backup/{}/backup_{}.obj'.format(gaParams["dataset"], 1), 'rb')
-    # data = pickle.load(file)
-    # print(len(data["allFitnesses"]))
+    
