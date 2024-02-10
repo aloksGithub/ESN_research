@@ -55,14 +55,14 @@ gaParams = {
     "crossoverProbability": 0.7,
     "mutationProbability": 0.2,
     "earlyStop": 0,
-    "n_jobs": 30,
+    "n_jobs": 25,
     "dataset": "mgs"
 }
 
 if __name__ == "__main__":
     nrmseErrors = []
     r2Errors = []
-    for i in range(5):
+    for i in range(1, 5):
         error = False
         gaParams["experimentIndex"] = i
         while True:
