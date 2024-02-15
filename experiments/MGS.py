@@ -12,6 +12,7 @@ from NAS import NAS
 warnings.filterwarnings("ignore")
 import traceback
 import sys
+import pickle
 
 rpy.verbosity(0)
 output_dim = 1
@@ -62,8 +63,8 @@ gaParams = {
 if __name__ == "__main__":
     nrmseErrors = []
     r2Errors = []
-    for i in range(2, 5):
-        error = False
+    for i in range(3, 4):
+        error = True
         gaParams["experimentIndex"] = i
         while True:
             try:
@@ -76,3 +77,6 @@ if __name__ == "__main__":
                 error = True
     print(np.array(nrmseErrors).mean(), np.array(nrmseErrors).std())
     print(np.array(r2Errors).mean(), np.array(r2Errors).std())
+    # file = open('backup/{}/backup_{}.obj'.format(gaParams["dataset"], 3), 'rb')
+    # data = pickle.load(file)
+    # print(data["generation"])
