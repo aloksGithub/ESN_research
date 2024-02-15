@@ -62,7 +62,7 @@ gaParams = {
 if __name__ == "__main__":
     nrmseErrors = []
     r2Errors = []
-    for i in range(1, 5):
+    for i in range(2, 5):
         error = False
         gaParams["experimentIndex"] = i
         while True:
