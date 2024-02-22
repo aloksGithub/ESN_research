@@ -55,7 +55,7 @@ gaParams = {
     "crossoverProbability": 0.7,
     "mutationProbability": 0.2,
     "earlyStop": 0,
-    "n_jobs": 20,
+    "n_jobs": 25,
     "saveModels": False,
     "dataset": "laser"
 }
