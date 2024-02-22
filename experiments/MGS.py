@@ -58,6 +58,7 @@ gaParams = {
     "mutationProbability": 0.2,
     "earlyStop": 0,
     "n_jobs": 25,
+    "saveModels": True,
     "dataset": "mgs"
 }
 

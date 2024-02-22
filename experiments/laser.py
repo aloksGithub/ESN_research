@@ -56,6 +56,7 @@ gaParams = {
     "mutationProbability": 0.2,
     "earlyStop": 0,
     "n_jobs": 20,
+    "saveModels": False,
     "dataset": "laser"
 }
 
