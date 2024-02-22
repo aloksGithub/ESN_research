@@ -63,8 +63,8 @@ gaParams = {
 if __name__ == "__main__":
     nrmseErrors = []
     r2Errors = []
-    for i in range(1):
-        error = True
+    for i in range(5):
+        error = False
         gaParams["experimentIndex"] = i
         while True:
             try:
@@ -72,7 +72,7 @@ if __name__ == "__main__":
                 r2Errors.append(r2)
                 nrmseErrors.append(nrmse)
                 break
-            except Exception as e:
+            except:
                 print(traceback.format_exc())
                 error = True
     print(np.array(nrmseErrors).mean(), np.array(nrmseErrors).std())
