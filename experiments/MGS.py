@@ -13,6 +13,7 @@ warnings.filterwarnings("ignore")
 import traceback
 import sys
 import pickle
+import matplotlib.pyplot as plt
 
 rpy.verbosity(0)
 output_dim = 1
@@ -63,7 +64,7 @@ gaParams = {
 if __name__ == "__main__":
     nrmseErrors = []
     r2Errors = []
-    for i in range(4, 5):
+    for i in range(5):
         error = True
         gaParams["experimentIndex"] = i
         while True:
@@ -77,6 +78,14 @@ if __name__ == "__main__":
                 error = True
     print(np.array(nrmseErrors).mean(), np.array(nrmseErrors).std())
     print(np.array(r2Errors).mean(), np.array(r2Errors).std())
-    # file = open('backup/{}/backup_{}.obj'.format(gaParams["dataset"], 3), 'rb')
-    # data = pickle.load(file)
-    # print(data["generation"])
+    # convergenceLines = []
+    # total = 0
+    # for i in range(5):
+    #     file = open('backup/{}/backup_{}.obj'.format(gaParams["dataset"], i), 'rb')
+    #     data = pickle.load(file)
+    #     fitnesses = data["allFitnesses"]
+    #     minFitnesses = []
+    #     total+=min(data["allFitnesses"])
+    #     for i in range(data["params"]["populationSize"], len(fitnesses), data["params"]["populationSize"]):
+    #         minFitnesses.append(min(fitnesses[i-data["params"]["populationSize"]:i]))
+    #     convergenceLines.append(minFitnesses)
