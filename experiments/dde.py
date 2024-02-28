@@ -24,7 +24,7 @@ output_dim = 1
 # Neutral Normed DDE dataset
 
 def getData():
-    data = np.load('./data/Neutral_normed.npy')
+    data = np.load('./data/Neutral_normed_2801.npy')
     data = data.reshape((data.shape[0],1))
     data = data[:3801,:]
     from scipy import stats
