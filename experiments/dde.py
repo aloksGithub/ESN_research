@@ -16,8 +16,6 @@ import pickle
 import matplotlib.pyplot as plt
 
 rpy.verbosity(0)
-output_dim = 1
-
 
 # https://www.sciencedirect.com/science/article/pii/S0925231222014291
 # Parameterizing echo state networks for multi-step time series prediction
@@ -25,8 +23,6 @@ output_dim = 1
 
 def getData():
     data = np.load('./data/Neutral_normed_2801.npy')
-    data = data.reshape((data.shape[0],1))
-    data = data[:3801,:]
     from scipy import stats
     data = stats.zscore(data)
     data.shape
