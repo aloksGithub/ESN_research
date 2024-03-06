@@ -13,6 +13,7 @@ import pandas as pd
 warnings.filterwarnings("ignore")
 import traceback
 import sys
+import pickle
 
 rpy.verbosity(0)
 output_dim = 1
@@ -63,7 +64,7 @@ gaParams = {
 if __name__ == "__main__":
     nrmseErrors = []
     r2Errors = []
-    for i in range(4, 5):
+    for i in range(5):
         error = False
         gaParams["experimentIndex"] = i
         while True:
