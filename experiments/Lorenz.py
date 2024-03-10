@@ -19,10 +19,10 @@ rpy.verbosity(0)
 
 # https://www.sciencedirect.com/science/article/pii/S0925231222014291
 # Parameterizing echo state networks for multi-step time series prediction
-# Neutral Normed DDE dataset
+# Lorenz dataset
 
 def getData():
-    data = np.load('./data/Neutral_normed_2801.npy')
+    data = np.load('./data/Lorenz_normed_2801.npy')
     from scipy import stats
     data = stats.zscore(data)
     data.shape
@@ -42,7 +42,7 @@ trainX, trainY, valX, valY, testX, testY = getData()
 
 gaParams = {
     "evaluator": partial(NAS.evaluateArchitecture2, trainX=trainX, trainY=trainY, valX=valX, valY=valY),
-    "generator": partial(NAS.generateRandomArchitecture, sampleX=trainX[:2000], sampleY=trainY[:2000], validThreshold=1, numVal=200),
+    "generator": partial(NAS.generateRandomArchitecture, sampleX=trainX[:2000], sampleY=trainY[:2000], validThreshold=2, numVal=200),
     "populationSize": 100,
     "eliteSize": 1,
     "stagnationReset": 5,

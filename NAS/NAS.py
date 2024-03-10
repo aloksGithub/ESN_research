@@ -21,7 +21,7 @@ import pickle
 warnings.filterwarnings("ignore")
 
 rpy.verbosity(0)
-output_dim = 6
+output_dim = 3
 
 class VotingEnsemble:
     def __init__(self, models, threshold):
