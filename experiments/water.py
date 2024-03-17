@@ -39,10 +39,10 @@ trainX, trainY, valX, valY, data, test, testIndex = getData()
 gaParams = {
     "evaluator": partial(NAS_refactored.evaluateArchitecture, trainX=trainX, trainY=trainY, valX=valX, valY=valY, numEvals=1),
     "generator": partial(NAS_refactored.generateRandomArchitecture, sampleX=trainX[:2000], sampleY=trainY[:2000], validThreshold=1, numVal=200),
-    "populationSize": 30,
+    "populationSize": 100,
     "eliteSize": 1,
     "stagnationReset": 5,
-    "generations": 10,
+    "generations": 50,
     "minimizeFitness": True,
     "logModels": False,
     "seedModels": [],
