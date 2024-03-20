@@ -58,25 +58,25 @@ if __name__ == "__main__":
     for i in range(1):
         error = False
         gaParams["experimentIndex"] = i
-##        while True:
-##            try:
-        gaResults = NAS_refactored.runGA(gaParams, error)
-        bestModelIndex = gaResults["allFitnesses"].index(min(gaResults["allFitnesses"]))
-        model = gaResults["allModels"][bestModelIndex]
-        preds = []
+        while True:
+            try:
+                gaResults = NAS_refactored.runGA(gaParams, error)
+                bestModelIndex = gaResults["allFitnesses"].index(min(gaResults["allFitnesses"]))
+                model = gaResults["allModels"][bestModelIndex]
+                preds = []
 
-        for idx in range(testIndex+18, len(data)):
-            modelCopy = copy.deepcopy(model)
-            pred = []
-            out = NAS_refactored.runModel(modelCopy, data[idx-500:idx])[-1]
-            pred.append(out[0])
-            for i in range(17):
-                out = NAS_refactored.runModel(modelCopy, pred[-1])
-                pred.append(out[0])
-            preds.append(pred)
-        preds = np.array(preds)
-        print(mse(test, preds))
-##                break
-##            except:
-##                print(traceback.format_exc())
-##                error = True
+                for idx in range(testIndex+18, len(data)):
+                    modelCopy = copy.deepcopy(model)
+                    pred = []
+                    out = NAS_refactored.runModel(modelCopy, data[idx-500:idx])[-1]
+                    pred.append(out[0])
+                    for i in range(17):
+                        out = NAS_refactored.runModel(modelCopy, pred[-1])
+                        pred.append(out[0])
+                    preds.append(pred)
+                preds = np.array(preds)
+                print(mse(test, preds))
+                break
+            except:
+                print(traceback.format_exc())
+                error = True
