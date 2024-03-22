@@ -464,6 +464,7 @@ def runGA(params, useBackup = False):
         modelGenerationIndices = []
         generationsSinceImprovement = 0
         earlyStopReached = False
+        bestModel = None
         if params['minimizeFitness']:
             defaultFitness = np.inf
         else:
@@ -484,6 +485,7 @@ def runGA(params, useBackup = False):
         prevFitness = data["prevFitness"]
         params = data["params"]
         defaultFitness = data["defaultFitness"]
+        bestModel = data["bestModel"]
 
     toolbox = base.Toolbox()
 
@@ -513,8 +515,10 @@ def runGA(params, useBackup = False):
         fitnesses = Parallel(n_jobs=params["n_jobs"])(delayed(params["evaluator"])(architecture) for architecture in population)
         for ind, fitness_model in zip(population, fitnesses):
             errors, model = fitness_model
-            allFitnesses.append(errors[0])
+            allFitnesses.append(errors)
             allArchitectures.append(ind)
+            if errors[0]<=min([elem[0] for elem in allFitnesses]) or len(allFitnesses)==0:
+                bestModel = model
             if params["saveModels"]:
                 allModels.append(model)
             if ((errors[0] <= params['earlyStop'] and params['minimizeFitness']) or 
@@ -538,7 +542,7 @@ def runGA(params, useBackup = False):
 
         prevFitnesses = allFitnesses[-params["populationSize"]:]
         prevArchitectures = allArchitectures[-params["populationSize"]:]
-        eliteIndices = sorted(range(len(prevFitnesses)), key=lambda i: prevFitnesses[i])[:params["eliteSize"]]
+        eliteIndices = sorted(range(len(prevFitnesses)), key=lambda i: prevFitnesses[i][0])[:params["eliteSize"]]
         allFitnesses+=[prevFitnesses[i] for i in eliteIndices]
         allArchitectures+=[prevArchitectures[i] for i in eliteIndices]
         if params["saveModels"]:
@@ -562,8 +566,10 @@ def runGA(params, useBackup = False):
         fitnesses = Parallel(n_jobs=params["n_jobs"])(delayed(params["evaluator"])(architecture) for architecture in offspring)
         for ind, fitness_model in zip(offspring, fitnesses):
             errors, model = fitness_model
-            allFitnesses.append(errors[0])
+            allFitnesses.append(errors)
             allArchitectures.append(ind)
+            if errors[0]<=min([elem[0] for elem in allFitnesses]) or len(allFitnesses)==0:
+                bestModel = model
             if params["saveModels"]:
                 allModels.append(model)
             if ((errors[0]<=params['earlyStop'] and params['minimizeFitness']) or (not params['minimizeFitness'] and errors[0]>=params['earlyStop'])):
@@ -580,7 +586,7 @@ def runGA(params, useBackup = False):
                 print("Resetting population due to stagnation")
             prevFitnesses = allFitnesses[-params["populationSize"]:]
             prevArchitectures = allArchitectures[-params["populationSize"]:]
-            eliteIndices = sorted(range(len(prevFitnesses)), key=lambda i: prevFitnesses[i])[:1]
+            eliteIndices = sorted(range(len(prevFitnesses)), key=lambda i: prevFitnesses[i][0])[:1]
             allFitnesses+=[prevFitnesses[i] for i in eliteIndices]
             allArchitectures+=[prevArchitectures[i] for i in eliteIndices]
             if params["saveModels"]:
@@ -592,8 +598,10 @@ def runGA(params, useBackup = False):
             fitnesses = Parallel(n_jobs=params["n_jobs"])(delayed(params["evaluator"])(architecture) for architecture in newRandomPopulation)
             for ind, fitness_model in zip(newRandomPopulation, fitnesses):
                 errors, model = fitness_model
-                allFitnesses.append(errors[0])
+                allFitnesses.append(errors)
                 allArchitectures.append(ind)
+                if errors[0]<=min([elem[0] for elem in allFitnesses]) or len(allFitnesses)==0:
+                    bestModel = model
                 if params["saveModels"]:
                     allModels.append(model)
                 if ((errors[0]<=params['earlyStop'] and params['minimizeFitness']) or (not params['minimizeFitness'] and errors[0]>=params['earlyStop'])):
@@ -620,14 +628,17 @@ def runGA(params, useBackup = False):
             "earlyStopReached": earlyStopReached,
             "prevFitness": prevFitness,
             "params": params,
-            "defaultFitness": defaultFitness
+            "defaultFitness": defaultFitness,
+            "bestModel": bestModel
         }
         file = open('backup/{}/backup_{}.obj'.format(params["dataset"], params["experimentIndex"]), 'wb')
 
         # dump information to that file
         pickle.dump(checkpoint, file)
+
     
-    return checkpoint
+    file = open('backup/{}/backup_{}.obj'.format(params["dataset"], params["experimentIndex"]), 'rb')
+    return pickle.load(file)
 
     # paired_data = list(zip(allModels, allFitnesses, allArchitectures))
     # if not params['minimizeFitness']:

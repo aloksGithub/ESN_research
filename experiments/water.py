@@ -42,15 +42,15 @@ gaParams = {
     "populationSize": 100,
     "eliteSize": 1,
     "stagnationReset": 5,
-    "generations": 50,
+    "generations": 25,
     "minimizeFitness": True,
     "logModels": False,
     "seedModels": [],
     "crossoverProbability": 0.7,
     "mutationProbability": 0.2,
     "earlyStop": 0,
-    "n_jobs": 5,
-    "saveModels": True,
+    "n_jobs": 25,
+    "saveModels": False,
     "dataset": "water"
 }
 
@@ -61,8 +61,7 @@ if __name__ == "__main__":
         while True:
             try:
                 gaResults = NAS_refactored.runGA(gaParams, error)
-                bestModelIndex = gaResults["allFitnesses"].index(min(gaResults["allFitnesses"]))
-                model = gaResults["allModels"][bestModelIndex]
+                model = gaResults["bestModel"]
                 preds = []
 
                 for idx in range(testIndex+18, len(data)):
@@ -75,7 +74,7 @@ if __name__ == "__main__":
                         pred.append(out[0])
                     preds.append(pred)
                 preds = np.array(preds)
-                print(mse(test, preds))
+                print("MSE:", mse(test, preds))
                 break
             except:
                 print(traceback.format_exc())
