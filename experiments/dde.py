@@ -59,33 +59,29 @@ gaParams = {
 }
 
 if __name__ == "__main__":
-    nrmseErrors = []
-    r2Errors = []
-    for i in range(5):
-        error = False
-        gaParams["experimentIndex"] = i
-        while True:
-            try:
-                nrmse, r2 = NAS.runGA(gaParams, error)
-                r2Errors.append(r2)
-                nrmseErrors.append(nrmse)
-                break
-            except:
-                print(traceback.format_exc())
-                error = True
-    print(np.array(nrmseErrors).mean(), np.array(nrmseErrors).std())
-    print(np.array(r2Errors).mean(), np.array(r2Errors).std())
-    # convergenceLines = []
-    # total = 0
-    # r2_total = 0
+    # nrmseErrors = []
+    # r2Errors = []
     # for i in range(5):
-    #     file = open('backup/{}/backup_{}.obj'.format(gaParams["dataset"], i), 'rb')
-    #     data = pickle.load(file)
-    #     fitnesses = data["allFitnesses"]
-    #     minFitnesses = []
-    #     total+=min(data["allFitnesses"])
-    #     r2_total+=data["fitnesses2"][data["allFitnesses"].index(min(data["allFitnesses"]))]
-    #     for i in range(data["params"]["populationSize"], len(fitnesses), data["params"]["populationSize"]):
-    #         minFitnesses.append(min(fitnesses[i-data["params"]["populationSize"]:i]))
-    #     convergenceLines.append(minFitnesses)
-    # print(total/5, r2_total/5)
+    #     error = False
+    #     gaParams["experimentIndex"] = i
+    #     while True:
+    #         try:
+    #             nrmse, r2 = NAS.runGA(gaParams, error)
+    #             r2Errors.append(r2)
+    #             nrmseErrors.append(nrmse)
+    #             break
+    #         except:
+    #             print(traceback.format_exc())
+    #             error = True
+    # print(np.array(nrmseErrors).mean(), np.array(nrmseErrors).std())
+    # print(np.array(r2Errors).mean(), np.array(r2Errors).std())
+    total = 0
+    r2_total = 0
+    for i in range(5):
+        file = open('backup/{}/backup_{}.obj'.format(gaParams["dataset"], i), 'rb')
+        data = pickle.load(file)
+        fitnesses = data["allFitnesses"]
+        minFitnesses = []
+        total+=min(data["allFitnesses"])
+        r2_total+=data["fitnesses2"][data["allFitnesses"].index(min(data["allFitnesses"]))]
+    print(total/5, r2_total/5)
