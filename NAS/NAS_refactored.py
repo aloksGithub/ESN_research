@@ -163,7 +163,7 @@ def isValidArchitecture(architecture):
     return True
 
 def generateRandomArchitecture(sampleX, sampleY, validThreshold, numVal=100):
-    num_nodes = random.randint(2, 5)
+    num_nodes = random.randint(2, 7)
 
     nodes = [
         {"type": "Input", "params": {}}
