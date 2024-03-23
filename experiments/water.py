@@ -42,7 +42,7 @@ gaParams = {
     "populationSize": 100,
     "eliteSize": 1,
     "stagnationReset": 5,
-    "generations": 25,
+    "generations": 50,
     "minimizeFitness": True,
     "logModels": False,
     "seedModels": [],
@@ -55,7 +55,7 @@ gaParams = {
 }
 
 if __name__ == "__main__":
-    for i in range(1, 2):
+    for i in range(2, 3):
         error = False
         gaParams["experimentIndex"] = i
         while True:
