@@ -55,7 +55,7 @@ gaParams = {
 }
 
 if __name__ == "__main__":
-    for i in range(2, 3):
+    for i in range(3, 4):
         error = False
         gaParams["experimentIndex"] = i
         while True:

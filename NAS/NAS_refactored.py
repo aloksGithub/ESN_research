@@ -116,7 +116,7 @@ nodeParameterRanges = {
     },
     "NVAR": {
         "delay": {"lower": 1, "upper": 4, "intOnly": True},
-        "order": {"lower": 1, "upper": 2, "intOnly": True},
+        "order": {"lower": 1, "upper": 3, "intOnly": True},
         "strides": {"lower": 1, "upper": 2, "intOnly": True}
     },
     "Ridge": {
@@ -163,7 +163,7 @@ def isValidArchitecture(architecture):
     return True
 
 def generateRandomArchitecture(sampleX, sampleY, validThreshold, numVal=100):
-    num_nodes = random.randint(2, 9)
+    num_nodes = random.randint(2, 8)
 
     nodes = [
         {"type": "Input", "params": {}}
