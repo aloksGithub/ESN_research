@@ -1,4 +1,3 @@
-from ucimlrepo import fetch_ucirepo
 import reservoirpy as rpy
 import numpy as np
 from functools import partial
