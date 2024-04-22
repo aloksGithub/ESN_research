@@ -4,13 +4,10 @@ from NAS.Ridge_parallel import Ridge
 from NAS.LMS_serializable import LMS
 # from reservoirpy.observables import (rmse, rsquare, nrmse, mse)
 import numpy as np
-from functools import reduce
 import random
 import math
-from contextlib import contextmanager
 import threading
 import _thread
-import time
 from deap import base, creator, tools
 from joblib import Parallel, delayed
 import copy
@@ -18,6 +15,7 @@ from queue import Queue
 import queue
 import warnings
 import pickle
+from NAS.memory_estimator import estimateMemory
 warnings.filterwarnings("ignore")
 
 rpy.verbosity(0)
@@ -130,7 +128,7 @@ nodeParameterRanges = {
     }
 }
 
-def generateRandomNodeParams(nodeType):
+def generateRandomNodeParams(nodeType, output_dim):
     params = {}
     if nodeType=="Ridge" or nodeType=="LMS" or nodeType=="RLS":
         params["output_dim"] = output_dim
@@ -143,7 +141,7 @@ def generateRandomNodeParams(nodeType):
             params[parameterName] = random.random() * (parameterRange["upper"] - parameterRange["lower"]) + parameterRange["lower"]
     return params
 
-def isValidArchitecture(architecture):
+def isValidArchitecture(architecture, numInputs, memoryLimit):
     ipExists = False
     forceExists = False
     for i, node in enumerate(architecture["nodes"]):
@@ -160,13 +158,16 @@ def isValidArchitecture(architecture):
                     return False
     if ipExists and forceExists:
         return False
+    memoryEstimate = estimateMemory(constructModel(architecture), numInputs)
+    if memoryEstimate>memoryLimit:
+        return False
     return True
 
-def generateRandomArchitecture(sampleX, sampleY, validThreshold, numVal=100):
+def generateRandomArchitecture(sampleX, sampleY, validThreshold, maxInput=None, memoryLimit=4*1024, numVal=100):
     num_nodes = random.randint(2, 4)
 
     nodes = [
-        {"type": "Input", "params": {}}
+        {"type": "Input", "params": {"input_dim": sampleX.shape[-1]}}
     ]
 
     for i in range(num_nodes):
@@ -187,7 +188,7 @@ def generateRandomArchitecture(sampleX, sampleY, validThreshold, numVal=100):
         
         node_type = random.choice(available_node_types)
 
-        node_params = generateRandomNodeParams(node_type)
+        node_params = generateRandomNodeParams(node_type, sampleY.shape[-1])
         nodes.append({"type": node_type, "params": node_params})
 
     edges = []
@@ -221,13 +222,13 @@ def generateRandomArchitecture(sampleX, sampleY, validThreshold, numVal=100):
             ipExists = True
     if ipExists:
         readouts = [
-            {"type": "Ridge", "params": generateRandomNodeParams("Ridge")}
+            {"type": "Ridge", "params": generateRandomNodeParams("Ridge", sampleY.shape[-1])}
         ]
     else:
         readouts = [
-            {"type": "Ridge", "params": generateRandomNodeParams("Ridge")},
-            {"type": "LMS", "params": generateRandomNodeParams("LMS")},
-            {"type": "RLS", "params": generateRandomNodeParams("RLS")}
+            {"type": "Ridge", "params": generateRandomNodeParams("Ridge", sampleY.shape[-1])},
+            {"type": "LMS", "params": generateRandomNodeParams("LMS", sampleY.shape[-1])},
+            {"type": "RLS", "params": generateRandomNodeParams("RLS", sampleY.shape[-1])}
         ]
     nodes.append(random.choice(readouts))
 
@@ -241,16 +242,18 @@ def generateRandomArchitecture(sampleX, sampleY, validThreshold, numVal=100):
 
     architecture = {"nodes": nodes, "edges": edges}
 
+    expectedMaxMemory = estimateMemory(constructModel(architecture), maxInput)
+    if expectedMaxMemory>memoryLimit:
+        return generateRandomArchitecture(sampleX, sampleY, validThreshold, maxInput, memoryLimit, numVal)
+
     # Try to run the model on a small sample to see if it is a valid network
     # Otherwise generate a new architecture
     try:
-        # performance, _ = evaluateArchitecture(architecture, sampleX, sampleY, sampleX, sampleY, 1, 1)
-        # model = constructModel(architecture)
         performances, _ = evaluateArchitecture(architecture, sampleX[:-numVal], sampleY[:-numVal], sampleX[-numVal:], sampleY[-numVal:], numEvals=1)
         if math.isnan(performances[0]) or np.isinf(performances[0]) or performances[0]>validThreshold: raise Exception("Bad Model")
         return architecture
     except Exception as e:
-        return generateRandomArchitecture(sampleX, sampleY, validThreshold, numVal)
+        return generateRandomArchitecture(sampleX, sampleY, validThreshold, maxInput, memoryLimit, numVal)
 
 def constructModel(architecture):
     nodes = [nodeConstructors[nodeData['type']](**nodeData['params']) for nodeData in architecture['nodes']]
@@ -322,12 +325,12 @@ def r_squared(y_true, y_pred):
     denominator = np.sum((y_true - np.mean(y_true))**2)
     return 1 - (numerator / denominator)
     
-def evaluateArchitecture(individual, trainX, trainY, valX, valY, errorMetrics=[nrmse], defaultErrors=[np.inf], numEvals=3, timeout=180):
+def evaluateArchitecture(individual, trainX, trainY, valX, valY, errorMetrics=[nrmse], defaultErrors=[np.inf], numEvals=3, timeout=180, memoryLimit=4*1024):
     """
     Instantiate random models using given architecture, then train and evaluate them
     on one step ahead prediction using errorMetrics on valX and valY.
     """
-    if not isValidArchitecture(individual):
+    if not isValidArchitecture(individual, len(trainX), memoryLimit):
         return defaultErrors, constructModel(individual)
     q = queue.Queue()
 
@@ -361,13 +364,13 @@ def evaluateArchitecture(individual, trainX, trainY, valX, valY, errorMetrics=[n
     
     return errors[bestErrorIndex], models[bestErrorIndex]
 
-def evaluateArchitectureAutoRegressive(individual, trainX, trainY, valX, valY, errorMetrics=[nrmse], defaultErrors=[np.inf], numEvals=3, timeout=180):
+def evaluateArchitectureAutoRegressive(individual, trainX, trainY, valX, valY, errorMetrics=[nrmse], defaultErrors=[np.inf], numEvals=3, timeout=180, memoryLimit=4*1024):
     """
     Instantiate random models using given architecture, then train and evaluate them
     using errorMetrics on valX and valY. Test prediction is done auto-regressively,
     the output from the current timestep is used as input for next timestep
     """
-    if not isValidArchitecture(individual):
+    if not isValidArchitecture(individual, len(trainX), memoryLimit):
         return np.inf, 0, constructModel(individual)
     q = queue.Queue()
 
@@ -419,7 +422,7 @@ def crossover_one_point(ind1, ind2):
 
 
 # Mutation function
-def mutate(ind):
+def mutate(ind, output_dim):
     """
     Mutate an individual. We can either:
     1. Swap out a node (excluding Input and Ridge nodes).
@@ -430,7 +433,7 @@ def mutate(ind):
     if mutation_type == "swap_node":
         idx = random.randint(1, len(ind['nodes'])-2)  # Excluding Input and Ridge
         node_type = random.choice(list(nodeConstructors.keys() - {"Input"}))
-        ind['nodes'][idx] = {"type": node_type, "params": generateRandomNodeParams(node_type)}
+        ind['nodes'][idx] = {"type": node_type, "params": generateRandomNodeParams(node_type, output_dim)}
     
     elif mutation_type == "change_param":
         idx = random.randint(1, len(ind['nodes'])-2)  # Excluding Input and Ridge
@@ -502,7 +505,7 @@ def runGA(params, useBackup = False):
     toolbox.register("individual_guess", initIndividual, creator.Individual)
     toolbox.register("population_seed", initPopulation, list, toolbox.individual_guess, params["seedModels"])
     toolbox.register("mate", crossover_one_point)
-    toolbox.register("mutate", mutate)
+    toolbox.register("mutate", mutate, output_dim = params["outputDim"])
     toolbox.register("select", tools.selBest)
     toolbox.register("selectWorst", tools.selWorst)
     toolbox.register("evaluate", params["evaluator"])

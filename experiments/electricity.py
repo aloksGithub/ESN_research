@@ -45,8 +45,8 @@ def getData():
 trainX, trainY, valX, valY, testX, testY = getData()
 
 gaParams = {
-    "evaluator": partial(NAS_refactored.evaluateArchitecture, trainX=trainX, trainY=trainY, valX=valX, valY=valY, numEvals=1),
-    "generator": partial(NAS_refactored.generateRandomArchitecture, sampleX=trainX[:2000], sampleY=trainY[:2000], validThreshold=10, numVal=200),
+    "evaluator": partial(NAS_refactored.evaluateArchitecture, trainX=trainX, trainY=trainY, valX=valX, valY=valY, numEvals=1, memoryLimit=4*1024),
+    "generator": partial(NAS_refactored.generateRandomArchitecture, sampleX=trainX[:2000], sampleY=trainY[:2000], validThreshold=10, maxInput=len(trainX), memoryLimit=4*1024, numVal=200),
     "populationSize": 50,
     "eliteSize": 1,
     "stagnationReset": 5,
@@ -58,6 +58,8 @@ gaParams = {
     "mutationProbability": 0.2,
     "earlyStop": 0,
     "n_jobs": 25,
+    "outputDim": trainY.shape[-1],
+    "memoryLimitPerJob": 4 * 1024,
     "saveModels": False,
     "dataset": "electricity"
 }
@@ -72,6 +74,7 @@ if __name__ == "__main__":
                 model = gaResults["bestModel"]
                 preds = NAS_refactored.runModel(model, testX)
                 print("MSE:", mse(testY, preds))
+                print("Norm MSE:", mse(testY, preds) / 0.0439292598)
                 break
             except:
                 print(traceback.format_exc())
