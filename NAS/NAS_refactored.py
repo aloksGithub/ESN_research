@@ -16,6 +16,7 @@ import queue
 import warnings
 import pickle
 from NAS.memory_estimator import estimateMemory
+import traceback
 warnings.filterwarnings("ignore")
 
 rpy.verbosity(0)
@@ -341,7 +342,8 @@ def evaluateArchitecture(individual, trainX, trainY, valX, valY, errorMetrics=[n
             preds = runModel(model, valX)
             errors = [metric(valY, preds) for metric in errorMetrics]
             q.put([errors, model])
-        except Exception as e:
+        except:
+            print(traceback.format_exc())
             q.put([defaultErrors, model])
 
     errors = []
@@ -371,7 +373,7 @@ def evaluateArchitectureAutoRegressive(individual, trainX, trainY, valX, valY, e
     the output from the current timestep is used as input for next timestep
     """
     if not isValidArchitecture(individual, len(trainX), memoryLimit):
-        return np.inf, 0, constructModel(individual)
+        return defaultErrors, constructModel(individual)
     q = queue.Queue()
 
     def work():
@@ -387,7 +389,8 @@ def evaluateArchitectureAutoRegressive(individual, trainX, trainY, valX, valY, e
             preds = np.array(preds)
             errors = [metric(valY, preds) for metric in errorMetrics]
             q.put([errors, model])
-        except Exception as e:
+        except:
+            print(traceback.format_exc())
             q.put([defaultErrors, model])
 
     errors = []
@@ -514,6 +517,7 @@ def runGA(params, useBackup = False):
         random_population = [creator.Individual(individual) for individual in  generateArchitectures(params["generator"], params["populationSize"] - len(params["seedModels"]), params["n_jobs"])]
         seed_population = [creator.Individual(individual) for individual in params["seedModels"]]
         population = seed_population + random_population
+        print("Finished generating initial population")
 
         fitnesses = Parallel(n_jobs=params["n_jobs"])(delayed(params["evaluator"])(architecture) for architecture in population)
         for ind, fitness_model in zip(population, fitnesses):
