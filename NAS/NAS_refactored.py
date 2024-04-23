@@ -326,7 +326,7 @@ def r_squared(y_true, y_pred):
     denominator = np.sum((y_true - np.mean(y_true))**2)
     return 1 - (numerator / denominator)
     
-def evaluateArchitecture(individual, trainX, trainY, valX, valY, errorMetrics=[nrmse], defaultErrors=[np.inf], numEvals=3, timeout=180, memoryLimit=4*1024):
+def evaluateArchitecture(individual, trainX, trainY, valX, valY, errorMetrics=[nrmse], defaultErrors=[np.inf], numEvals=3, timeout=360, memoryLimit=4*1024):
     """
     Instantiate random models using given architecture, then train and evaluate them
     on one step ahead prediction using errorMetrics on valX and valY.
@@ -343,7 +343,7 @@ def evaluateArchitecture(individual, trainX, trainY, valX, valY, errorMetrics=[n
             errors = [metric(valY, preds) for metric in errorMetrics]
             q.put([errors, model])
         except:
-            print(traceback.format_exc())
+            # print(traceback.format_exc())
             q.put([defaultErrors, model])
 
     errors = []
@@ -353,7 +353,6 @@ def evaluateArchitecture(individual, trainX, trainY, valX, valY, errorMetrics=[n
         thread.start()
         thread.join(timeout=timeout)
         if thread.is_alive():
-            print("Thread timeout")
             errors.append(defaultErrors)
             models.append(constructModel(individual))
         else:
@@ -391,7 +390,7 @@ def evaluateArchitectureAutoRegressive(individual, trainX, trainY, valX, valY, e
             errors = [metric(valY, preds) for metric in errorMetrics]
             q.put([errors, model])
         except:
-            print(traceback.format_exc())
+            # print(traceback.format_exc())
             q.put([defaultErrors, model])
 
     errors = []
@@ -401,7 +400,6 @@ def evaluateArchitectureAutoRegressive(individual, trainX, trainY, valX, valY, e
         thread.start()
         thread.join(timeout=timeout)
         if thread.is_alive():
-            print("Thread timeout")
             errors.append(defaultErrors)
             models.append(constructModel(individual))
         else:
