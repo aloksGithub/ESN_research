@@ -353,6 +353,7 @@ def evaluateArchitecture(individual, trainX, trainY, valX, valY, errorMetrics=[n
         thread.start()
         thread.join(timeout=timeout)
         if thread.is_alive():
+            print("Thread timeout")
             errors.append(defaultErrors)
             models.append(constructModel(individual))
         else:
@@ -400,6 +401,7 @@ def evaluateArchitectureAutoRegressive(individual, trainX, trainY, valX, valY, e
         thread.start()
         thread.join(timeout=timeout)
         if thread.is_alive():
+            print("Thread timeout")
             errors.append(defaultErrors)
             models.append(constructModel(individual))
         else:
