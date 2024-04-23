@@ -47,7 +47,7 @@ trainX, trainY, valX, valY, testX, testY = getData()
 gaParams = {
     "evaluator": partial(NAS_refactored.evaluateArchitecture, trainX=trainX, trainY=trainY, valX=valX, valY=valY, numEvals=1, memoryLimit=4*1024),
     "generator": partial(NAS_refactored.generateRandomArchitecture, sampleX=trainX[:2000], sampleY=trainY[:2000], validThreshold=10, maxInput=len(trainX), memoryLimit=4*1024, numVal=200),
-    "populationSize": 25,
+    "populationSize": 10,
     "eliteSize": 1,
     "stagnationReset": 5,
     "generations": 20,
@@ -57,7 +57,7 @@ gaParams = {
     "crossoverProbability": 0.7,
     "mutationProbability": 0.2,
     "earlyStop": 0,
-    "n_jobs": 25,
+    "n_jobs": 10,
     "outputDim": trainY.shape[-1],
     "memoryLimitPerJob": 4 * 1024,
     "saveModels": False,
