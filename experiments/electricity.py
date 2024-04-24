@@ -60,6 +60,7 @@ if __name__ == "__main__":
             trainY.shape[-1],
             n_jobs=3,
             timeout=480,
+            errorMetrics=[nmse],
             saveLocation='backup/electricity/backup_{}.obj'.format(i)
         )
         gaResults = ga.run()
