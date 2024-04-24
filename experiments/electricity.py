@@ -8,6 +8,7 @@ current_dir = os.path.abspath(os.path.dirname(__file__))
 parent_dir = os.path.dirname(current_dir)
 sys.path.insert(0, parent_dir)
 from NAS import NAS_refactored
+from NAS.ESN_NAS import ESN_NAS
 warnings.filterwarnings("ignore")
 import traceback
 import sys
@@ -21,7 +22,7 @@ def getData():
     df = pd.read_csv("data/electricity.csv", index_col="Unnamed: 0")
     df.index = pd.to_datetime(df['Date'] + " " + df['Time'])
     df = df.sort_index()
-    # df = df.iloc[:100000]
+    # df = df.iloc[:60000]
 
     df['Target_active_power'] = df['Global_active_power'].shift(-1)
     df = df.replace("?", np.nan).ffill().dropna()
@@ -44,38 +45,25 @@ def getData():
 
 trainX, trainY, valX, valY, testX, testY = getData()
 
-gaParams = {
-    "evaluator": partial(NAS_refactored.evaluateArchitecture, trainX=trainX, trainY=trainY, valX=valX, valY=valY, numEvals=1, memoryLimit=4*1024),
-    "generator": partial(NAS_refactored.generateRandomArchitecture, sampleX=trainX[:2000], sampleY=trainY[:2000], validThreshold=10, maxInput=len(trainX), memoryLimit=4*1024, numVal=200),
-    "populationSize": 10,
-    "eliteSize": 1,
-    "stagnationReset": 5,
-    "generations": 20,
-    "minimizeFitness": True,
-    "logModels": False,
-    "seedModels": [],
-    "crossoverProbability": 0.7,
-    "mutationProbability": 0.2,
-    "earlyStop": 0,
-    "n_jobs": 10,
-    "outputDim": trainY.shape[-1],
-    "memoryLimitPerJob": 4 * 1024,
-    "saveModels": False,
-    "dataset": "electricity"
-}
+def nmse(true, pred):
+    return mse(true, pred) / 0.0439292598
 
 if __name__ == "__main__":
     for i in range(1):
-        error = False
-        gaParams["experimentIndex"] = i
-        while True:
-            try:
-                gaResults = NAS_refactored.runGA(gaParams, error)
-                model = gaResults["bestModel"]
-                preds = NAS_refactored.runModel(model, testX)
-                print("MSE:", mse(testY, preds))
-                print("Norm MSE:", mse(testY, preds) / 0.0439292598)
-                break
-            except:
-                print(traceback.format_exc())
-                error = True
+        ga = ESN_NAS(
+            trainX,
+            trainY,
+            valX,
+            valY,
+            20,
+            50,
+            trainY.shape[-1],
+            n_jobs=3,
+            timeout=480,
+            saveLocation='backup/electricity/backup_{}.obj'.format(i)
+        )
+        gaResults = ga.run()
+        model = gaResults["bestModel"]
+        preds = NAS_refactored.runModel(model, testX)
+        print("MSE:", mse(testY, preds))
+        print("Norm MSE:", nmse(testY, preds))
