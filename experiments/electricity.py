@@ -58,7 +58,7 @@ if __name__ == "__main__":
             20,
             50,
             trainY.shape[-1],
-            n_jobs=3,
+            n_jobs=25,
             timeout=480,
             errorMetrics=[nmse],
             saveLocation='backup/electricity/backup_{}.obj'.format(i)
