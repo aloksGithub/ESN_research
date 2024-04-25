@@ -55,11 +55,11 @@ if __name__ == "__main__":
             trainY,
             valX,
             valY,
-            20,
-            50,
+            10,
+            15,
             trainY.shape[-1],
-            n_jobs=25,
-            timeout=480,
+            n_jobs=5,
+            timeout=2*480,
             errorMetrics=[nmse],
             saveLocation='backup/electricity/backup_{}.obj'.format(i)
         )

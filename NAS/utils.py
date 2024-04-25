@@ -332,3 +332,10 @@ def runModel(model, x):
         return nodePreds
     else:
         return nodePreds[output_nodes[-1]]
+    
+def smape(yTrue, preds):
+    tmp = 2 * np.abs(preds - yTrue) / (np.abs(yTrue) + np.abs(preds))
+    len_ = np.count_nonzero(~np.isnan(tmp))
+    if len_ == 0 and np.nansum(tmp) == 0: # Deals with a special case
+        return 100
+    return 100 / len_ * np.nansum(tmp)

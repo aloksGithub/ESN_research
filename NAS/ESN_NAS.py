@@ -155,11 +155,15 @@ class ESN_NAS:
         models = []
         for _ in range(self.numEvals):
             model = constructModel(individual)
-            model = trainModel(model, self.trainX, self.trainY)
-            preds = runModel(model, self.valX)
-            modelErrors = [metric(self.valY, preds) for metric in self.errorMetrics]
-            errors.append(modelErrors)
-            models.append(model)
+            try:
+                model = trainModel(model, self.trainX, self.trainY)
+                preds = runModel(model, self.valX)
+                modelErrors = [metric(self.valY, preds) for metric in self.errorMetrics]
+                errors.append(modelErrors)
+                models.append(model)
+            except:
+                errors.append(self.defaultErrors)
+                models.append(model)
                 
             # Find index for model with best error metrics
             error0 = [modelErrors[0] for modelErrors in errors]
@@ -186,17 +190,21 @@ class ESN_NAS:
         models = []
         for _ in range(self.numEvals):
             model = constructModel(individual)
-            model = trainModel(model, self.trainX, self.trainY)
-            prevOutput = self.valX[0]
-            preds = []
-            for _ in range(len(self.valX)):
-                pred = runModel(model, prevOutput)
-                prevOutput = pred
-                preds.append(pred[0])
-            preds = np.array(preds)
-            modelErrors = [metric(self.valY, preds) for metric in self.errorMetrics]
-            errors.append(modelErrors)
-            models.append(model)
+            try:
+                model = trainModel(model, self.trainX, self.trainY)
+                prevOutput = self.valX[0]
+                preds = []
+                for _ in range(len(self.valX)):
+                    pred = runModel(model, prevOutput)
+                    prevOutput = pred
+                    preds.append(pred[0])
+                preds = np.array(preds)
+                modelErrors = [metric(self.valY, preds) for metric in self.errorMetrics]
+                errors.append(modelErrors)
+                models.append(model)
+            except:
+                errors.append(self.defaultErrors)
+                models.append(model)
 
             # Find index for model with best error metrics
             error0 = [modelErrors[0] for modelErrors in errors]
@@ -286,7 +294,13 @@ class ESN_NAS:
                 population[:] = offspring
             
             bestFitness = min(self.fitnesses)
-            print("Generation", gen, "Best so far:", bestFitness)
+            numFailures = 0
+            for fitness in self.fitnesses[-self.populationSize:]:
+                if fitness[0]==self.defaultFitness:
+                    numFailures+=1
+            print("=======================Generation {}=======================".format(gen))
+            print("Best so far:", bestFitness)
+            print("Failure rate: {}%".format(100*numFailures/self.populationSize))
 
             checkpoint = {
                 "generation": gen,
