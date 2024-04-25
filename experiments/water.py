@@ -41,7 +41,7 @@ if __name__ == "__main__":
             15,
             50,
             trainY.shape[-1],
-            n_jobs=5,
+            n_jobs=25,
             errorMetrics=[mse, smape],
             defaultErrors=[np.inf, np.inf],
             timeout=480,
