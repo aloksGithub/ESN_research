@@ -44,8 +44,8 @@ if __name__ == "__main__":
             n_jobs=25,
             errorMetrics=[mse, smape],
             defaultErrors=[np.inf, np.inf],
-            timeout=480,
-            numEvals=3,
+            timeout=2*480,
+            numEvals=2,
             saveLocation='backup/electricity/backup_{}.obj'.format(i)
         )
         gaResults = ga.run()
