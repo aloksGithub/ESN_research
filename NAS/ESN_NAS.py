@@ -161,7 +161,8 @@ class ESN_NAS:
                 modelErrors = [metric(self.valY, preds) for metric in self.errorMetrics]
                 errors.append(modelErrors)
                 models.append(model)
-            except:
+            except Exception as e:
+                print(e)
                 errors.append(self.defaultErrors)
                 models.append(model)
                 
@@ -221,6 +222,7 @@ class ESN_NAS:
             parallel = Parallel(n_jobs=self.n_jobs, timeout=self.timeout, require='sharedmem')
             parallel(delayed(self.evaluateArchitecture)(architecture) for architecture in population)
         except:
+            print("Timedout")
             pass
         
         for result in self.fitnessCache:
