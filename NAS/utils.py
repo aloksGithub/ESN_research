@@ -142,16 +142,9 @@ def isValidArchitecture(architecture, numInputs, memoryLimit):
             ipExists = True
         if node["type"]=="LMS" or node["type"]=="RLS":
             forceExists = True
-        if node["type"]=="NVAR":
-            for connection in architecture["edges"]:
-                if connection[1]!=i:
-                    continue
-                prevNode = architecture["nodes"][connection[0]]
-                if prevNode["type"]=="Reservoir" or prevNode["type"]=="IPReservoir" or prevNode["type"]=="NVAR":
-                    return False
     if ipExists and forceExists:
         return False
-    memoryEstimate = estimateMemory(constructModel(architecture), numInputs)
+    memoryEstimate = estimateMemory(architecture, numInputs)
     if memoryEstimate>memoryLimit:
         return False
     return True
@@ -238,7 +231,7 @@ def generateRandomArchitecture(sampleX, sampleY, validThreshold, maxInput=None, 
     # Try to run the model on a small sample to see if it is a valid network
     # Otherwise generate a new architecture
     try:
-        expectedMaxMemory = estimateMemory(constructModel(architecture), maxInput)
+        expectedMaxMemory = estimateMemory(architecture, maxInput)
         if expectedMaxMemory>memoryLimit: raise Exception("Bad Model")
         performances, _ = evaluateArchitecture(architecture, sampleX[:-numVal], sampleY[:-numVal], sampleX[-numVal:], sampleY[-numVal:], numEvals=1)
         if math.isnan(performances[0]) or np.isinf(performances[0]) or performances[0]>validThreshold: raise Exception("Bad Model")

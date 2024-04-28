@@ -124,22 +124,45 @@ def estimate_reservoir_memory(units, input_shape):
 
     return memory_mb
 
-def estimateMemory(model, numInputs):
-    model.initialize()
-    memories = []
-    for node in model.nodes:
-        name = node.name.split("-")[0]
-        if name=="Concat" or name=="Input":
+def getInputDimension(architecture, idx):
+    if idx==0:
+        return architecture["nodes"][0]["params"]["input_dim"]
+    inputDims = 0
+    for edge in architecture["edges"]:
+        if edge[1]!=idx: continue
+        inputDim = getInputDimension(architecture, edge[0])
+        inputNode = architecture["nodes"][edge[0]]
+        outputDim = 0
+        if inputNode["type"]=="Input":
+            outputDim = inputDim
+        elif inputNode["type"]=="Reservoir" or inputNode["type"]=="IPReservoir":
+            outputDim = inputNode["params"]["units"]
+        elif inputNode["type"]=="NVAR":
+            effective_linear_dim = inputNode["params"]["delay"] * inputDim
+            nonlinear_dim = comb(effective_linear_dim + inputNode["params"]["order"] - 1, inputNode["params"]["order"], exact=True)
+            outputDim = effective_linear_dim + nonlinear_dim
+        elif inputNode["type"]=="Ridge" or inputNode["type"]=="RLS" or inputNode["type"]=="LMS":
+            outputDim = inputNode["params"]["output_dim"]
+        inputDims+=outputDim
+
+    return inputDims
+
+def estimateMemory(architecture, numInputs):
+    maxMemory = 0
+    for i, node in enumerate(architecture["nodes"]):
+        inputDimension = getInputDimension(architecture, i)
+        memory = 0
+        if node["type"]=="Input":
             continue
-        if name=="LMS":
-            memory = estimate_lms_memory(node.input_dim, node.output_dim)
-        elif name=="RLS":
-            memory = estimate_rls_memory(node.input_dim)
-        elif name=="Ridge":
-            memory = estimate_ridge_memory(node.output_dim, [numInputs, node.input_dim])
-        elif name=="NVAR":
-            memory = estimate_nvar_memory(node.delay, node.order, [numInputs, node.input_dim])
-        elif name=="Reservoir" or name=="IPReservoir":
-            memory = estimate_reservoir_memory(node.units, [numInputs, node.input_dim])
-        memories.append(memory)
-    return max(memories)
+        if node["type"]=="LMS":
+            memory = estimate_lms_memory(inputDimension, node["params"]["output_dim"])
+        elif node["type"]=="RLS":
+            memory = estimate_rls_memory(inputDimension)
+        elif node["type"]=="Ridge":
+            memory = estimate_ridge_memory(node["params"]["output_dim"], [numInputs, inputDimension])
+        elif node["type"]=="NVAR":
+            memory = estimate_nvar_memory(node["params"]["delay"], node["params"]["order"], [numInputs, inputDimension])
+        elif node["type"]=="Reservoir" or node["type"]=="IPReservoir":
+            memory = estimate_reservoir_memory(node["params"]["units"], [numInputs, inputDimension])
+        maxMemory = max(memory, maxMemory)
+    return maxMemory
