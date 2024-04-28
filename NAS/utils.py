@@ -106,9 +106,9 @@ nodeParameterRanges = {
         "fb_connectivity": {"lower": 0.05, "upper": 0.5, "intOnly": False}
     },
     "NVAR": {
-        "delay": {"lower": 1, "upper": 4, "intOnly": True},
-        "order": {"lower": 1, "upper": 2, "intOnly": True},
-        "strides": {"lower": 1, "upper": 2, "intOnly": True}
+        "delay": {"lower": 1, "upper": 5, "intOnly": True},
+        "order": {"lower": 1, "upper": 5, "intOnly": True},
+        "strides": {"lower": 1, "upper": 5, "intOnly": True}
     },
     "Ridge": {
         "ridge": {"lower": 0, "upper": 0.0001, "intOnly": False}
@@ -157,7 +157,7 @@ def isValidArchitecture(architecture, numInputs, memoryLimit):
     return True
 
 def generateRandomArchitecture(sampleX, sampleY, validThreshold, maxInput=None, memoryLimit=4*1024, numVal=100):
-    num_nodes = random.randint(2, 4)
+    num_nodes = random.randint(2, 9)
 
     nodes = [
         {"type": "Input", "params": {"input_dim": sampleX.shape[-1]}}
