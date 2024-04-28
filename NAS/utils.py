@@ -235,13 +235,11 @@ def generateRandomArchitecture(sampleX, sampleY, validThreshold, maxInput=None, 
 
     architecture = {"nodes": nodes, "edges": edges}
 
-    expectedMaxMemory = estimateMemory(constructModel(architecture), maxInput)
-    if expectedMaxMemory>memoryLimit:
-        return generateRandomArchitecture(sampleX, sampleY, validThreshold, maxInput, memoryLimit, numVal)
-
     # Try to run the model on a small sample to see if it is a valid network
     # Otherwise generate a new architecture
     try:
+        expectedMaxMemory = estimateMemory(constructModel(architecture), maxInput)
+        if expectedMaxMemory>memoryLimit: raise Exception("Bad Model")
         performances, _ = evaluateArchitecture(architecture, sampleX[:-numVal], sampleY[:-numVal], sampleX[-numVal:], sampleY[-numVal:], numEvals=1)
         if math.isnan(performances[0]) or np.isinf(performances[0]) or performances[0]>validThreshold: raise Exception("Bad Model")
         return architecture
