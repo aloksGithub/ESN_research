@@ -50,7 +50,8 @@ if __name__ == "__main__":
             defaultErrors=[np.inf, np.inf],
             timeout=480,
             numEvals=1,
-            saveLocation='backup/electricity/backup_{}.obj'.format(i)
+            saveLocation='backup/electricity/backup_{}.obj'.format(i),
+            memoryLimit=2*1024
         )
         gaResults = ga.run()
         model = gaResults["bestModel"]
