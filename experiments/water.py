@@ -13,6 +13,7 @@ import sys
 import pandas as pd
 import math
 from reservoirpy.observables import (mse)
+import pickle
 
 rpy.verbosity(0)
 
@@ -33,23 +34,32 @@ trainX, trainY, valX, valY, testX, testY = getData()
 
 if __name__ == "__main__":
     for i in range(1):
+        # file = open('backup/electricity/backup_{}.obj'.format(i), 'rb')
+        # data = pickle.load(file)
+        # model = data["bestModel"]
         ga = ESN_NAS(
             trainX,
             trainY,
             valX,
             valY,
-            15,
             50,
+            100,
             trainY.shape[-1],
             n_jobs=25,
             errorMetrics=[mse, smape],
             defaultErrors=[np.inf, np.inf],
-            timeout=8*480,
-            numEvals=2,
+            timeout=480,
+            numEvals=1,
             saveLocation='backup/electricity/backup_{}.obj'.format(i)
         )
         gaResults = ga.run()
         model = gaResults["bestModel"]
         preds = runModel(model, testX)
-        print("MSE:", mse(testY, preds))
-        print("SMAPE:", smape(testY, preds))
+        print("MSE (1-7):", mse(testY[:, :7], preds[:, :7]))
+        print("SMAPE (1-7):", smape(testY[:, :7], preds[:, :7]))
+        print("MSE (8-12):", mse(testY[:, 7:13], preds[:, 7:13]))
+        print("SMAPE (8-12):", smape(testY[:, 7:13], preds[:, 7:13]))
+        print("MSE (13-18):", mse(testY[:, 13:18], preds[:, 13:18]))
+        print("SMAPE (13-18):", smape(testY[:, 13:18], preds[:, 13:18]))
+        print("MSE (1-18):", mse(testY, preds))
+        print("SMAPE (1-18):", smape(testY, preds))
