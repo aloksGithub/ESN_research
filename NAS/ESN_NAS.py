@@ -297,8 +297,9 @@ class ESN_NAS:
             
             bestFitness = min(self.fitnesses)
             numFailures = 0
-            for fitness in self.fitnesses[-self.populationSize:]:
+            for index, fitness in enumerate(self.fitnesses[-self.populationSize:]):
                 if fitness[0]==self.defaultFitness:
+                    print(self.architectures[-self.populationSize:][index])
                     numFailures+=1
             print("=======================Generation {}=======================".format(gen))
             print("Best so far:", bestFitness)
