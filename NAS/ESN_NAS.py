@@ -23,6 +23,21 @@ warnings.filterwarnings("ignore")
 
 rpy.verbosity(0)
 
+def fixInvalidArchitecture(architecture):
+    ipIndex = -1
+    forceIndex = -1
+    for i, node in enumerate(architecture["nodes"]):
+        if node["type"]=="IPReservoir":
+            ipIndex = i
+        if node["type"]=="LMS" or node["type"]=="RLS":
+            forceIndex = i
+    if ipIndex>0 and forceIndex>0:
+        if random.random() < 0.5:
+            architecture["nodes"][ipIndex] = generateRandomNodeParams("Reservoir", 0)
+        else:
+            architecture["nodes"][forceIndex] = generateRandomNodeParams("Ridge", architecture["nodes"][-1]["params"]["output_dim"])
+    return architecture
+
 # Crossover function
 def crossover_one_point(ind1, ind2):
     maxNodeIndex = max(len(ind1['nodes']), len(ind2['nodes'])) - 1
@@ -30,8 +45,12 @@ def crossover_one_point(ind1, ind2):
     point2 = random.randint(point1, maxNodeIndex)
     child1_nodes = ind1['nodes'][:point1] + ind2['nodes'][point1:point2] + ind1['nodes'][point2:]
     child2_nodes = ind2['nodes'][:point1] + ind1['nodes'][point1:point2] + ind2['nodes'][point2:]
+    child1 = {"nodes": child1_nodes, "edges": ind1['edges']}
+    child2 = {"nodes": child2_nodes, "edges": ind2['edges']}
 
-    return ({"nodes": child1_nodes, "edges": ind1['edges']}, {"nodes": child2_nodes, "edges": ind2['edges']})
+    child1 = fixInvalidArchitecture(child1)
+    child2 = fixInvalidArchitecture(child2)
+    return (child1, child2)
 
 # Mutation function
 def mutate(ind, output_dim):
@@ -58,7 +77,7 @@ def mutate(ind, output_dim):
         else:
             ind['nodes'][idx]['params'][param_name] = random.random() * (param_range["upper"] - param_range["lower"]) + param_range["lower"]
     
-    return ind
+    return fixInvalidArchitecture(ind)
 
 def generateArchitectures(generator, n, n_jobs):
     architectures = Parallel(n_jobs=n_jobs)(delayed(generator)() for i in range(n))
