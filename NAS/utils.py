@@ -8,7 +8,7 @@ import random
 import math
 import warnings
 from NAS.memory_estimator import estimateMemory
-import traceback
+import time
 warnings.filterwarnings("ignore")
 
 rpy.verbosity(0)
@@ -134,7 +134,7 @@ def generateRandomNodeParams(nodeType, output_dim):
             params[parameterName] = random.random() * (parameterRange["upper"] - parameterRange["lower"]) + parameterRange["lower"]
     return params
 
-def isValidArchitecture(architecture, numInputs, memoryLimit):
+def isValidArchitecture(architecture, numInputs, memoryLimit, timeLimit):
     ipExists = False
     forceExists = False
     for i, node in enumerate(architecture["nodes"]):
@@ -147,13 +147,48 @@ def isValidArchitecture(architecture, numInputs, memoryLimit):
     memoryEstimate = estimateMemory(architecture, numInputs)
     if memoryEstimate>memoryLimit:
         return False
+    
+    try:
+        inputDim = architecture["nodes"][0]["params"]["input_dim"]
+        outputDim = architecture["nodes"][-1]["params"]["output_dim"]
+        start = time.time()
+        evaluateArchitecture(
+            architecture,
+            np.random.random((100, inputDim)),
+            np.random.random((100, outputDim)),
+            np.random.random((100, inputDim)),
+            np.random.random((100, outputDim)),
+            numEvals=1
+        )
+        timeTaken1 = time.time() - start
+    
+        isOnlineTrained = False
+        for node in architecture["nodes"]:
+            if node["type"]=="LMS" or node["type"]=="RLS":
+                isOnlineTrained = True
+        if isOnlineTrained:
+            start = time.time()
+            evaluateArchitecture(
+                architecture,
+                np.random.random((200, inputDim)),
+                np.random.random((200, outputDim)),
+                np.random.random((200, inputDim)),
+                np.random.random((200, outputDim)),
+                numEvals=1
+            )
+            timeTaken2 = time.time() - start
+            expectedTime = timeTaken1 + (numInputs * (timeTaken2 - timeTaken1 / (200 - 100)))
+            if expectedTime>timeLimit:
+                return False
+    except:
+        return False
     return True
 
-def generateRandomArchitecture(sampleX, sampleY, validThreshold, maxInput=None, memoryLimit=4*1024, numVal=100):
+def generateRandomArchitecture(inputDim, outputDim, maxInput=None, memoryLimit=4*1024, timeLimit=180):
     num_nodes = random.randint(2, 9)
 
     nodes = [
-        {"type": "Input", "params": {"input_dim": sampleX.shape[-1]}}
+        {"type": "Input", "params": {"input_dim": inputDim}}
     ]
 
     for i in range(num_nodes):
@@ -174,7 +209,7 @@ def generateRandomArchitecture(sampleX, sampleY, validThreshold, maxInput=None, 
         
         node_type = random.choice(available_node_types)
 
-        node_params = generateRandomNodeParams(node_type, sampleY.shape[-1])
+        node_params = generateRandomNodeParams(node_type, outputDim)
         nodes.append({"type": node_type, "params": node_params})
 
     edges = []
@@ -208,13 +243,13 @@ def generateRandomArchitecture(sampleX, sampleY, validThreshold, maxInput=None, 
             ipExists = True
     if ipExists:
         readouts = [
-            {"type": "Ridge", "params": generateRandomNodeParams("Ridge", sampleY.shape[-1])}
+            {"type": "Ridge", "params": generateRandomNodeParams("Ridge", outputDim)}
         ]
     else:
         readouts = [
-            {"type": "Ridge", "params": generateRandomNodeParams("Ridge", sampleY.shape[-1])},
-            {"type": "LMS", "params": generateRandomNodeParams("LMS", sampleY.shape[-1])},
-            {"type": "RLS", "params": generateRandomNodeParams("RLS", sampleY.shape[-1])}
+            {"type": "Ridge", "params": generateRandomNodeParams("Ridge", outputDim)},
+            {"type": "LMS", "params": generateRandomNodeParams("LMS", outputDim)},
+            {"type": "RLS", "params": generateRandomNodeParams("RLS", outputDim)}
         ]
     nodes.append(random.choice(readouts))
 
@@ -228,28 +263,19 @@ def generateRandomArchitecture(sampleX, sampleY, validThreshold, maxInput=None, 
 
     architecture = {"nodes": nodes, "edges": edges}
 
-    # Try to run the model on a small sample to see if it is a valid network
-    # Otherwise generate a new architecture
-    try:
-        expectedMaxMemory = estimateMemory(architecture, maxInput)
-        if expectedMaxMemory>memoryLimit: raise Exception("Bad Model")
-        performances, _ = evaluateArchitecture(architecture, sampleX[:-numVal], sampleY[:-numVal], sampleX[-numVal:], sampleY[-numVal:], numEvals=1)
-        if math.isnan(performances[0]) or np.isinf(performances[0]) or performances[0]>validThreshold: raise Exception("Bad Model")
+    if isValidArchitecture(architecture, maxInput, memoryLimit, timeLimit):
         return architecture
-    except Exception as e:
-        return generateRandomArchitecture(sampleX, sampleY, validThreshold, maxInput, memoryLimit, numVal)
+    else:
+        return generateRandomArchitecture(inputDim, outputDim, maxInput, memoryLimit, timeLimit)
     
   
-def evaluateArchitecture(individual, trainX, trainY, valX, valY, errorMetrics=[nrmse], defaultErrors=[np.inf], numEvals=3, memoryLimit=4*1024):
+def evaluateArchitecture(individual, trainX, trainY, valX, valY, errorMetrics=[nrmse], defaultErrors=[np.inf], numEvals=3):
     """
     Instantiate random models using given architecture, then train and evaluate them
     on one step ahead prediction using errorMetrics on valX and valY.
     """
     index = len(globalFitnesses)
     globalFitnesses.append([individual, defaultErrors, constructModel(individual)])
-
-    if not isValidArchitecture(individual, len(trainX), memoryLimit):
-        return globalFitnesses[index][1], globalFitnesses[index][2]
 
     errors = []
     models = []

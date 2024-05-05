@@ -19,65 +19,11 @@ import warnings
 import pickle
 from NAS.memory_estimator import estimateMemory
 import traceback
+import copy
 warnings.filterwarnings("ignore")
 
 rpy.verbosity(0)
 
-def fixInvalidArchitecture(architecture):
-    ipIndex = -1
-    forceIndex = -1
-    for i, node in enumerate(architecture["nodes"]):
-        if node["type"]=="IPReservoir":
-            ipIndex = i
-        if node["type"]=="LMS" or node["type"]=="RLS":
-            forceIndex = i
-    if ipIndex>0 and forceIndex>0:
-        if random.random() < 0.5:
-            architecture["nodes"][ipIndex] = generateRandomNodeParams("Reservoir", 0)
-        else:
-            architecture["nodes"][forceIndex] = generateRandomNodeParams("Ridge", architecture["nodes"][-1]["params"]["output_dim"])
-    return architecture
-
-# Crossover function
-def crossover_one_point(ind1, ind2):
-    maxNodeIndex = max(len(ind1['nodes']), len(ind2['nodes'])) - 1
-    point1 = random.randint(1, maxNodeIndex-1)
-    point2 = random.randint(point1, maxNodeIndex)
-    child1_nodes = ind1['nodes'][:point1] + ind2['nodes'][point1:point2] + ind1['nodes'][point2:]
-    child2_nodes = ind2['nodes'][:point1] + ind1['nodes'][point1:point2] + ind2['nodes'][point2:]
-    child1 = {"nodes": child1_nodes, "edges": ind1['edges']}
-    child2 = {"nodes": child2_nodes, "edges": ind2['edges']}
-
-    child1 = fixInvalidArchitecture(child1)
-    child2 = fixInvalidArchitecture(child2)
-    return (child1, child2)
-
-# Mutation function
-def mutate(ind, output_dim):
-    """
-    Mutate an individual. We can either:
-    1. Swap out a node (excluding Input and Ridge nodes).
-    2. Change a parameter of a node (again excluding Input and Ridge nodes).
-    """
-    mutation_type = random.choice(["swap_node", "change_param"])
-    
-    if mutation_type == "swap_node":
-        idx = random.randint(1, len(ind['nodes'])-2)  # Excluding Input and Ridge
-        node_type = random.choice(list(nodeConstructors.keys() - {"Input"}))
-        ind['nodes'][idx] = {"type": node_type, "params": generateRandomNodeParams(node_type, output_dim)}
-    
-    elif mutation_type == "change_param":
-        idx = random.randint(1, len(ind['nodes'])-2)  # Excluding Input and Ridge
-        node_type = ind['nodes'][idx]['type']
-        param_name = random.choice(list(nodeParameterRanges[node_type].keys()))
-        param_range = nodeParameterRanges[node_type][param_name]
-        
-        if param_range["intOnly"]:
-            ind['nodes'][idx]['params'][param_name] = random.randint(param_range["lower"], param_range["upper"])
-        else:
-            ind['nodes'][idx]['params'][param_name] = random.random() * (param_range["upper"] - param_range["lower"]) + param_range["lower"]
-    
-    return fixInvalidArchitecture(ind)
 
 def generateArchitectures(generator, n, n_jobs):
     architectures = Parallel(n_jobs=n_jobs)(delayed(generator)() for i in range(n))
@@ -149,8 +95,8 @@ class ESN_NAS:
 
         self.toolbox = base.Toolbox()
         
-        self.toolbox.register("mate", crossover_one_point)
-        self.toolbox.register("mutate", mutate, output_dim = outputDim)
+        self.toolbox.register("mate", self.crossover_one_point)
+        self.toolbox.register("mutate", self.mutate, output_dim = outputDim)
         self.toolbox.register("select", tools.selBest)
         self.toolbox.register("selectWorst", tools.selWorst)
 
@@ -159,6 +105,54 @@ class ESN_NAS:
         self.valX = valX
         self.valY = valY
     
+    # Crossover function
+    def crossover_one_point(self, ind1, ind2):
+        ind1Copy = copy.deepcopy(ind1)
+        ind2Copy = copy.deepcopy(ind2)
+        maxNodeIndex = max(len(ind1['nodes']), len(ind2['nodes'])) - 1
+        point1 = random.randint(1, maxNodeIndex-1)
+        point2 = random.randint(point1, maxNodeIndex)
+        child1_nodes = ind1['nodes'][:point1] + ind2['nodes'][point1:point2] + ind1['nodes'][point2:]
+        child2_nodes = ind2['nodes'][:point1] + ind1['nodes'][point1:point2] + ind2['nodes'][point2:]
+        child1 = {"nodes": child1_nodes, "edges": ind1['edges']}
+        child2 = {"nodes": child2_nodes, "edges": ind2['edges']}
+
+        if isValidArchitecture(child1, len(self.trainY), self.memoryLimit, self.timeout / self.numEvals) and isValidArchitecture(child2, len(self.trainY), self.memoryLimit, self.timeout / self.numEvals):
+            return (child1, child2)
+        else:
+            return ind1Copy, ind2Copy
+
+    # Mutation function
+    def mutate(self, ind, output_dim):
+        """
+        Mutate an individual. We can either:
+        1. Swap out a node (excluding Input and Ridge nodes).
+        2. Change a parameter of a node (again excluding Input and Ridge nodes).
+        """
+        indCopy = copy.deepcopy(ind)
+        mutation_type = random.choice(["swap_node", "change_param"])
+        
+        if mutation_type == "swap_node":
+            idx = random.randint(1, len(ind['nodes'])-2)  # Excluding Input and Ridge
+            node_type = random.choice(list(nodeConstructors.keys() - {"Input"}))
+            ind['nodes'][idx] = {"type": node_type, "params": generateRandomNodeParams(node_type, output_dim)}
+        
+        elif mutation_type == "change_param":
+            idx = random.randint(1, len(ind['nodes'])-2)  # Excluding Input and Ridge
+            node_type = ind['nodes'][idx]['type']
+            param_name = random.choice(list(nodeParameterRanges[node_type].keys()))
+            param_range = nodeParameterRanges[node_type][param_name]
+            
+            if param_range["intOnly"]:
+                ind['nodes'][idx]['params'][param_name] = random.randint(param_range["lower"], param_range["upper"])
+            else:
+                ind['nodes'][idx]['params'][param_name] = random.random() * (param_range["upper"] - param_range["lower"]) + param_range["lower"]
+        
+        if isValidArchitecture(ind, len(self.trainY), self.memoryLimit, self.timeout / self.numEvals):
+            return ind
+        else:
+            return indCopy
+    
     def evaluateArchitecture(self, individual):
         """
         Instantiate random models using given architecture, then train and evaluate them
@@ -166,9 +160,6 @@ class ESN_NAS:
         """
         index = len(self.fitnessCache)
         self.fitnessCache.append([individual, self.defaultErrors, constructModel(individual)])
-
-        if not isValidArchitecture(individual, len(self.trainX), self.memoryLimit):
-            return self.fitnessCache[index][1], self.fitnessCache[index][2]
 
         errors = []
         models = []
@@ -202,9 +193,6 @@ class ESN_NAS:
         """
         index = len(self.fitnessCache)
         self.fitnessCache.append([individual, self.defaultErrors, constructModel(individual)])
-        
-        if not isValidArchitecture(individual, len(self.trainX), self.memoryLimit):
-            return self.fitnessCache[index][1], self.fitnessCache[index][2]
 
         errors = []
         models = []
@@ -259,12 +247,11 @@ class ESN_NAS:
         generatedArchitectures = generateArchitectures(
             partial(
                 generateRandomArchitecture,
-                sampleX=self.trainX[:2000],
-                sampleY=self.trainY[:2000],
-                validThreshold=10,
+                inputDim=self.trainX.shape[-1],
+                outputDim=self.trainY.shape[-1],
                 maxInput=len(self.trainX),
                 memoryLimit=self.memoryLimit,
-                numVal=200
+                timeLimit=self.timeout / self.numEvals
             ),
             numIndividuals,
             self.n_jobs

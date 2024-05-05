@@ -7,8 +7,8 @@ import warnings
 current_dir = os.path.abspath(os.path.dirname(__file__))
 parent_dir = os.path.dirname(current_dir)
 sys.path.insert(0, parent_dir)
-from NAS import NAS_refactored
 from NAS.ESN_NAS import ESN_NAS
+from NAS.utils import runModel
 warnings.filterwarnings("ignore")
 import traceback
 import sys
@@ -65,6 +65,6 @@ if __name__ == "__main__":
         )
         gaResults = ga.run()
         model = gaResults["bestModel"]
-        preds = NAS_refactored.runModel(model, testX)
+        preds = runModel(model, testX)
         print("MSE:", mse(testY, preds))
         print("Norm MSE:", nmse(testY, preds))
