@@ -48,7 +48,7 @@ if __name__ == "__main__":
             n_jobs=25,
             errorMetrics=[mse, smape],
             defaultErrors=[np.inf, np.inf],
-            timeout=480,
+            timeout=300,
             numEvals=1,
             saveLocation='backup/electricity/backup_{}.obj'.format(i),
             memoryLimit=1024

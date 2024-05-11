@@ -185,7 +185,7 @@ def isValidArchitecture(architecture, numInputs, memoryLimit, timeLimit):
     return True
 
 def generateRandomArchitecture(inputDim, outputDim, maxInput=None, memoryLimit=4*1024, timeLimit=180):
-    num_nodes = random.randint(2, 9)
+    num_nodes = random.randint(2, 5)
 
     nodes = [
         {"type": "Input", "params": {"input_dim": inputDim}}
