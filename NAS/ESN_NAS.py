@@ -263,6 +263,7 @@ class ESN_NAS:
         random_population = self.generatePopulation(self.populationSize - len(self.seedModels))
         seed_population = [creator.Individual(individual) for individual in self.seedModels]
         population = seed_population + random_population
+        print("Initial population generated")
 
         self.evaluateParallel(population)
         self.modelGenerationIndices.append(0)

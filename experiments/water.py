@@ -43,15 +43,15 @@ if __name__ == "__main__":
             valX,
             valY,
             50,
-            100,
+            25,
             trainY.shape[-1],
-            n_jobs=10,
+            n_jobs=25,
             errorMetrics=[mse, smape],
             defaultErrors=[np.inf, np.inf],
             timeout=480,
             numEvals=1,
             saveLocation='backup/electricity/backup_{}.obj'.format(i),
-            memoryLimit=2*1024
+            memoryLimit=1024
         )
         gaResults = ga.run()
         model = gaResults["bestModel"]
