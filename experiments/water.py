@@ -7,7 +7,7 @@ current_dir = os.path.abspath(os.path.dirname(__file__))
 parent_dir = os.path.dirname(current_dir)
 sys.path.insert(0, parent_dir)
 from NAS.ESN_NAS import ESN_NAS
-from NAS.utils import runModel, smape
+from NAS.utils import runModel, smape, trainModel
 warnings.filterwarnings("ignore")
 import sys
 import pandas as pd
@@ -43,7 +43,7 @@ if __name__ == "__main__":
             valX,
             valY,
             50,
-            25,
+            100,
             trainY.shape[-1],
             n_jobs=25,
             errorMetrics=[mse, smape],

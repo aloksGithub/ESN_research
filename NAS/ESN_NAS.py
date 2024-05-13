@@ -1,4 +1,5 @@
 from functools import partial
+import multiprocessing.context
 import reservoirpy as rpy
 from NAS.utils import (
     generateRandomArchitecture,
@@ -21,6 +22,9 @@ from NAS.memory_estimator import estimateMemory
 import traceback
 import copy
 warnings.filterwarnings("ignore")
+import time
+import multiprocessing
+import math
 
 rpy.verbosity(0)
 
@@ -114,13 +118,13 @@ class ESN_NAS:
         point2 = random.randint(point1, maxNodeIndex)
         child1_nodes = ind1['nodes'][:point1] + ind2['nodes'][point1:point2] + ind1['nodes'][point2:]
         child2_nodes = ind2['nodes'][:point1] + ind1['nodes'][point1:point2] + ind2['nodes'][point2:]
-        child1 = {"nodes": child1_nodes, "edges": ind1['edges']}
-        child2 = {"nodes": child2_nodes, "edges": ind2['edges']}
+        ind1["nodes"] = child1_nodes
+        ind2["nodes"] = child2_nodes
 
-        if isValidArchitecture(child1, len(self.trainY), self.memoryLimit, self.timeout / self.numEvals) and isValidArchitecture(child2, len(self.trainY), self.memoryLimit, self.timeout / self.numEvals):
-            return (child1, child2)
-        else:
-            return ind1Copy, ind2Copy
+        if not isValidArchitecture(ind1, len(self.trainY), self.memoryLimit, self.timeout / self.numEvals):
+            ind1["nodes"] = ind1Copy["nodes"]
+        if not isValidArchitecture(ind2, len(self.trainY), self.memoryLimit, self.timeout / self.numEvals):
+            ind2["nodes"] = ind2Copy["nodes"]
 
     # Mutation function
     def mutate(self, ind, output_dim):
@@ -148,10 +152,8 @@ class ESN_NAS:
             else:
                 ind['nodes'][idx]['params'][param_name] = random.random() * (param_range["upper"] - param_range["lower"]) + param_range["lower"]
         
-        if isValidArchitecture(ind, len(self.trainY), self.memoryLimit, self.timeout / self.numEvals):
-            return ind
-        else:
-            return indCopy
+        if not isValidArchitecture(ind, len(self.trainY), self.memoryLimit, self.timeout / self.numEvals):
+            ind["nodes"] = indCopy["nodes"]
     
     def evaluateArchitecture(self, individual):
         """
@@ -225,12 +227,15 @@ class ESN_NAS:
 
     def evaluateParallel(self, population):
         self.fitnessCache = []
-        try:
-            parallel = Parallel(n_jobs=self.n_jobs, timeout=self.timeout, require='sharedmem')
-            parallel(delayed(self.evaluateArchitecture)(architecture) for architecture in population)
-        except:
-            print("Timedout")
-            pass
+        startTime = time.time()
+        for i in range(math.ceil(len(population) / self.n_jobs)):
+            try:
+                evaluatedIndividuals = population[i * self.n_jobs : min(len(population), (i+1) * self.n_jobs)]
+                parallel = Parallel(n_jobs=self.n_jobs, timeout=self.timeout, require='sharedmem')
+                parallel(delayed(self.evaluateArchitecture)(architecture) for architecture in evaluatedIndividuals)
+            except multiprocessing.context.TimeoutError:
+                pass
+        print("Time taken:", time.time() - startTime, "seconds")
         
         for result in self.fitnessCache:
             ind, errors, model = result
@@ -269,6 +274,7 @@ class ESN_NAS:
         self.modelGenerationIndices.append(0)
         
         for gen in range(self.generation, self.generations + 1):
+            print("=======================Generation {}=======================".format(gen))
             self.generationsSinceImprovement+=1
             offspring = self.toolbox.select(population, self.populationSize)
             offspring = list(map(self.toolbox.clone, offspring))
@@ -308,7 +314,6 @@ class ESN_NAS:
                 if fitness[0]==self.defaultFitness:
                     print(self.architectures[-self.populationSize:][index])
                     numFailures+=1
-            print("=======================Generation {}=======================".format(gen))
             print("Best so far:", bestFitness)
             print("Failure rate: {}%".format(100*numFailures/self.populationSize))
 
