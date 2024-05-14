@@ -230,7 +230,7 @@ class ESN_NAS:
         startTime = time.time()
         for i in range(math.ceil(len(population) / self.n_jobs)):
             try:
-                print("Starting")
+                print("Starting", len(evaluatedIndividuals))
                 evaluatedIndividuals = population[i * self.n_jobs : min(len(population), (i+1) * self.n_jobs)]
                 parallel = Parallel(n_jobs=self.n_jobs, timeout=self.timeout, require='sharedmem')
                 parallel(delayed(self.evaluateArchitecture)(architecture) for architecture in evaluatedIndividuals)
