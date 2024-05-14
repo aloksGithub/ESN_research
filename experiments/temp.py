@@ -1,92 +1,59 @@
-import reservoirpy as rpy
-from reservoirpy.datasets import (lorenz, mackey_glass, narma)
-from reservoirpy.observables import (rmse, rsquare, nrmse, mse)
-import numpy as np
 import math
+import multiprocessing
+from joblib import Parallel, delayed
 import pandas as pd
-from functools import partial
-import sys
-import os
+import os, sys
+current_dir = os.path.abspath(os.path.dirname(__file__))
+parent_dir = os.path.dirname(current_dir)
+sys.path.insert(0, parent_dir)
+from NAS.utils import evaluateArchitecture, estimateMemory, isValidArchitecture
 import time
 import matplotlib.pyplot as plt
 
-# Add the parent directory to the sys.path list
-sys.path.append(os.path.abspath('../'))
-from NAS import NAS
-from joblib import Parallel, delayed
-import warnings
-warnings.filterwarnings("ignore")
-
-rpy.verbosity(0)
-output_dim = 1
-
-def nmse(y, o):
-    assert len(o) == len(y), "Both arrays must have the same length."
-    sigma2 = np.var(y)  # variance of y
-    i = len(y)
-    error = sum((o[t] - y[t])**2 for t in range(i))
-    return error / (i * sigma2)
-
-def mae(y, o):
-    assert len(o) == len(y), "Both arrays must have the same length."
-    i = len(y)
-    error = sum(abs(o[t] - y[t]) for t in range(i))
-    return error / i
-
-def mape(y, o):
-    assert len(o) == len(y), "Both arrays must have the same length."
-    i = len(y)
-    error = sum(abs(o[t] - y[t]) / abs(y[t]) for t in range(i))
-    return (error / i) * 100
-
 def getData():
-    sunspots = pd.read_csv("../datasets/Sunspots.csv")
-    data = sunspots.loc[:,"Monthly Mean Total Sunspot Number"]
-    data = np.expand_dims(data, axis=1)
-    train = data[:2000]
-    val = data[2000:2500]
-    test = data[2500:]
-    trainX = train[:-1]
-    trainY = train[1:]
-    valX = val[:-1]
-    valY = val[1:]
-    testX = test[:-1]
-    testY = test[1:]
-    return trainX, trainY, valX, valY, testX, testY
+    water = pd.read_csv("./datasets/Water.csv").to_numpy()
+    trainLen = math.floor(len(water)*0.5)
+    valLen = math.floor(len(water)*0.7)
+    
+    train_in = water[0:trainLen, :18]
+    train_out = water[0:trainLen, 18:]
+    val_in = water[trainLen:valLen, :18]
+    val_out = water[trainLen:valLen, 18:]
+    test_in = water[valLen:, :18]
+    test_out = water[valLen:, 18:]
+    return train_in, train_out, val_in, val_out, test_in, test_out
+
+trainX, trainY, valX, valY, testX, testY = getData()
+
+def checkTrainTime(architecture, numInputs):
+    start = time.time()
+    evaluateArchitecture(architecture, trainX[:numInputs], trainY[:numInputs], valX[:numInputs], valY[:numInputs])
+    timeTaken = time.time() - start
+    return timeTaken
+
+
+def wait():
+    time.sleep(20)
 
 if __name__ == "__main__":
-    trainX, trainY, valX, valY, testX, testY = getData()
+    try:
+        parallel = Parallel(n_jobs=5, timeout=3, require='sharedmem')
+        parallel(delayed(wait)() for i in range(5))
+    except multiprocessing.context.TimeoutError:
+        print("Task failed successfully")
+        pass
+    # runtimes = []
+    # architecture = {'nodes': [{'type': 'Input', 'params': {'input_dim': 18}}, {'type': 'IPReservoir', 'params': {'units': 1516, 'lr': 0.3794160763282813, 'sr': 0.9412495273142261, 'mu': 0.09315428782964497, 'sigma': 1.9996893018324113, 'learning_rate': 0.007115438623711385, 'input_connectivity': 0.19270834464023434, 'rc_connectivity': 0.4139009070019663, 'fb_connectivity': 0.4407973219740993}}, {'type': 'LMS', 'params': {'output_dim': 18, 'alpha': 0.3507005013535671}}, {'type': 'NVAR', 'params': {'delay': 5, 'order': 2, 'strides': 3}}, {'type': 'Ridge', 'params': {'output_dim': 18, 'ridge': 6.563310358305086e-06}}, {'type': 'IPReservoir', 'params': {'units': 68, 'lr': 0.8788496628894418, 'sr': 0.660379110102254, 'mu': 0.16625820180299722, 'sigma': 0.5806266716741275, 'learning_rate': 0.008367985016205044, 'input_connectivity': 0.16643347500247355, 'rc_connectivity': 0.136383107016403, 'fb_connectivity': 0.11601073175108537}}, {'type': 'Ridge', 'params': {'output_dim': 18, 'ridge': 2.2092030120388196e-05}}], 'edges': [[0, 1], [1, 2], [2, 3], [1, 4], [2, 5], [3, 6], [4, 6], [5, 6]]}
 
-    gaParams = {
-        "evaluator": partial(NAS.evaluateArchitecture, trainX=trainX, trainY=trainY, valX=valX, valY=valY),
-        "generator": partial(NAS.generateRandomArchitecture, sampleX=trainX[:2], sampleY=trainY[:2]),
-        "populationSize": 5,
-        "eliteSize": 1,
-        "stagnationReset": 5,
-        "generations": 10,
-        "minimizeFitness": True,
-        "logModels": True,
-        "seedModels": [],
-        "crossoverProbability": 0.7,
-        "mutationProbability": 0.2,
-        "earlyStop": 0,
-        "n_jobs": 5
-    }
 
-    nmseErrors = []
-    maeErrors = []
-    mapeErrors = []
-    for i in range(1):
-        models, performances, architectures = NAS.runGA(gaParams)
-        model = models[0]
-        preds = NAS.runModel(model, testX)
-        
-        performance = nmse(testY, preds)
-        print("Performance", nmse(testY, preds), mae(testY, preds), mape(testY, preds))
-        nmseErrors.append(nmse(testY, preds))
-        maeErrors.append(mae(testY, preds))
-        mapeErrors.append(mape(testY, preds))
-
-    print(np.array(nmseErrors).mean(), np.array(nmseErrors).std())
-    print(np.array(maeErrors).mean(), np.array(maeErrors).std())
-    print(np.array(mapeErrors).mean(), np.array(mapeErrors).std())
+    # print(isValidArchitecture(architecture, 4000, 1024, 480))
+    # start = time.time()
+    # perf = evaluateArchitecture(architecture, trainX, trainY, valX, valY)
+    # print(time.time() - start)
+    # print(perf)
+    # for i in range(10, 50, 10):
+    #     timeTaken = checkTrainTime(architecture, i)
+    #     print(timeTaken)
+    #     runtimes.append(timeTaken)
+    # plt.plot(runtimes)
+    # plt.show()
