@@ -161,13 +161,13 @@ class ESN_NAS:
         on one step ahead prediction using errorMetrics on valX and valY.
         """
         index = len(self.fitnessCache)
-        self.fitnessCache.append([individual, self.defaultErrors, constructModel(individual)])
+        self.fitnessCache.append([individual, self.defaultErrors, None])
 
         errors = []
         models = []
         for _ in range(self.numEvals):
-            model = constructModel(individual)
             try:
+                model = constructModel(individual)
                 model = trainModel(model, self.trainX, self.trainY)
                 preds = runModel(model, self.valX)
                 modelErrors = [metric(self.valY, preds) for metric in self.errorMetrics]
@@ -176,7 +176,7 @@ class ESN_NAS:
             except Exception as e:
                 print(e)
                 errors.append(self.defaultErrors)
-                models.append(model)
+                models.append(None)
                 
             # Find index for model with best error metrics
             error0 = [modelErrors[0] for modelErrors in errors]
@@ -194,13 +194,13 @@ class ESN_NAS:
         the output from the current timestep is used as input for next timestep
         """
         index = len(self.fitnessCache)
-        self.fitnessCache.append([individual, self.defaultErrors, constructModel(individual)])
+        self.fitnessCache.append([individual, self.defaultErrors, None])
 
         errors = []
         models = []
         for _ in range(self.numEvals):
-            model = constructModel(individual)
             try:
+                model = constructModel(individual)
                 model = trainModel(model, self.trainX, self.trainY)
                 prevOutput = self.valX[0]
                 preds = []
@@ -214,7 +214,7 @@ class ESN_NAS:
                 models.append(model)
             except:
                 errors.append(self.defaultErrors)
-                models.append(model)
+                models.append(None)
 
             # Find index for model with best error metrics
             error0 = [modelErrors[0] for modelErrors in errors]
