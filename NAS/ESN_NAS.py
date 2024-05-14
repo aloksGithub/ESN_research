@@ -233,7 +233,9 @@ class ESN_NAS:
                 evaluatedIndividuals = population[i * self.n_jobs : min(len(population), (i+1) * self.n_jobs)]
                 parallel = Parallel(n_jobs=self.n_jobs, timeout=self.timeout, require='sharedmem')
                 parallel(delayed(self.evaluateArchitecture)(architecture) for architecture in evaluatedIndividuals)
+                print("Finished")
             except multiprocessing.context.TimeoutError:
+                print("Timeout")
                 pass
         print("Time taken:", time.time() - startTime, "seconds")
         
