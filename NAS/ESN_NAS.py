@@ -315,7 +315,7 @@ class ESN_NAS:
             numFailures = 0
             for index, fitness in enumerate(self.fitnesses[-self.populationSize:]):
                 if fitness[0]==self.defaultFitness:
-                    print(self.architectures[-self.populationSize:][index])
+                    # print(self.architectures[-self.populationSize:][index])
                     numFailures+=1
             print("Best so far:", bestFitness)
             print("Failure rate: {}%".format(100*numFailures/self.populationSize))
