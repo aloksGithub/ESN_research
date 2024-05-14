@@ -236,7 +236,7 @@ class ESN_NAS:
                 parallel(delayed(self.evaluateArchitecture)(architecture) for architecture in evaluatedIndividuals)
                 print("Finished", time.time() - startTime)
             except multiprocessing.context.TimeoutError:
-                print("Timeout")
+                print("Timeout", time.time() - startTime)
                 pass
         print("Time taken:", time.time() - startTime, "seconds")
         
