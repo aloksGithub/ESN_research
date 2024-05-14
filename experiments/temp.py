@@ -33,7 +33,8 @@ def checkTrainTime(architecture, numInputs):
 
 
 def wait():
-    time.sleep(20)
+    while True:
+        pass
 
 if __name__ == "__main__":
     try:
