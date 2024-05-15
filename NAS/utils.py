@@ -148,40 +148,40 @@ def isValidArchitecture(architecture, numInputs, memoryLimit, timeLimit):
     if memoryEstimate>memoryLimit:
         return False
     
-    # try:
-    #     inputDim = architecture["nodes"][0]["params"]["input_dim"]
-    #     outputDim = architecture["nodes"][-1]["params"]["output_dim"]
-    #     start = time.time()
-    #     evaluateArchitecture(
-    #         architecture,
-    #         np.random.random((100, inputDim)),
-    #         np.random.random((100, outputDim)),
-    #         np.random.random((100, inputDim)),
-    #         np.random.random((100, outputDim)),
-    #         numEvals=1
-    #     )
-    #     timeTaken1 = time.time() - start
+    try:
+        inputDim = architecture["nodes"][0]["params"]["input_dim"]
+        outputDim = architecture["nodes"][-1]["params"]["output_dim"]
+        start = time.time()
+        evaluateArchitecture(
+            architecture,
+            np.random.random((1, inputDim)),
+            np.random.random((1, outputDim)),
+            np.random.random((1, inputDim)),
+            np.random.random((1, outputDim)),
+            numEvals=1
+        )
+        timeTaken1 = time.time() - start
     
-    #     isOnlineTrained = False
-    #     for node in architecture["nodes"]:
-    #         if node["type"]=="LMS" or node["type"]=="RLS":
-    #             isOnlineTrained = True
-    #     if isOnlineTrained:
-    #         start = time.time()
-    #         evaluateArchitecture(
-    #             architecture,
-    #             np.random.random((200, inputDim)),
-    #             np.random.random((200, outputDim)),
-    #             np.random.random((200, inputDim)),
-    #             np.random.random((200, outputDim)),
-    #             numEvals=1
-    #         )
-    #         timeTaken2 = time.time() - start
-    #         expectedTime = timeTaken1 + (numInputs * (timeTaken2 - timeTaken1 / (200 - 100)))
-    #         if expectedTime>timeLimit:
-    #             return False
-    # except:
-    #     return False
+        # isOnlineTrained = False
+        # for node in architecture["nodes"]:
+        #     if node["type"]=="LMS" or node["type"]=="RLS":
+        #         isOnlineTrained = True
+        # if isOnlineTrained:
+        #     start = time.time()
+        #     evaluateArchitecture(
+        #         architecture,
+        #         np.random.random((200, inputDim)),
+        #         np.random.random((200, outputDim)),
+        #         np.random.random((200, inputDim)),
+        #         np.random.random((200, outputDim)),
+        #         numEvals=1
+        #     )
+        #     timeTaken2 = time.time() - start
+        #     expectedTime = timeTaken1 + (numInputs * (timeTaken2 - timeTaken1 / (200 - 100)))
+        #     if expectedTime>timeLimit:
+        #         return False
+    except:
+        return False
     return True
 
 def generateRandomArchitecture(inputDim, outputDim, maxInput=None, memoryLimit=4*1024, timeLimit=180):
