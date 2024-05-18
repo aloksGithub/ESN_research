@@ -105,6 +105,7 @@ class ESN_NAS:
         self.valY = valY
 
     def generateOffspring(self, population):
+        print("Generating offspring")
         offspring = self.toolbox.selectBest(population, self.eliteSize)
         candidates = []
         
@@ -246,6 +247,7 @@ class ESN_NAS:
         return errors[bestErrorIndex], models[bestErrorIndex]
 
     def evaluateParallel(self, population):
+        print("Evaluating population")
         self.fitnessCache = []
         startTime = time.time()
         for i in range(math.ceil(len(population) / self.n_jobs)):
@@ -269,6 +271,7 @@ class ESN_NAS:
         return [performanceData[1][0] for performanceData in self.fitnessCache]
 
     def generatePopulation(self, numIndividuals):
+        print("Generating population")
         generatedArchitectures = []
 
         def generateModels():
@@ -288,14 +291,13 @@ class ESN_NAS:
             except multiprocessing.context.TimeoutError:
                 pass
 
-        population = [creator.Individual(individual) for individual in generatedArchitectures]
+        population = [creator.Individual(individual) for individual in generatedArchitectures[:self.populationSize]]
         return population
 
     def run(self):
         random_population = self.generatePopulation(self.populationSize - len(self.seedModels))
         seed_population = [creator.Individual(individual) for individual in self.seedModels]
         population = seed_population + random_population
-        print("Initial population generated")
 
         self.evaluateParallel(population)
         self.modelGenerationIndices.append(0)
