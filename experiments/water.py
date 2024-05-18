@@ -45,10 +45,10 @@ if __name__ == "__main__":
             50,
             100,
             trainY.shape[-1],
-            n_jobs=25,
+            n_jobs=20,
             errorMetrics=[mse, smape],
             defaultErrors=[np.inf, np.inf],
-            timeout=120,
+            timeout=180,
             numEvals=1,
             saveLocation='backup/electricity/backup_{}.obj'.format(i),
             memoryLimit=512
