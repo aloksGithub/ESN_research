@@ -51,7 +51,7 @@ if __name__ == "__main__":
             timeout=120,
             numEvals=1,
             saveLocation='backup/electricity/backup_{}.obj'.format(i),
-            memoryLimit=1024
+            memoryLimit=512
         )
         gaResults = ga.run()
         model = gaResults["bestModel"]
