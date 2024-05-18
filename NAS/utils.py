@@ -154,32 +154,32 @@ def isValidArchitecture(architecture, numInputs, memoryLimit, timeLimit):
         start = time.time()
         evaluateArchitecture(
             architecture,
-            np.random.random((1, inputDim)),
-            np.random.random((1, outputDim)),
-            np.random.random((1, inputDim)),
-            np.random.random((1, outputDim)),
+            np.random.random((100, inputDim)),
+            np.random.random((100, outputDim)),
+            np.random.random((100, inputDim)),
+            np.random.random((100, outputDim)),
             numEvals=1
         )
         timeTaken1 = time.time() - start
     
-        # isOnlineTrained = False
-        # for node in architecture["nodes"]:
-        #     if node["type"]=="LMS" or node["type"]=="RLS":
-        #         isOnlineTrained = True
-        # if isOnlineTrained:
-        #     start = time.time()
-        #     evaluateArchitecture(
-        #         architecture,
-        #         np.random.random((200, inputDim)),
-        #         np.random.random((200, outputDim)),
-        #         np.random.random((200, inputDim)),
-        #         np.random.random((200, outputDim)),
-        #         numEvals=1
-        #     )
-        #     timeTaken2 = time.time() - start
-        #     expectedTime = timeTaken1 + (numInputs * (timeTaken2 - timeTaken1 / (200 - 100)))
-        #     if expectedTime>timeLimit:
-        #         return False
+        isOnlineTrained = False
+        for node in architecture["nodes"]:
+            if node["type"]=="LMS" or node["type"]=="RLS":
+                isOnlineTrained = True
+        if isOnlineTrained:
+            start = time.time()
+            evaluateArchitecture(
+                architecture,
+                np.random.random((200, inputDim)),
+                np.random.random((200, outputDim)),
+                np.random.random((200, inputDim)),
+                np.random.random((200, outputDim)),
+                numEvals=1
+            )
+            timeTaken2 = time.time() - start
+            expectedTime = timeTaken1 + (numInputs * (timeTaken2 - timeTaken1 / (200 - 100)))
+            if expectedTime>timeLimit:
+                return False
     except:
         return False
     return True
@@ -356,3 +356,8 @@ def smape(yTrue, preds):
     if len_ == 0 and np.nansum(tmp) == 0: # Deals with a special case
         return 100
     return 100 / len_ * np.nansum(tmp)
+
+def printArchitecture(architecture):
+    for node in architecture["nodes"]:
+        print("{}({})".format(node["type"], list(node["params"].values())))
+    print(architecture["edges"])

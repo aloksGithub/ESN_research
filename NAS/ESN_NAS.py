@@ -25,13 +25,7 @@ warnings.filterwarnings("ignore")
 import time
 import multiprocessing
 import math
-
 rpy.verbosity(0)
-
-
-def generateArchitectures(generator, n, n_jobs):
-    architectures = Parallel(n_jobs=n_jobs)(delayed(generator)() for i in range(n))
-    return architectures
 
 class ESN_NAS:
     """Genetic algorithm to obtain an optimized ESN architecture for a dataset"""
@@ -68,6 +62,7 @@ class ESN_NAS:
 
         self.generations = generations
         self.populationSize = populationSize
+        self.outputDim = outputDim
         self.errorMetrics = errorMetrics
         self.defaultErrors = defaultErrors
         self.seedModels = seedModels
@@ -100,60 +95,85 @@ class ESN_NAS:
         self.toolbox = base.Toolbox()
         
         self.toolbox.register("mate", self.crossover_one_point)
-        self.toolbox.register("mutate", self.mutate, output_dim = outputDim)
-        self.toolbox.register("select", tools.selBest)
-        self.toolbox.register("selectWorst", tools.selWorst)
+        self.toolbox.register("mutate", self.mutate)
+        self.toolbox.register("selectTournament", tools.selTournament)
+        self.toolbox.register("selectBest", tools.selBest)
 
         self.trainX = trainX
         self.trainY = trainY
         self.valX = valX
         self.valY = valY
+
+    def generateOffspring(self, population):
+        offspring = self.toolbox.selectBest(population, self.eliteSize)
+        candidates = []
+        
+        def checkModelValidity(architecture):
+            isValid = isValidArchitecture(architecture, len(self.trainY), self.memoryLimit, self.timeout / self.numEvals )
+            if isValid:
+                offspring.append(architecture)
+
+        while len(offspring) < self.populationSize:
+            while len(candidates) < self.n_jobs:
+                parent1 = self.toolbox.selectTournament(population, 1, len(population)//4)[0]
+                parent2 = self.toolbox.selectTournament(population, 1, len(population)//4)[0]
+
+                child1, child2 = self.crossover_one_point(parent1, parent2)
+                child1 = self.mutate(child1)
+                child2 = self.mutate(child2)
+
+                candidates.append(child1)
+                candidates.append(child2)
+
+            try:
+                parallel = Parallel(n_jobs=self.n_jobs, timeout=120, require='sharedmem')
+                parallel(delayed(checkModelValidity)(candidate) for candidate in candidates)
+            except multiprocessing.context.TimeoutError:
+                pass
+            candidates = []
+        return offspring[:self.populationSize]
     
     # Crossover function
     def crossover_one_point(self, ind1, ind2):
         ind1Copy = copy.deepcopy(ind1)
         ind2Copy = copy.deepcopy(ind2)
-        maxNodeIndex = max(len(ind1['nodes']), len(ind2['nodes'])) - 1
+        if random.random() >= self.crossoverProbability: return (ind1Copy, ind2Copy)
+        maxNodeIndex = max(len(ind1Copy['nodes']), len(ind2Copy['nodes'])) - 1
         point1 = random.randint(1, maxNodeIndex-1)
         point2 = random.randint(point1, maxNodeIndex)
-        child1_nodes = ind1['nodes'][:point1] + ind2['nodes'][point1:point2] + ind1['nodes'][point2:]
-        child2_nodes = ind2['nodes'][:point1] + ind1['nodes'][point1:point2] + ind2['nodes'][point2:]
-        ind1["nodes"] = child1_nodes
-        ind2["nodes"] = child2_nodes
-
-        if not isValidArchitecture(ind1, len(self.trainY), self.memoryLimit, self.timeout / self.numEvals):
-            ind1["nodes"] = ind1Copy["nodes"]
-        if not isValidArchitecture(ind2, len(self.trainY), self.memoryLimit, self.timeout / self.numEvals):
-            ind2["nodes"] = ind2Copy["nodes"]
+        child1_nodes = ind1Copy['nodes'][:point1] + ind2Copy['nodes'][point1:point2] + ind1Copy['nodes'][point2:]
+        child2_nodes = ind1Copy['nodes'][:point1] + ind1Copy['nodes'][point1:point2] + ind2Copy['nodes'][point2:]
+        ind1Copy["nodes"] = child1_nodes
+        ind2Copy["nodes"] = child2_nodes
+        return (ind1Copy, ind2Copy)
 
     # Mutation function
-    def mutate(self, ind, output_dim):
+    def mutate(self, ind):
         """
         Mutate an individual. We can either:
         1. Swap out a node (excluding Input and Ridge nodes).
         2. Change a parameter of a node (again excluding Input and Ridge nodes).
         """
         indCopy = copy.deepcopy(ind)
+        if random.random() >= self.mutationProbability: return indCopy
         mutation_type = random.choice(["swap_node", "change_param"])
         
         if mutation_type == "swap_node":
-            idx = random.randint(1, len(ind['nodes'])-2)  # Excluding Input and Ridge
+            idx = random.randint(1, len(indCopy['nodes'])-2)  # Excluding Input and Ridge
             node_type = random.choice(list(nodeConstructors.keys() - {"Input"}))
-            ind['nodes'][idx] = {"type": node_type, "params": generateRandomNodeParams(node_type, output_dim)}
+            indCopy['nodes'][idx] = {"type": node_type, "params": generateRandomNodeParams(node_type, self.outputDim)}
         
         elif mutation_type == "change_param":
-            idx = random.randint(1, len(ind['nodes'])-2)  # Excluding Input and Ridge
-            node_type = ind['nodes'][idx]['type']
+            idx = random.randint(1, len(indCopy['nodes'])-2)  # Excluding Input and Ridge
+            node_type = indCopy['nodes'][idx]['type']
             param_name = random.choice(list(nodeParameterRanges[node_type].keys()))
             param_range = nodeParameterRanges[node_type][param_name]
             
             if param_range["intOnly"]:
-                ind['nodes'][idx]['params'][param_name] = random.randint(param_range["lower"], param_range["upper"])
+                indCopy['nodes'][idx]['params'][param_name] = random.randint(param_range["lower"], param_range["upper"])
             else:
-                ind['nodes'][idx]['params'][param_name] = random.random() * (param_range["upper"] - param_range["lower"]) + param_range["lower"]
-        
-        if not isValidArchitecture(ind, len(self.trainY), self.memoryLimit, self.timeout / self.numEvals):
-            ind["nodes"] = indCopy["nodes"]
+                indCopy['nodes'][idx]['params'][param_name] = random.random() * (param_range["upper"] - param_range["lower"]) + param_range["lower"]
+        return indCopy
     
     def evaluateArchitecture(self, individual):
         """
@@ -231,12 +251,9 @@ class ESN_NAS:
         for i in range(math.ceil(len(population) / self.n_jobs)):
             try:
                 evaluatedIndividuals = population[i * self.n_jobs : min(len(population), (i+1) * self.n_jobs)]
-                print("Starting", len(evaluatedIndividuals))
                 parallel = Parallel(n_jobs=self.n_jobs, timeout=self.timeout, require='sharedmem')
                 parallel(delayed(self.evaluateArchitecture)(architecture) for architecture in evaluatedIndividuals)
-                print("Finished", time.time() - startTime)
             except multiprocessing.context.TimeoutError:
-                print("Timeout", time.time() - startTime)
                 pass
         print("Time taken:", time.time() - startTime, "seconds")
         
@@ -252,18 +269,25 @@ class ESN_NAS:
         return [performanceData[1][0] for performanceData in self.fitnessCache]
 
     def generatePopulation(self, numIndividuals):
-        generatedArchitectures = generateArchitectures(
-            partial(
-                generateRandomArchitecture,
+        generatedArchitectures = []
+
+        def generateModels():
+            architecture = generateRandomArchitecture(
                 inputDim=self.trainX.shape[-1],
                 outputDim=self.trainY.shape[-1],
                 maxInput=len(self.trainX),
                 memoryLimit=self.memoryLimit,
                 timeLimit=self.timeout / self.numEvals
-            ),
-            numIndividuals,
-            self.n_jobs
-        )
+            )
+            generatedArchitectures.append(architecture)
+
+        while len(generatedArchitectures)<numIndividuals:
+            try:
+                parallel = Parallel(n_jobs=self.n_jobs, timeout=120, require='sharedmem')
+                parallel(delayed(generateModels)() for _ in range(self.n_jobs))
+            except multiprocessing.context.TimeoutError:
+                pass
+
         population = [creator.Individual(individual) for individual in generatedArchitectures]
         return population
 
@@ -279,25 +303,12 @@ class ESN_NAS:
         for gen in range(self.generation, self.generations + 1):
             print("=======================Generation {}=======================".format(gen))
             self.generationsSinceImprovement+=1
-            offspring = self.toolbox.select(population, self.populationSize)
-            offspring = list(map(self.toolbox.clone, offspring))
-
-            # Crossover
-            for child1, child2 in zip(offspring[::2], offspring[1::2]):
-                if random.random() < self.crossoverProbability:
-                    self.toolbox.mate(child1, child2)
-                    del child1.fitness.values
-                    del child2.fitness.values
-
-            # Mutation
-            for mutant in offspring:
-                if random.random() < self.mutationProbability:
-                    self.toolbox.mutate(mutant)
-                    del mutant.fitness.values
+            offspring = self.generateOffspring(list(map(self.toolbox.clone, population)))
 
             # Evaluate offspring
             offSpringFitnesses = self.evaluateParallel(offspring)
             if self.minimizeFitness and min(offSpringFitnesses)<self.prevFitness or not self.minimizeFitness and max(offSpringFitnesses)>self.prevFitness:
+                self.prevFitness = min(offSpringFitnesses)
                 self.generationsSinceImprovement = 0
 
             if self.generationsSinceImprovement>=self.stagnationReset:
