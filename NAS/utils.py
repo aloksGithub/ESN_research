@@ -185,7 +185,7 @@ def isValidArchitecture(architecture, numInputs, memoryLimit, timeLimit):
     return True
 
 def generateRandomArchitecture(inputDim, outputDim, maxInput=None, memoryLimit=4*1024, timeLimit=180):
-    num_nodes = random.randint(2, 5)
+    num_nodes = random.randint(2, 7)
 
     nodes = [
         {"type": "Input", "params": {"input_dim": inputDim}}
@@ -361,3 +361,6 @@ def printArchitecture(architecture):
     for node in architecture["nodes"]:
         print("{}({})".format(node["type"], list(node["params"].values())))
     print(architecture["edges"])
+
+def printArchitectures(architectures):
+    [printArchitecture(architecture) for architecture in architectures]

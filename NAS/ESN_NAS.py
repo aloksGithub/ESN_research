@@ -9,7 +9,8 @@ from NAS.utils import (
     constructModel,
     runModel,
     trainModel,
-    isValidArchitecture
+    isValidArchitecture,
+    printArchitectures
 )
 from reservoirpy.observables import nrmse
 import numpy as np
@@ -98,11 +99,39 @@ class ESN_NAS:
         self.toolbox.register("mutate", self.mutate)
         self.toolbox.register("selectTournament", tools.selTournament)
         self.toolbox.register("selectBest", tools.selBest)
+        self.toolbox.register("selectWorst", tools.selWorst)
 
         self.trainX = trainX
         self.trainY = trainY
         self.valX = valX
         self.valY = valY
+
+    def generateOffspringOld(self, population):
+        finalPopulation = []
+        def checkModelValidity(architecture):
+            isValid = isValidArchitecture(architecture, len(self.trainY), self.memoryLimit, self.timeout / self.numEvals )
+            if isValid:
+                finalPopulation.append(architecture)
+
+        offspring = list(map(self.toolbox.clone, population))
+        for child1, child2, i, j in zip(offspring[::2], offspring[1::2], range(0, len(offspring), 2), range(1, len(offspring), 2)):
+            if random.random() < self.crossoverProbability:
+                offspring[i], offspring[j] = self.toolbox.mate(child1, child2)
+                del offspring[i].fitness.values
+                del offspring[j].fitness.values
+        
+        for i, mutant in enumerate(offspring):
+            if random.random() < self.mutationProbability:
+                offspring[i] = self.toolbox.mutate(mutant)
+                del offspring[i].fitness.values
+        
+        try:
+            parallel = Parallel(n_jobs=self.n_jobs, timeout=120, require='sharedmem')
+            parallel(delayed(checkModelValidity)(candidate) for candidate in offspring)
+        except multiprocessing.context.TimeoutError:
+            pass
+
+        return self.toolbox.selectBest(population, len(population) - len(finalPopulation)) + finalPopulation
 
     def generateOffspring(self, population):
         print("Generating offspring")
@@ -319,12 +348,14 @@ class ESN_NAS:
                 self.prevFitness = self.defaultFitness
                 newRandomPopulation = self.generatePopulation(self.populationSize-1)
                 self.evaluateParallel(newRandomPopulation)
-                population[:] = self.toolbox.select(population, 1) + newRandomPopulation
+                population[:] = self.toolbox.selectBest(population, 1) + newRandomPopulation
                 self.modelGenerationIndices.append(gen)
             else:
                 population[:] = offspring
             
-            bestFitness = min(self.fitnesses)
+            objective = [errors[0] for errors in self.fitnesses]
+            bestIndex = objective.index(min(objective)) if self.minimizeFitness else objective.index(max(objective))
+            bestFitness = self.fitnesses[bestIndex]
             numFailures = 0
             for index, fitness in enumerate(self.fitnesses[-self.populationSize:]):
                 if fitness[0]==self.defaultFitness:
