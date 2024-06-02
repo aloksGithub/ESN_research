@@ -51,7 +51,7 @@ if __name__ == "__main__":
             timeout=480,
             numEvals=1,
             saveLocation='backup/water/backup_{}.obj'.format(i),
-            memoryLimit=1024
+            memoryLimit=512
         ) for _ in range(5)]
         gaResults = [ga.run() for ga in GAs]
         architectures = []
