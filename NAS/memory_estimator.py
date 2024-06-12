@@ -165,4 +165,4 @@ def estimateMemory(architecture, numInputs):
         elif node["type"]=="Reservoir" or node["type"]=="IPReservoir":
             memory = estimate_reservoir_memory(node["params"]["units"], [numInputs, inputDimension])
         maxMemory = max(memory, maxMemory)
-    return maxMemory * 1.3
+    return maxMemory * 2

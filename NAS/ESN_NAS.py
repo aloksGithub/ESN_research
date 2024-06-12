@@ -126,7 +126,7 @@ class ESN_NAS:
                 del offspring[i].fitness.values
         
         try:
-            parallel = Parallel(n_jobs=self.n_jobs, timeout=120, require='sharedmem')
+            parallel = Parallel(n_jobs=self.n_jobs, timeout=self.timeout, require='sharedmem')
             parallel(delayed(checkModelValidity)(candidate) for candidate in offspring)
         except multiprocessing.context.TimeoutError:
             pass
@@ -156,7 +156,7 @@ class ESN_NAS:
                 candidates.append(child2)
 
             try:
-                parallel = Parallel(n_jobs=self.n_jobs, timeout=120, require='sharedmem')
+                parallel = Parallel(n_jobs=self.n_jobs, timeout=self.timeout, require='sharedmem')
                 parallel(delayed(checkModelValidity)(candidate) for candidate in candidates)
             except multiprocessing.context.TimeoutError:
                 pass
@@ -315,7 +315,7 @@ class ESN_NAS:
 
         while len(generatedArchitectures)<numIndividuals:
             try:
-                parallel = Parallel(n_jobs=self.n_jobs, timeout=120, require='sharedmem')
+                parallel = Parallel(n_jobs=self.n_jobs, timeout=self.timeout, require='sharedmem')
                 parallel(delayed(generateModels)() for _ in range(self.n_jobs))
             except multiprocessing.context.TimeoutError:
                 pass
