@@ -1,5 +1,4 @@
 from functools import partial
-import multiprocessing.context
 import reservoirpy as rpy
 from NAS.utils import (
     generateRandomArchitecture,
@@ -9,23 +8,20 @@ from NAS.utils import (
     constructModel,
     runModel,
     trainModel,
-    isValidArchitecture,
-    printArchitectures
+    isValidArchitecture
 )
 from reservoirpy.observables import nrmse
 import numpy as np
 import random
 from deap import base, creator, tools
-from joblib import Parallel, delayed
 import warnings
 import pickle
-from NAS.memory_estimator import estimateMemory
-import traceback
+from NAS.memory_estimator import measure_memory_usage
 import copy
 warnings.filterwarnings("ignore")
 import time
-import multiprocessing
-import math
+from pebble import ProcessExpired, ProcessPool
+from concurrent.futures import TimeoutError
 rpy.verbosity(0)
 
 class ESN_NAS:
@@ -106,12 +102,15 @@ class ESN_NAS:
         self.valX = valX
         self.valY = valY
 
+        self.diagnosisResults = []
+        self.population = []
+
+        
+    def checkModelValidity(self, architecture):
+        return isValidArchitecture(architecture, len(self.trainY), self.memoryLimit, self.timeout / self.numEvals ), architecture
+
     def generateOffspringOld(self, population):
         finalPopulation = []
-        def checkModelValidity(architecture):
-            isValid = isValidArchitecture(architecture, len(self.trainY), self.memoryLimit, self.timeout / self.numEvals )
-            if isValid:
-                finalPopulation.append(architecture)
 
         offspring = list(map(self.toolbox.clone, population))
         for child1, child2, i, j in zip(offspring[::2], offspring[1::2], range(0, len(offspring), 2), range(1, len(offspring), 2)):
@@ -125,11 +124,24 @@ class ESN_NAS:
                 offspring[i] = self.toolbox.mutate(mutant)
                 del offspring[i].fitness.values
         
-        try:
-            parallel = Parallel(n_jobs=self.n_jobs, timeout=self.timeout, require='sharedmem')
-            parallel(delayed(checkModelValidity)(candidate) for candidate in offspring)
-        except multiprocessing.context.TimeoutError:
-            pass
+        with ProcessPool(max_workers=self.n_jobs) as pool:
+            future = pool.map(self.checkModelValidity, offspring, timeout=self.timeout)
+            iterator = future.result()
+
+            while True:
+                try:
+                    result = next(iterator)
+                    if result[0]:
+                        finalPopulation.append(result[1])
+                except StopIteration:
+                    break
+                except TimeoutError as error:
+                    print("function took longer than %d seconds" % error.args[1])
+                except ProcessExpired as error:
+                    print("%s. Exit code: %d" % (error, error.exitcode))
+                except Exception as error:
+                    print("function raised %s" % error)
+                    print(error.traceback)
 
         return self.toolbox.selectBest(population, len(population) - len(finalPopulation)) + finalPopulation
 
@@ -137,11 +149,6 @@ class ESN_NAS:
         print("Generating offspring")
         offspring = self.toolbox.selectBest(population, self.eliteSize)
         candidates = []
-        
-        def checkModelValidity(architecture):
-            isValid = isValidArchitecture(architecture, len(self.trainY), self.memoryLimit, self.timeout / self.numEvals )
-            if isValid:
-                offspring.append(architecture)
 
         while len(offspring) < self.populationSize:
             while len(candidates) < self.n_jobs:
@@ -154,12 +161,25 @@ class ESN_NAS:
 
                 candidates.append(child1)
                 candidates.append(child2)
+            
+            with ProcessPool(max_workers=self.n_jobs) as pool:
+                future = pool.map(self.checkModelValidity, candidates, timeout=self.timeout)
+                iterator = future.result()
 
-            try:
-                parallel = Parallel(n_jobs=self.n_jobs, timeout=self.timeout, require='sharedmem')
-                parallel(delayed(checkModelValidity)(candidate) for candidate in candidates)
-            except multiprocessing.context.TimeoutError:
-                pass
+                while True:
+                    try:
+                        result = next(iterator)
+                        if result[0]:
+                            offspring.append(result[1])
+                    except StopIteration:
+                        break
+                    except TimeoutError as error:
+                        print("function took longer than %d seconds" % error.args[1])
+                    except ProcessExpired as error:
+                        print("%s. Exit code: %d" % (error, error.exitcode))
+                    except Exception as error:
+                        print("function raised %s" % error)
+                        print(error.traceback)
             candidates = []
         return offspring[:self.populationSize]
     
@@ -210,8 +230,6 @@ class ESN_NAS:
         Instantiate random models using given architecture, then train and evaluate them
         on one step ahead prediction using errorMetrics on valX and valY.
         """
-        index = len(self.fitnessCache)
-        self.fitnessCache.append([individual, self.defaultErrors, None])
 
         errors = []
         models = []
@@ -232,10 +250,7 @@ class ESN_NAS:
             error0 = [modelErrors[0] for modelErrors in errors]
             bestErrorIndex = error0.index(max(error0)) if self.defaultErrors[0]==0 else error0.index(min(error0))
             
-            self.fitnessCache[index][1] = errors[bestErrorIndex]
-            self.fitnessCache[index][2] = models[bestErrorIndex]
-
-        return self.fitnessCache[index][1], self.fitnessCache[index][2]
+        return individual, errors[bestErrorIndex], models[bestErrorIndex]
 
     def evaluateArchitectureAutoRegressive(self, individual):
         """
@@ -277,18 +292,33 @@ class ESN_NAS:
 
     def evaluateParallel(self, population):
         print("Evaluating population")
-        self.fitnessCache = []
-        startTime = time.time()
-        for i in range(math.ceil(len(population) / self.n_jobs)):
-            try:
-                evaluatedIndividuals = population[i * self.n_jobs : min(len(population), (i+1) * self.n_jobs)]
-                parallel = Parallel(n_jobs=self.n_jobs, timeout=self.timeout, require='sharedmem')
-                parallel(delayed(self.evaluateArchitecture)(architecture) for architecture in evaluatedIndividuals)
-            except multiprocessing.context.TimeoutError:
-                pass
-        print("Time taken:", time.time() - startTime, "seconds")
+        results = []
+        with ProcessPool(max_workers=self.n_jobs) as pool:
+            future = pool.map(self.evaluateArchitecture, population, timeout=self.timeout * self.numEvals)
+            iterator = future.result()
+
+            while True:
+                try:
+                    result = next(iterator)
+                    results.append(result)
+                except StopIteration:
+                    break
+                except TimeoutError as error:
+                    print("function took longer than %d seconds" % error.args[1])
+                except ProcessExpired as error:
+                    print("%s. Exit code: %d" % (error, error.exitcode))
+                except Exception as error:
+                    print("function raised %s" % error)
+                    print(error.traceback)
+        for individual in population:
+            found = False
+            for result in results:
+                if result[0]==individual:
+                    found = True
+            if not found:
+                results.append([individual, self.defaultErrors, None])
         
-        for result in self.fitnessCache:
+        for result in results:
             ind, errors, model = result
             self.fitnesses.append(errors)
             self.architectures.append(ind)
@@ -297,89 +327,127 @@ class ESN_NAS:
             if self.saveModels:
                 self.models.append(model)
             ind.fitness.values = (errors[0],)
-        return [performanceData[1][0] for performanceData in self.fitnessCache]
-
+        return [performanceData[1][0] for performanceData in results]
+    
     def generatePopulation(self, numIndividuals):
         print("Generating population")
         generatedArchitectures = []
 
-        def generateModels():
-            architecture = generateRandomArchitecture(
-                inputDim=self.trainX.shape[-1],
-                outputDim=self.trainY.shape[-1],
-                maxInput=len(self.trainX),
-                memoryLimit=self.memoryLimit,
-                timeLimit=self.timeout / self.numEvals
-            )
-            generatedArchitectures.append(architecture)
-
         while len(generatedArchitectures)<numIndividuals:
-            try:
-                parallel = Parallel(n_jobs=self.n_jobs, timeout=self.timeout, require='sharedmem')
-                parallel(delayed(generateModels)() for _ in range(self.n_jobs))
-            except multiprocessing.context.TimeoutError:
-                pass
+            with ProcessPool(max_workers=self.n_jobs) as pool:
+                func = partial(
+                    generateRandomArchitecture,
+                    self.trainX.shape[-1],
+                    self.trainY.shape[-1],
+                    len(self.trainX),
+                    self.memoryLimit,
+                    self.timeout / self.numEvals
+                )
+                future = pool.map(func, range(numIndividuals - len(generatedArchitectures)), timeout=self.timeout)
+                iterator = future.result()
+
+                while True:
+                    try:
+                        result = next(iterator)
+                        generatedArchitectures.append(result)
+                    except StopIteration:
+                        break
+                    except TimeoutError as error:
+                        print("function took longer than %d seconds" % error.args[1])
+                    except ProcessExpired as error:
+                        print("%s. Exit code: %d" % (error, error.exitcode))
+                    except Exception as error:
+                        print("function raised %s" % error)
+                        print(error.traceback)
 
         population = [creator.Individual(individual) for individual in generatedArchitectures[:self.populationSize]]
         return population
+    
+    def generationRun(self, gen):
+        startTime = time.time()
+        print("=======================Generation {}=======================".format(gen))
+        self.generationsSinceImprovement+=1
+        offspring = self.generateOffspring(list(map(self.toolbox.clone, self.population)))
+
+        # Evaluate offspring
+        offSpringFitnesses = self.evaluateParallel(offspring)
+        if self.minimizeFitness and min(offSpringFitnesses)<self.prevFitness or not self.minimizeFitness and max(offSpringFitnesses)>self.prevFitness:
+            self.prevFitness = min(offSpringFitnesses)
+            self.generationsSinceImprovement = 0
+
+        if self.generationsSinceImprovement>=self.stagnationReset:
+            print("Resetting population due to stagnation")
+
+            self.prevFitness = self.defaultFitness
+            newRandomPopulation = self.generatePopulation(self.populationSize-1)
+            self.evaluateParallel(newRandomPopulation)
+            self.population[:] = self.toolbox.selectBest(self.population, 1) + newRandomPopulation
+            self.modelGenerationIndices.append(gen)
+        else:
+            self.population[:] = offspring
+        
+        objective = [errors[0] for errors in self.fitnesses]
+        bestIndex = objective.index(min(objective)) if self.minimizeFitness else objective.index(max(objective))
+        bestFitness = self.fitnesses[bestIndex]
+        numFailures = 0
+        for index, fitness in enumerate(self.fitnesses[-self.populationSize:]):
+            if fitness[0]==self.defaultFitness:
+                # print(self.architectures[-self.populationSize:][index])
+                numFailures+=1
+        print("Best so far:", bestFitness)
+        print("Failure rate: {}%".format(100*numFailures/self.populationSize))
+        print("Time taken:", time.time() - startTime)
+
+        file = open(self.saveLocation, 'wb')
+        pickle.dump(self, file)
 
     def run(self):
         random_population = self.generatePopulation(self.populationSize - len(self.seedModels))
         seed_population = [creator.Individual(individual) for individual in self.seedModels]
-        population = seed_population + random_population
+        self.population = seed_population + random_population
 
-        self.evaluateParallel(population)
+        self.evaluateParallel(self.population)
         self.modelGenerationIndices.append(0)
         
         for gen in range(self.generation, self.generations + 1):
-            print("=======================Generation {}=======================".format(gen))
-            self.generationsSinceImprovement+=1
-            offspring = self.generateOffspring(list(map(self.toolbox.clone, population)))
-
-            # Evaluate offspring
-            offSpringFitnesses = self.evaluateParallel(offspring)
-            if self.minimizeFitness and min(offSpringFitnesses)<self.prevFitness or not self.minimizeFitness and max(offSpringFitnesses)>self.prevFitness:
-                self.prevFitness = min(offSpringFitnesses)
-                self.generationsSinceImprovement = 0
-
-            if self.generationsSinceImprovement>=self.stagnationReset:
-                print("Resetting population due to stagnation")
-
-                self.prevFitness = self.defaultFitness
-                newRandomPopulation = self.generatePopulation(self.populationSize-1)
-                self.evaluateParallel(newRandomPopulation)
-                population[:] = self.toolbox.selectBest(population, 1) + newRandomPopulation
-                self.modelGenerationIndices.append(gen)
-            else:
-                population[:] = offspring
-            
-            objective = [errors[0] for errors in self.fitnesses]
-            bestIndex = objective.index(min(objective)) if self.minimizeFitness else objective.index(max(objective))
-            bestFitness = self.fitnesses[bestIndex]
-            numFailures = 0
-            for index, fitness in enumerate(self.fitnesses[-self.populationSize:]):
-                if fitness[0]==self.defaultFitness:
-                    # print(self.architectures[-self.populationSize:][index])
-                    numFailures+=1
-            print("Best so far:", bestFitness)
-            print("Failure rate: {}%".format(100*numFailures/self.populationSize))
-
-            checkpoint = {
-                "generation": gen,
-                "fitnesses": self.fitnesses,
-                "architectures": self.architectures,
-                "models": self.models,
-                "modelGenerationIndices": self.modelGenerationIndices,
-                "generationsSinceImprovement": self.generationsSinceImprovement,
-                "population": population,
-                "prevFitness": self.prevFitness,
-                "defaultFitness": self.defaultFitness,
-                "bestModel": self.bestModel
-            }
-
-            file = open(self.saveLocation, 'wb')
-            pickle.dump(checkpoint, file)
-
+            self.generationRun(gen)
         
         file = open(self.saveLocation, 'rb')
         return pickle.load(file)
+    
+    def diagnosis(self):
+        """
+        Occassionally, an individual will be spawned that might consume excessive memory and result in a crash
+        while also slipping past the existing checks to prevent such individuals. This function goes over the
+        current population to find such individuals. The evaluation is done serially for each individual. We
+        check the training time and memory usage to find the bad individual. This individual will be replaced
+        with a newly generated random individual.
+        Note: This function has the possibility of resulting in another crash. To deal with such situations,
+        we save the diagnosis results to file and the diagnosis function can be called again. The model
+        that caused the crash will be marked as a bad model and replaced at the end of the function
+
+        """
+
+        def memoryCheckFunc():
+            model = constructModel(individual)
+            model = trainModel(model, self.trainX, self.trainY)
+            runModel(model, self.valX)
+
+        for individual in self.population[len(self.diagnosisResults):]:
+            self.diagnosisResults.append(True)
+            startTime = time.time()
+            memoryUsage = measure_memory_usage(memoryCheckFunc)
+            timeTaken = time.time() - startTime
+            if timeTaken<self.timeout and memoryUsage<self.memoryLimit:
+                self.diagnosisResults[-1] = False
+        
+        numNewModels = 0
+        for diagnosis in self.diagnosisResults:
+            if diagnosis: numNewModels+=1
+        newModels = self.generatePopulation(numNewModels)
+
+        for diagnosis, i in enumerate(self.diagnosisResults):
+            if diagnosis:
+                self.population[i] = newModels[-1]
+                newModels = newModels[:-1]
+        self.diagnosisResults = []
