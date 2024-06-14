@@ -7,15 +7,12 @@ current_dir = os.path.abspath(os.path.dirname(__file__))
 parent_dir = os.path.dirname(current_dir)
 sys.path.insert(0, parent_dir)
 from NAS.ESN_NAS import ESN_NAS
-from NAS.utils import runModel, smape, trainModel
+from NAS.utils import runModel
 warnings.filterwarnings("ignore")
 import sys
 import pandas as pd
 import math
 from reservoirpy.observables import (mse)
-import copy
-from bayes_opt import BayesianOptimization
-import pickle
 
 rpy.verbosity(0)
 
@@ -50,7 +47,22 @@ def getData():
     return train_in, train_out, val_in, val_out, test_in, test_out
 
 trainX, trainY, valX, valY, testX, testY, allData = getDataSingleCol()
-numExperiments = 5
+
+def nrmse(y_true, y_pred):
+    y_true = np.array(y_true)
+    y_pred = np.array(y_pred)
+    
+    rmse = np.sqrt(np.mean((y_true - y_pred)**2))
+    mean_norm = np.linalg.norm(np.mean(y_true))
+    
+    return rmse / mean_norm
+    
+def r_squared(y_true, y_pred):
+    y_true = np.array(y_true)
+    y_pred = np.array(y_pred)
+    numerator = np.sum((y_true - y_pred)**2)
+    denominator = np.sum((y_true - np.mean(y_true))**2)
+    return 1 - (numerator / denominator)
 
 if __name__ == "__main__":
     for i in range(1):
@@ -59,22 +71,22 @@ if __name__ == "__main__":
             trainY,
             valX,
             valY,
-            4,
-            4,
+            50,
+            50,
             trainY.shape[-1],
-            n_jobs=4,
-            errorMetrics=[mse, smape],
+            n_jobs=25,
+            errorMetrics=[nrmse, r_squared],
             defaultErrors=[np.inf, np.inf],
             timeout=120,
             numEvals=3,
             saveLocation='backup/water/backup_0.obj',
-            memoryLimit=512
+            memoryLimit=1024
         )
         ga.run()
         model = ga.bestModel
         preds = runModel(model, testX)
-        print("MSE:", mse(testY, preds))
-        print("SMAPE:", smape(testY, preds))
+        print("NRMSE:", mse(nrmse, preds))
+        print("R2:", r_squared(testY, preds))
 
 
     # model1 = copy.deepcopy(model)
