@@ -15,14 +15,18 @@ def worker(queue, func, args, n_jobs):
     parallel(delayed(funcWrapper)(i, *args[i]) for i in range(len(args)))
 
 def executeParallel(func, args, n_jobs, timeout):
-    queue = multiprocessing.Queue()
-    p = multiprocessing.Process(target=worker, args=(queue, func, args, n_jobs))
-    p.start()
-    p.join(timeout=timeout)
-    if p.is_alive():
-        result = queue.get_nowait()
-        p.terminate()
-        p.join()
-        return result
-    result = queue.get_nowait()
-    return result
+    results = []
+    for i in range(0, len(args), n_jobs):
+        argsToUse = args[i:min(i+n_jobs, len(args))]
+
+        queue = multiprocessing.Queue()
+        p = multiprocessing.Process(target=worker, args=(queue, func, argsToUse, n_jobs))
+        p.start()
+        p.join(timeout=timeout)
+
+        currentReults = queue.get_nowait()
+        results+=currentReults
+        if p.is_alive():
+            p.terminate()
+            p.join()
+    return results

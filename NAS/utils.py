@@ -154,32 +154,15 @@ def isValidArchitecture(architecture, numInputs, memoryLimit, timeLimit):
         start = time.time()
         evaluateArchitecture(
             architecture,
-            np.random.random((100, inputDim)),
-            np.random.random((100, outputDim)),
-            np.random.random((100, inputDim)),
-            np.random.random((100, outputDim)),
+            np.random.random((numInputs, inputDim)),
+            np.random.random((numInputs, outputDim)),
+            np.random.random((numInputs, inputDim)),
+            np.random.random((numInputs, outputDim)),
             numEvals=1
         )
         timeTaken1 = time.time() - start
-    
-        isOnlineTrained = False
-        for node in architecture["nodes"]:
-            if node["type"]=="LMS" or node["type"]=="RLS":
-                isOnlineTrained = True
-        if isOnlineTrained:
-            start = time.time()
-            evaluateArchitecture(
-                architecture,
-                np.random.random((200, inputDim)),
-                np.random.random((200, outputDim)),
-                np.random.random((200, inputDim)),
-                np.random.random((200, outputDim)),
-                numEvals=1
-            )
-            timeTaken2 = time.time() - start
-            expectedTime = timeTaken1 + (numInputs * (timeTaken2 - timeTaken1 / (200 - 100)))
-            if expectedTime>timeLimit:
-                return False
+        if timeTaken1*1.1>timeLimit:
+            return False
     except:
         return False
     return True
