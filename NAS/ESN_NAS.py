@@ -22,6 +22,7 @@ warnings.filterwarnings("ignore")
 import time
 from pebble import ProcessExpired, ProcessPool
 from concurrent.futures import TimeoutError
+from NAS.parallel_processing import executeParallel
 rpy.verbosity(0)
 
 class ESN_NAS:
@@ -162,24 +163,10 @@ class ESN_NAS:
                 candidates.append(child1)
                 candidates.append(child2)
             
-            with ProcessPool(max_workers=self.n_jobs) as pool:
-                future = pool.map(self.checkModelValidity, candidates, timeout=self.timeout)
-                iterator = future.result()
-
-                while True:
-                    try:
-                        result = next(iterator)
-                        if result[0]:
-                            offspring.append(result[1])
-                    except StopIteration:
-                        break
-                    except TimeoutError as error:
-                        print("function took longer than %d seconds" % error.args[1])
-                    except ProcessExpired as error:
-                        print("%s. Exit code: %d" % (error, error.exitcode))
-                    except Exception as error:
-                        print("function raised %s" % error)
-                        print(error.traceback)
+            validities = executeParallel(self.checkModelValidity, [(c,) for c in candidates], self.n_jobs, self.timeout)
+            for validity in validities:
+                if validity is not None and validity[0]:
+                    offspring.append(validity[1])
             candidates = []
         return offspring[:self.populationSize]
     
@@ -293,30 +280,19 @@ class ESN_NAS:
     def evaluateParallel(self, population):
         print("Evaluating population")
         results = []
-        with ProcessPool(max_workers=self.n_jobs) as pool:
-            future = pool.map(self.evaluateArchitecture, population, timeout=self.timeout * self.numEvals)
-            iterator = future.result()
-
-            while True:
-                try:
-                    result = next(iterator)
-                    results.append(result)
-                except StopIteration:
-                    break
-                except TimeoutError as error:
-                    print("function took longer than %d seconds" % error.args[1])
-                except ProcessExpired as error:
-                    print("%s. Exit code: %d" % (error, error.exitcode))
-                except Exception as error:
-                    print("function raised %s" % error)
-                    print(error.traceback)
+        results = executeParallel(self.evaluateArchitecture, [(individual,) for individual in population], self.n_jobs, self.timeout)
+        
         for individual in population:
             found = False
             for result in results:
-                if result[0]==individual:
+                if result is not None and result[0]==individual:
                     found = True
             if not found:
                 results.append([individual, self.defaultErrors, None])
+        
+        for i in range(len(results)-1, -1, -1):
+            if results[i] is None:
+                del results[i]
         
         for result in results:
             ind, errors, model = result
@@ -334,31 +310,21 @@ class ESN_NAS:
         generatedArchitectures = []
 
         while len(generatedArchitectures)<numIndividuals:
-            with ProcessPool(max_workers=self.n_jobs) as pool:
-                func = partial(
-                    generateRandomArchitecture,
+            results = executeParallel(
+                generateRandomArchitecture,
+                [(
                     self.trainX.shape[-1],
                     self.trainY.shape[-1],
                     len(self.trainX),
                     self.memoryLimit,
                     self.timeout / self.numEvals
-                )
-                future = pool.map(func, range(numIndividuals - len(generatedArchitectures)), timeout=self.timeout)
-                iterator = future.result()
-
-                while True:
-                    try:
-                        result = next(iterator)
-                        generatedArchitectures.append(result)
-                    except StopIteration:
-                        break
-                    except TimeoutError as error:
-                        print("function took longer than %d seconds" % error.args[1])
-                    except ProcessExpired as error:
-                        print("%s. Exit code: %d" % (error, error.exitcode))
-                    except Exception as error:
-                        print("function raised %s" % error)
-                        print(error.traceback)
+                ) for _ in range(numIndividuals - len(generatedArchitectures))],
+                self.n_jobs,
+                self.timeout
+            )
+            for result in results:
+                if result is not None:
+                    generatedArchitectures.append(result)
 
         population = [creator.Individual(individual) for individual in generatedArchitectures[:self.populationSize]]
         return population

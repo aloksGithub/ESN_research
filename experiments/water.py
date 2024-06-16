@@ -74,11 +74,11 @@ if __name__ == "__main__":
             50,
             50,
             trainY.shape[-1],
-            n_jobs=5,
+            n_jobs=25,
             errorMetrics=[nrmse, r_squared],
             defaultErrors=[np.inf, np.inf],
             timeout=120,
-            numEvals=3,
+            numEvals=1,
             saveLocation='backup/water/backup_0.obj',
             memoryLimit=1024
         )
