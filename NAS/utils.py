@@ -154,10 +154,10 @@ def isValidArchitecture(architecture, numInputs, memoryLimit, timeLimit):
         start = time.time()
         evaluateArchitecture(
             architecture,
-            np.random.random((numInputs, inputDim)),
-            np.random.random((numInputs, outputDim)),
-            np.random.random((numInputs, inputDim)),
-            np.random.random((numInputs, outputDim)),
+            np.random.random((1, inputDim)),
+            np.random.random((1, outputDim)),
+            np.random.random((1, inputDim)),
+            np.random.random((1, outputDim)),
             numEvals=1
         )
         timeTaken1 = time.time() - start
@@ -167,7 +167,7 @@ def isValidArchitecture(architecture, numInputs, memoryLimit, timeLimit):
         return False
     return True
 
-def generateRandomArchitecture(inputDim, outputDim, maxInput=None, memoryLimit=4*1024, timeLimit=180, *args):
+def generateRandomArchitecture(inputDim, outputDim, maxInput=None, memoryLimit=4*1024, timeLimit=180):
     num_nodes = random.randint(2, 4)
 
     nodes = [
