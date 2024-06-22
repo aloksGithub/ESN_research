@@ -154,10 +154,10 @@ def isValidArchitecture(architecture, numInputs, memoryLimit, timeLimit):
         start = time.time()
         evaluateArchitecture(
             architecture,
-            np.random.random((1, inputDim)),
-            np.random.random((1, outputDim)),
-            np.random.random((1, inputDim)),
-            np.random.random((1, outputDim)),
+            np.random.random((numInputs, inputDim)),
+            np.random.random((numInputs, outputDim)),
+            np.random.random((numInputs, inputDim)),
+            np.random.random((numInputs, outputDim)),
             numEvals=1
         )
         timeTaken1 = time.time() - start
