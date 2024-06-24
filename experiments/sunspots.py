@@ -50,13 +50,13 @@ if __name__ == "__main__":
             50,
             50,
             trainY.shape[-1],
-            n_jobs=10,
+            n_jobs=17,
             errorMetrics=[nrmse],
             defaultErrors=[np.inf, np.inf],
-            timeout=120,
-            numEvals=3,
+            timeout=60,
+            numEvals=2,
             saveLocation='backup/sunspots/backup_{}.obj'.format(i),
-            memoryLimit=512
+            memoryLimit=1024
         )
         gaResults = ga.run()
         model = gaResults["bestModel"]
