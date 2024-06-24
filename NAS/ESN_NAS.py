@@ -110,41 +110,41 @@ class ESN_NAS:
     def checkModelValidity(self, architecture):
         return isValidArchitecture(architecture, len(self.trainY), self.memoryLimit, self.timeout / self.numEvals ), architecture
 
-    def generateOffspringOld(self, population):
-        finalPopulation = []
+    # def generateOffspringOld(self, population):
+    #     finalPopulation = []
 
-        offspring = list(map(self.toolbox.clone, population))
-        for child1, child2, i, j in zip(offspring[::2], offspring[1::2], range(0, len(offspring), 2), range(1, len(offspring), 2)):
-            if random.random() < self.crossoverProbability:
-                offspring[i], offspring[j] = self.toolbox.mate(child1, child2)
-                del offspring[i].fitness.values
-                del offspring[j].fitness.values
+    #     offspring = list(map(self.toolbox.clone, population))
+    #     for child1, child2, i, j in zip(offspring[::2], offspring[1::2], range(0, len(offspring), 2), range(1, len(offspring), 2)):
+    #         if random.random() < self.crossoverProbability:
+    #             offspring[i], offspring[j] = self.toolbox.mate(child1, child2)
+    #             del offspring[i].fitness.values
+    #             del offspring[j].fitness.values
         
-        for i, mutant in enumerate(offspring):
-            if random.random() < self.mutationProbability:
-                offspring[i] = self.toolbox.mutate(mutant)
-                del offspring[i].fitness.values
+    #     for i, mutant in enumerate(offspring):
+    #         if random.random() < self.mutationProbability:
+    #             offspring[i] = self.toolbox.mutate(mutant)
+    #             del offspring[i].fitness.values
         
-        with ProcessPool(max_workers=self.n_jobs) as pool:
-            future = pool.map(self.checkModelValidity, offspring, timeout=self.timeout)
-            iterator = future.result()
+    #     with ProcessPool(max_workers=self.n_jobs) as pool:
+    #         future = pool.map(self.checkModelValidity, offspring, timeout=self.timeout)
+    #         iterator = future.result()
 
-            while True:
-                try:
-                    result = next(iterator)
-                    if result[0]:
-                        finalPopulation.append(result[1])
-                except StopIteration:
-                    break
-                except TimeoutError as error:
-                    print("function took longer than %d seconds" % error.args[1])
-                except ProcessExpired as error:
-                    print("%s. Exit code: %d" % (error, error.exitcode))
-                except Exception as error:
-                    print("function raised %s" % error)
-                    print(error.traceback)
+    #         while True:
+    #             try:
+    #                 result = next(iterator)
+    #                 if result[0]:
+    #                     finalPopulation.append(result[1])
+    #             except StopIteration:
+    #                 break
+    #             except TimeoutError as error:
+    #                 print("function took longer than %d seconds" % error.args[1])
+    #             except ProcessExpired as error:
+    #                 print("%s. Exit code: %d" % (error, error.exitcode))
+    #             except Exception as error:
+    #                 print("function raised %s" % error)
+    #                 print(error.traceback)
 
-        return self.toolbox.selectBest(population, len(population) - len(finalPopulation)) + finalPopulation
+    #     return self.toolbox.selectBest(population, len(population) - len(finalPopulation)) + finalPopulation
 
     def generateOffspring(self, population):
         print("Generating offspring")
@@ -229,7 +229,7 @@ class ESN_NAS:
                 errors.append(modelErrors)
                 models.append(model)
             except Exception as e:
-                print(e)
+                # print(e)
                 errors.append(self.defaultErrors)
                 models.append(None)
                 

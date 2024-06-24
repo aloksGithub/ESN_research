@@ -41,11 +41,9 @@ def executeParallel(func, args, n_jobs, timeout):
         results.append(result)
     
     for i in range(0, len(args), n_jobs):
-        startTime = time.time()
         pool = Pool(processes=n_jobs)
         argsToUse = args[i:min(i+n_jobs, len(args))]
         [pool.apply_async(func, args=eachArgs, callback=callback) for eachArgs in argsToUse]
         time.sleep(timeout)
-        print(time.time() - startTime)
         pool.terminate()
     return results
