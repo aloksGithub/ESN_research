@@ -38,7 +38,11 @@ trainX, trainY, valX, valY, testX, testY = getData()
 def nrmse(y_true, y_pred):
     mseError = mse(y_true, y_pred)
     variance = np.asarray(y_true).var()
-    return np.sqrt(mseError/variance)
+    error = np.sqrt(mseError/variance)
+    if math.isnan(error):
+        return np.inf
+    else:
+        return error
 
 if __name__ == "__main__":
     for i in range(1):
