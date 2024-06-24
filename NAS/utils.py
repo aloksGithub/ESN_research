@@ -92,7 +92,7 @@ nodeParameterRanges = {
         "sr": {"lower": 0.5, "upper": 2, "intOnly": False},
         "input_connectivity": {"lower": 0.05, "upper": 0.5, "intOnly": False},
         "rc_connectivity": {"lower": 0.05, "upper": 0.5, "intOnly": False},
-        "fb_connectivity": {"lower": 0.05, "upper": 0.5, "intOnly": False}
+        # "fb_connectivity": {"lower": 0.05, "upper": 0.5, "intOnly": False}
     },
     "IPReservoir": {
         "units": {"lower": 10, "upper": 3000, "intOnly": True},
@@ -103,7 +103,7 @@ nodeParameterRanges = {
         "learning_rate": {"lower": 0, "upper": 0.01, "intOnly": False},
         "input_connectivity": {"lower": 0.05, "upper": 0.5, "intOnly": False},
         "rc_connectivity": {"lower": 0.05, "upper": 0.5, "intOnly": False},
-        "fb_connectivity": {"lower": 0.05, "upper": 0.5, "intOnly": False}
+        # "fb_connectivity": {"lower": 0.05, "upper": 0.5, "intOnly": False}
     },
     "NVAR": {
         "delay": {"lower": 1, "upper": 5, "intOnly": True},
