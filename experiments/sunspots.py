@@ -57,12 +57,12 @@ if __name__ == "__main__":
             n_jobs=10,
             errorMetrics=[nrmse],
             defaultErrors=[np.inf, np.inf],
-            timeout=60,
-            numEvals=2,
+            timeout=120,
+            numEvals=3,
             saveLocation='backup/sunspots/backup_{}.obj'.format(i),
             memoryLimit=1024
         )
         gaResults = ga.run()
-        model = gaResults["bestModel"]
+        model = ga.bestModel
         preds = runModel(model, testX)
         print("NRMSE:", nrmse(testY, preds))
