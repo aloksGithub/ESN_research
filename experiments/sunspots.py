@@ -65,7 +65,7 @@ if __name__ == "__main__":
             timeout=180,
             numEvals=3,
             saveLocation='backup/sunspots/backup_{}.obj'.format(i),
-            memoryLimit=1024
+            memoryLimit=756
         )
         gaResults = ga.run()
         model = ga.bestModel
