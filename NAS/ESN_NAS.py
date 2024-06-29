@@ -1,6 +1,7 @@
 import reservoirpy as rpy
 from NAS.utils import (
     generateRandomArchitecture,
+    generateRandomArchitectureOld,
     generateRandomNodeParams,
     nodeConstructors,
     nodeParameterRanges,
@@ -308,7 +309,7 @@ class ESN_NAS:
 
         while len(generatedArchitectures)<numIndividuals:
             results = executeParallel(
-                generateRandomArchitecture,
+                generateRandomArchitectureOld,
                 [(
                     self.trainX.shape[-1],
                     self.trainY.shape[-1],
