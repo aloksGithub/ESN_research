@@ -9,6 +9,8 @@ import math
 import warnings
 from NAS.memory_estimator import estimateMemory
 import time
+import networkx as nx
+import random
 warnings.filterwarnings("ignore")
 
 rpy.verbosity(0)
@@ -134,7 +136,7 @@ def generateRandomNodeParams(nodeType, output_dim):
             params[parameterName] = random.random() * (parameterRange["upper"] - parameterRange["lower"]) + parameterRange["lower"]
     return params
 
-def isValidArchitecture(architecture, numInputs, memoryLimit, timeLimit):
+def isValidArchitecture(architecture, sampleInput, sampleOutput, memoryLimit, timeLimit):
     ipExists = False
     forceExists = False
     for i, node in enumerate(architecture["nodes"]):
@@ -144,30 +146,106 @@ def isValidArchitecture(architecture, numInputs, memoryLimit, timeLimit):
             forceExists = True
     if ipExists and forceExists:
         return False
-    memoryEstimate = estimateMemory(architecture, numInputs)
+    memoryEstimate = estimateMemory(architecture, len(sampleInput))
     if memoryEstimate>memoryLimit:
         return False
     
     try:
-        inputDim = architecture["nodes"][0]["params"]["input_dim"]
-        outputDim = architecture["nodes"][-1]["params"]["output_dim"]
         start = time.time()
-        evaluateArchitecture(
-            architecture,
-            np.random.random((numInputs, inputDim)),
-            np.random.random((numInputs, outputDim)),
-            np.random.random((numInputs, inputDim)),
-            np.random.random((numInputs, outputDim)),
-            numEvals=1
+        error = evaluateArchitecture(
+            architecture, sampleInput, sampleOutput, sampleInput, sampleOutput
         )
         timeTaken1 = time.time() - start
         if timeTaken1*1.1>timeLimit:
+            return False
+        if np.isinf(error) or np.isnan(error):
             return False
     except:
         return False
     return True
 
-def generateRandomArchitecture(inputDim, outputDim, maxInput=None, memoryLimit=4*1024, timeLimit=180):
+def createRandomGraph(numNodes):
+    while True:
+        G = nx.gnp_random_graph(numNodes - 2, 0.7, directed=True)
+        DAG = nx.DiGraph([(u, v, {'weight':random.randint(-10, 10)}) for (u, v) in G.edges() if u<v])
+        if len(DAG.nodes)==numNodes-2:
+            break
+    
+    sources = []
+    sinks = []
+    for node in DAG.nodes:
+        hasPredecessor = False
+        for otherNode in DAG.nodes:
+            if DAG.has_predecessor(node, otherNode):
+                hasPredecessor = True
+        if not hasPredecessor:
+            sources.append(node)
+            
+        hasSuccessor = False
+        for otherNode in DAG.nodes:
+            if DAG.has_successor(node, otherNode):
+                hasSuccessor = True
+        if not hasSuccessor:
+            sinks.append(node)
+
+    edges = [[0, source+1] for source in sources] + [[e1 + 1, e2 + 1] for (e1, e2) in DAG.edges] + [[sink+1, numNodes-1] for sink in sinks]
+    return edges
+
+def generateRandomArchitecture(inputDim, outputDim, sampleInput, sampleOutput, memoryLimit=4*1024, timeLimit=180):
+    num_nodes = random.randint(4, 7)
+    nodes = [
+        {"type": "Input", "params": {"input_dim": inputDim}}
+    ]
+    for i in range(num_nodes-1):
+        available_node_types = list(nodeConstructors.keys())
+        if i==0:
+            available_node_types.remove("LMS")
+            available_node_types.remove("RLS")
+            available_node_types.remove("Ridge")
+        available_node_types.remove("Input")
+        for node in nodes:
+            if node["type"]=="IPReservoir":
+                if "LMS" in available_node_types:
+                    available_node_types.remove("LMS")
+                if "RLS" in available_node_types:
+                    available_node_types.remove("RLS")
+            if (node["type"]=="LMS" or node["type"]=="RLS") and "IPReservoir" in available_node_types:
+                available_node_types.remove("IPReservoir")
+        
+        node_type = random.choice(available_node_types)
+
+        node_params = generateRandomNodeParams(node_type, outputDim)
+        nodes.append({"type": node_type, "params": node_params})
+
+    # Adding the readout node
+    ipExists = False
+    for node in nodes:
+        if node["type"]=="IPReservoir":
+            ipExists = True
+    if ipExists:
+        readouts = [
+            {"type": "Ridge", "params": generateRandomNodeParams("Ridge", outputDim)}
+        ]
+    else:
+        readouts = [
+            {"type": "Ridge", "params": generateRandomNodeParams("Ridge", outputDim)},
+            {"type": "LMS", "params": generateRandomNodeParams("LMS", outputDim)},
+            {"type": "RLS", "params": generateRandomNodeParams("RLS", outputDim)}
+        ]
+    nodes.append(random.choice(readouts))
+
+    # Create a graph with num_nodes + 1 nodes (+1 is for the input node)
+    edges = createRandomGraph(num_nodes+1)
+
+    architecture = {"nodes": nodes, "edges": edges}
+
+    if isValidArchitecture(architecture, sampleInput, sampleOutput, memoryLimit, timeLimit):
+        return architecture
+    else:
+        return generateRandomArchitecture(inputDim, outputDim, sampleInput, sampleOutput, memoryLimit, timeLimit)
+
+
+def generateRandomArchitectureOld(inputDim, outputDim, sampleInput, sampleOutput, memoryLimit=4*1024, timeLimit=180):
     num_nodes = random.randint(2, 4)
 
     nodes = [
@@ -246,38 +324,24 @@ def generateRandomArchitecture(inputDim, outputDim, maxInput=None, memoryLimit=4
 
     architecture = {"nodes": nodes, "edges": edges}
 
-    if isValidArchitecture(architecture, maxInput, memoryLimit, timeLimit):
+    if isValidArchitecture(architecture, sampleInput, sampleOutput, memoryLimit, timeLimit):
         return architecture
     else:
-        return generateRandomArchitecture(inputDim, outputDim, maxInput, memoryLimit, timeLimit)
+        return generateRandomArchitectureOld(inputDim, outputDim, sampleInput, sampleOutput, memoryLimit, timeLimit)
     
   
-def evaluateArchitecture(individual, trainX, trainY, valX, valY, errorMetrics=[nrmse], defaultErrors=[np.inf], numEvals=3):
+def evaluateArchitecture(individual, trainX, trainY, valX, valY, errorMetrics=[nrmse], defaultErrors=[np.inf]):
     """
     Instantiate random models using given architecture, then train and evaluate them
     on one step ahead prediction using errorMetrics on valX and valY.
     """
-    index = len(globalFitnesses)
-    globalFitnesses.append([individual, defaultErrors, constructModel(individual)])
 
-    errors = []
-    models = []
-    for _ in range(numEvals):
-        model = constructModel(individual)
-        model = trainModel(model, trainX, trainY)
-        preds = runModel(model, valX)
-        modelErrors = [metric(valY, preds) for metric in errorMetrics]
-        errors.append(modelErrors)
-        models.append(model)
-            
-        # Find index for model with best error metrics
-        error0 = [modelErrors[0] for modelErrors in errors]
-        bestErrorIndex = error0.index(max(error0)) if defaultErrors[0]==0 else error0.index(min(error0))
+    model = constructModel(individual)
+    model = trainModel(model, trainX, trainY)
+    preds = runModel(model, valX)
+    modelErrors = [metric(valY, preds) for metric in errorMetrics]
         
-        globalFitnesses[index][1] = errors[bestErrorIndex]
-        globalFitnesses[index][2] = models[bestErrorIndex]
-
-    return globalFitnesses[index][1], globalFitnesses[index][2]
+    return modelErrors[0]
 
 def constructModel(architecture):
     nodes = [nodeConstructors[nodeData['type']](**nodeData['params']) for nodeData in architecture['nodes']]

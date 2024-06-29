@@ -1,4 +1,3 @@
-from functools import partial
 import reservoirpy as rpy
 from NAS.utils import (
     generateRandomArchitecture,
@@ -20,8 +19,6 @@ from NAS.memory_estimator import measure_memory_usage
 import copy
 warnings.filterwarnings("ignore")
 import time
-from pebble import ProcessExpired, ProcessPool
-from concurrent.futures import TimeoutError
 from NAS.parallel_processing import executeParallel
 rpy.verbosity(0)
 
@@ -108,7 +105,7 @@ class ESN_NAS:
 
         
     def checkModelValidity(self, architecture):
-        return isValidArchitecture(architecture, len(self.trainY), self.memoryLimit, self.timeout / self.numEvals ), architecture
+        return isValidArchitecture(architecture, self.trainX, self.trainY, self.memoryLimit, self.timeout / self.numEvals ), architecture
 
     # def generateOffspringOld(self, population):
     #     finalPopulation = []
@@ -315,7 +312,8 @@ class ESN_NAS:
                 [(
                     self.trainX.shape[-1],
                     self.trainY.shape[-1],
-                    len(self.trainX),
+                    self.trainX,
+                    self.trainY,
                     self.memoryLimit,
                     self.timeout / self.numEvals
                 ) for _ in range(numIndividuals - len(generatedArchitectures))],

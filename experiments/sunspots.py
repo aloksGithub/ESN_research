@@ -43,6 +43,11 @@ def nrmse(y_true, y_pred):
         return np.inf
     else:
         return error
+    
+def loadSavedGA(index):
+    file = open('backup/sunspots/backup_{}.obj'.format(index), 'rb')
+    ga = pickle.load(file)
+    return ga
 
 if __name__ == "__main__":
     for i in range(1):
@@ -57,7 +62,7 @@ if __name__ == "__main__":
             n_jobs=10,
             errorMetrics=[nrmse],
             defaultErrors=[np.inf, np.inf],
-            timeout=120,
+            timeout=180,
             numEvals=3,
             saveLocation='backup/sunspots/backup_{}.obj'.format(i),
             memoryLimit=1024
