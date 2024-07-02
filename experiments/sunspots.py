@@ -50,13 +50,13 @@ def loadSavedGA(index):
     return ga
 
 if __name__ == "__main__":
-    for i in range(1):
+    for i in [1, 2, 3]:
         ga = ESN_NAS(
             trainX,
             trainY,
             valX,
             valY,
-            50,
+            10,
             50,
             trainY.shape[-1],
             n_jobs=10,
