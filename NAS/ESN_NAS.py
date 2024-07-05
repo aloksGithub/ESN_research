@@ -48,7 +48,8 @@ class ESN_NAS:
         saveModels=False,
         timeout = 180,
         stagnationReset = 5,
-        saveLocation = None
+        saveLocation = None,
+        isAutoRegressive = False
     ):
         if minimizeFitness:
             creator.create("Fitness", base.Fitness, weights=(-1.0,))
@@ -73,8 +74,8 @@ class ESN_NAS:
         self.timeout = timeout
         self.stagnationReset = stagnationReset
         self.saveLocation = saveLocation if saveLocation is not None else "temp"
+        self.isAutoregressive = isAutoRegressive
 
-        self.fitnessCache = []
         self.generation = 1
         self.fitnesses = []
         self.architectures = []
@@ -103,6 +104,7 @@ class ESN_NAS:
 
         self.diagnosisResults = []
         self.population = []
+        self.bestFitness = defaultErrors
 
         
     def checkModelValidity(self, architecture):
@@ -243,8 +245,6 @@ class ESN_NAS:
         using errorMetrics on valX and valY. Test prediction is done auto-regressively,
         the output from the current timestep is used as input for next timestep
         """
-        index = len(self.fitnessCache)
-        self.fitnessCache.append([individual, self.defaultErrors, None])
 
         errors = []
         models = []
@@ -270,15 +270,15 @@ class ESN_NAS:
             error0 = [modelErrors[0] for modelErrors in errors]
             bestErrorIndex = error0.index(max(error0)) if self.defaultErrors[0]==0 else error0.index(min(error0))
             
-            self.fitnessCache[index][1] = errors[bestErrorIndex]
-            self.fitnessCache[index][2] = models[bestErrorIndex]
-        
-        return errors[bestErrorIndex], models[bestErrorIndex]
+        return individual, errors[bestErrorIndex], models[bestErrorIndex]
 
     def evaluateParallel(self, population):
         print("Evaluating population")
         results = []
-        results = executeParallel(self.evaluateArchitecture, [(individual,) for individual in population], self.n_jobs, self.timeout)
+        results = executeParallel(
+            self.evaluateArchitectureAutoRegressive if self.isAutoregressive else self.evaluateArchitecture,
+            [(individual,) for individual in population], self.n_jobs, self.timeout
+        )
         
         for individual in population:
             found = False
@@ -353,13 +353,13 @@ class ESN_NAS:
         
         objective = [errors[0] for errors in self.fitnesses]
         bestIndex = objective.index(min(objective)) if self.minimizeFitness else objective.index(max(objective))
-        bestFitness = self.fitnesses[bestIndex]
+        self.bestFitness = self.fitnesses[bestIndex]
         numFailures = 0
         for index, fitness in enumerate(self.fitnesses[-self.populationSize:]):
             if fitness[0]==self.defaultFitness:
                 # print(self.architectures[-self.populationSize:][index])
                 numFailures+=1
-        print("Best so far:", bestFitness)
+        print("Best so far:", self.bestFitness)
         print("Failure rate: {}%".format(100*numFailures/self.populationSize))
         print("Time taken:", time.time() - startTime)
 
