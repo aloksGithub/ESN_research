@@ -281,7 +281,7 @@ def generateRandomArchitectureOld(inputDim, outputDim, sampleInput, sampleOutput
             source = random.choice([node for node in list(connected_nodes) if node != i])
             if (nodes[source]['type']=="Reservoir" or nodes[source]['type']=="IPReservoir" or nodes[source]['type']=="NVAR") and nodes[i]["type"]=="NVAR":
                 continue
-            if nodes[source]['type']=="IPReservoir" and (nodes[i]["type"]=="RLS" or nodes[i]["type"]=="LLS"):
+            if nodes[source]['type']=="IPReservoir" and (nodes[i]["type"]=="RLS" or nodes[i]["type"]=="LMS"):
                 continue
             if [source, i] not in edges and [i, source] not in edges:
                 edges.append([source, i]) 
