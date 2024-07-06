@@ -1,3 +1,4 @@
+import math
 import reservoirpy as rpy
 import numpy as np
 from functools import partial
@@ -27,15 +28,22 @@ def nrmse(y_true, y_pred):
     
     rmse = np.sqrt(np.mean((y_true - y_pred)**2))
     mean_norm = np.linalg.norm(np.mean(y_true))
-    
-    return rmse / mean_norm
+    error = rmse/mean_norm
+    if math.isnan(error):
+        return np.inf
+    else:
+        return error
     
 def r_squared(y_true, y_pred):
     y_true = np.array(y_true)
     y_pred = np.array(y_pred)
     numerator = np.sum((y_true - y_pred)**2)
     denominator = np.sum((y_true - np.mean(y_true))**2)
-    return 1 - (numerator / denominator)
+    r2 = 1 - (numerator / denominator)
+    if math.isnan(r2):
+        return 0
+    else:
+        return r2
 
 def readSavedExperiment(path):
     file = open(path, 'rb')
