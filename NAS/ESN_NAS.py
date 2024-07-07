@@ -108,7 +108,7 @@ class ESN_NAS:
 
         
     def checkModelValidity(self, architecture):
-        return isValidArchitecture(architecture, self.trainX, self.trainY, self.memoryLimit, self.timeout / self.numEvals ), architecture
+        return isValidArchitecture(architecture, self.trainX, self.trainY, self.memoryLimit, self.timeout / self.numEvals, self.isAutoregressive ), architecture
 
     # def generateOffspringOld(self, population):
     #     finalPopulation = []

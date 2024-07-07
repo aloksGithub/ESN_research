@@ -89,7 +89,7 @@ if __name__ == "__main__":
             n_jobs=10,
             errorMetrics=[nrmse, r_squared],
             defaultErrors=[np.inf, 0],
-            timeout=60,
+            timeout=180,
             numEvals=3,
             saveLocation='backup/mgs/backup_{}.obj'.format(i),
             memoryLimit=756,

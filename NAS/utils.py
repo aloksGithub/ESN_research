@@ -136,7 +136,7 @@ def generateRandomNodeParams(nodeType, output_dim):
             params[parameterName] = random.random() * (parameterRange["upper"] - parameterRange["lower"]) + parameterRange["lower"]
     return params
 
-def isValidArchitecture(architecture, sampleInput, sampleOutput, memoryLimit, timeLimit):
+def isValidArchitecture(architecture, sampleInput, sampleOutput, memoryLimit, timeLimit, isAutoRegressive=False):
     ipExists = False
     forceExists = False
     for i, node in enumerate(architecture["nodes"]):
@@ -153,6 +153,8 @@ def isValidArchitecture(architecture, sampleInput, sampleOutput, memoryLimit, ti
     try:
         start = time.time()
         error = evaluateArchitecture(
+            architecture, sampleInput, sampleOutput, sampleInput, sampleOutput
+        ) if not isAutoRegressive else evaluateArchitectureAutoRegressive(
             architecture, sampleInput, sampleOutput, sampleInput, sampleOutput
         )
         timeTaken1 = time.time() - start
@@ -339,6 +341,25 @@ def evaluateArchitecture(individual, trainX, trainY, valX, valY, errorMetrics=[n
     model = constructModel(individual)
     model = trainModel(model, trainX, trainY)
     preds = runModel(model, valX)
+    modelErrors = [metric(valY, preds) for metric in errorMetrics]
+        
+    return modelErrors[0]
+  
+def evaluateArchitectureAutoRegressive(individual, trainX, trainY, valX, valY, errorMetrics=[nrmse], defaultErrors=[np.inf]):
+    """
+    Instantiate random models using given architecture, then train and evaluate them
+    on one step ahead prediction using errorMetrics on valX and valY.
+    """
+
+    model = constructModel(individual)
+    model = trainModel(model, trainX, trainY)
+    prevOutput = valX[0]
+    preds = []
+    for _ in range(len(valX)):
+        pred = runModel(model, prevOutput)
+        prevOutput = pred
+        preds.append(pred[0])
+    preds = np.array(preds)
     modelErrors = [metric(valY, preds) for metric in errorMetrics]
         
     return modelErrors[0]
