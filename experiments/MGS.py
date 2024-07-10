@@ -74,17 +74,16 @@ def getData():
 trainX, trainY, valX, valY, testX, testY = getData()
 
 if __name__ == "__main__":
-    numExperiments = 2
     nrmseErrors = []
     r2_squaredValues = []
-    for i in range(numExperiments):
+    for i in [0, 1, 2, 3, 4]:
         ga = ESN_NAS(
             trainX,
             trainY,
             valX,
             valY,
             50,
-            100,
+            50,
             trainY.shape[-1],
             n_jobs=10,
             errorMetrics=[nrmse, r_squared],
@@ -98,33 +97,10 @@ if __name__ == "__main__":
         ga.run()
         nrmseErrors.append(ga.bestFitness[0])
         r2_squaredValues.append(ga.bestFitness[1])
+    print("Errors:")
+    print(nrmseErrors)
+    print(r2_squaredValues)
     print("Averaged errors:")
     print("NRMSE: {} ({})".format(np.average(nrmseErrors), np.std(nrmseErrors)))
     print("R2: {} ({})".format(np.average(r2_squaredValues), np.std(r2_squaredValues)))
-    
-    # nrmseErrors = []
-    # r2Errors = []
-    # for i in range(5):
-    #     error = False
-    #     gaParams["experimentIndex"] = i
-    #     while True:
-    #         try:
-    #             nrmse, r2 = NAS.runGA(gaParams, error)
-    #             r2Errors.append(r2)
-    #             nrmseErrors.append(nrmse)
-    #             break
-    #         except:
-    #             print(traceback.format_exc())
-    #             error = True
-    # print(np.array(nrmseErrors).mean(), np.array(nrmseErrors).std())
-    # print(np.array(r2Errors).mean(), np.array(r2Errors).std())
-    # total = 0
-    # r2_total = 0
-    # for i in range(5):
-    #     file = open('backup/{}/backup_{}.obj'.format(gaParams["dataset"], i), 'rb')
-    #     data = pickle.load(file)
-    #     fitnesses = data["allFitnesses"]
-    #     minFitnesses = []
-    #     total+=min(data["allFitnesses"])
-    #     r2_total+=data["fitnesses2"][data["allFitnesses"].index(min(data["allFitnesses"]))]
-    # print(total/5, r2_total/5)
+
