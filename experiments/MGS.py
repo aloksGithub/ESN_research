@@ -84,7 +84,7 @@ if __name__ == "__main__":
             valX,
             valY,
             50,
-            50,
+            100,
             trainY.shape[-1],
             n_jobs=10,
             errorMetrics=[nrmse, r_squared],
