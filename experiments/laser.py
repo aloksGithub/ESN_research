@@ -91,7 +91,7 @@ if __name__ == "__main__":
             defaultErrors=[np.inf, 0],
             timeout=180,
             numEvals=3,
-            saveLocation='backup/mgs/backup_{}.obj'.format(i),
+            saveLocation='backup/laser/backup_{}.obj'.format(i),
             memoryLimit=756,
             isAutoRegressive=True
         )
