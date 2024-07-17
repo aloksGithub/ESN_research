@@ -71,6 +71,20 @@ def getData():
     test_out = data[trainLen+valLen+1:trainLen+valLen+testLen+1]
     return train_in, train_out, val_in, val_out, test_in, test_out
 
+def printSavedResults():
+    nrmseErrors = []
+    r2_squaredValues = []
+    for i in range(5):
+        ga = readSavedExperiment('backup/mgs/backup_{}.obj'.format(i))
+        nrmseErrors.append(ga.bestFitness[0])
+        r2_squaredValues.append(ga.bestFitness[1])
+    print("Errors:")
+    print(nrmseErrors)
+    print(r2_squaredValues)
+    print("Averaged errors:")
+    print("NRMSE: {} ({})".format(np.average(nrmseErrors), np.std(nrmseErrors)))
+    print("R2: {} ({})".format(np.average(r2_squaredValues), np.std(r2_squaredValues)))
+
 trainX, trainY, valX, valY, testX, testY = getData()
 
 if __name__ == "__main__":
