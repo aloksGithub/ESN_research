@@ -20,7 +20,6 @@ import sys
 import pickle
 
 rpy.verbosity(0)
-output_dim = 1
 
 def nrmse(y_true, y_pred):
     y_true = np.array(y_true)
@@ -85,9 +84,27 @@ def printSavedResults():
     print("NRMSE: {} ({})".format(np.average(nrmseErrors), np.std(nrmseErrors)))
     print("R2: {} ({})".format(np.average(r2_squaredValues), np.std(r2_squaredValues)))
 
-trainX, trainY, valX, valY, testX, testY = getData()
+def printOldSavedResults():
+    nrmseErrors = []
+    r2_squaredValues = []
+    total = 0
+    r2_total = 0
+    for i in range(5):
+        data = readSavedExperiment('old_backup/mgs/backup_{}.obj'.format(i))
+        total+=min(data["allFitnesses"])
+        nrmseErrors.append(min(data["allFitnesses"]))
+        r2_squaredValues.append(data["fitnesses2"][data["allFitnesses"].index(min(data["allFitnesses"]))])
+        r2_total+=data["fitnesses2"][data["allFitnesses"].index(min(data["allFitnesses"]))]
+    print("Errors:")
+    print(nrmseErrors)
+    print(r2_squaredValues)
+    print("Averaged errors:")
+    print("NRMSE: {} ({})".format(np.average(nrmseErrors), np.std(nrmseErrors)))
+    print("R2: {} ({})".format(np.average(r2_squaredValues), np.std(r2_squaredValues)))
+
 
 if __name__ == "__main__":
+    trainX, trainY, valX, valY, testX, testY = getData()
     nrmseErrors = []
     r2_squaredValues = []
     for i in [0, 1, 2, 3, 4]:

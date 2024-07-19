@@ -21,7 +21,6 @@ import pickle
 import pandas as pd
 
 rpy.verbosity(0)
-output_dim = 1
 
 def nrmse(y_true, y_pred):
     y_true = np.array(y_true)
@@ -72,9 +71,40 @@ def getData():
     test_out = data[trainLen+valLen+1:trainLen+valLen+testLen+1]
     return train_in, train_out, val_in, val_out, test_in, test_out
 
-trainX, trainY, valX, valY, testX, testY = getData()
+def printSavedResults():
+    nrmseErrors = []
+    r2_squaredValues = []
+    for i in range(5):
+        ga = readSavedExperiment('backup/laser/backup_{}.obj'.format(i))
+        nrmseErrors.append(ga.bestFitness[0])
+        r2_squaredValues.append(ga.bestFitness[1])
+    print("Errors:")
+    print(nrmseErrors)
+    print(r2_squaredValues)
+    print("Averaged errors:")
+    print("NRMSE: {} ({})".format(np.average(nrmseErrors), np.std(nrmseErrors)))
+    print("R2: {} ({})".format(np.average(r2_squaredValues), np.std(r2_squaredValues)))
+
+def printOldSavedResults():
+    nrmseErrors = []
+    r2_squaredValues = []
+    total = 0
+    r2_total = 0
+    for i in range(5):
+        data = readSavedExperiment('old_backup/laser/backup_{}.obj'.format(i))
+        total+=min(data["allFitnesses"])
+        nrmseErrors.append(min(data["allFitnesses"]))
+        r2_squaredValues.append(data["fitnesses2"][data["allFitnesses"].index(min(data["allFitnesses"]))])
+        r2_total+=data["fitnesses2"][data["allFitnesses"].index(min(data["allFitnesses"]))]
+    print("Errors:")
+    print(nrmseErrors)
+    print(r2_squaredValues)
+    print("Averaged errors:")
+    print("NRMSE: {} ({})".format(np.average(nrmseErrors), np.std(nrmseErrors)))
+    print("R2: {} ({})".format(np.average(r2_squaredValues), np.std(r2_squaredValues)))
 
 if __name__ == "__main__":
+    trainX, trainY, valX, valY, testX, testY = getData()
     nrmseErrors = []
     r2_squaredValues = []
     for i in [0, 1, 2, 3, 4]:
