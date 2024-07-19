@@ -79,10 +79,10 @@ if __name__ == "__main__":
             trainY,
             valX,
             valY,
-            50,
-            50,
+            5,
+            10,
             trainY.shape[-1],
-            n_jobs=20,
+            n_jobs=5,
             errorMetrics=[nrmse, r_squared],
             defaultErrors=[np.inf, 0],
             timeout=60,
@@ -93,7 +93,7 @@ if __name__ == "__main__":
         ga.run()
         model = ga.bestModel
         preds = runModel(model, testX)
-        print("NRMSE:", mse(nrmse, preds))
+        print("NRMSE:", mse(testY, preds))
         print("R2:", r_squared(testY, preds))
 
 

@@ -1,61 +1,75 @@
-import math
 import multiprocessing
+import time
 from joblib import Parallel, delayed
-import pandas as pd
-import os, sys
+import pickle
+import sys
+import os
 current_dir = os.path.abspath(os.path.dirname(__file__))
 parent_dir = os.path.dirname(current_dir)
 sys.path.insert(0, parent_dir)
-from NAS.utils import evaluateArchitecture, estimateMemory, isValidArchitecture
-import time
-import matplotlib.pyplot as plt
+from NAS.ESN_NAS import ESN_NAS
+import numpy as np
+import math
 
-def getData():
-    water = pd.read_csv("./datasets/Water.csv").to_numpy()
-    trainLen = math.floor(len(water)*0.5)
-    valLen = math.floor(len(water)*0.7)
+def nrmse(y_true, y_pred):
+    y_true = np.array(y_true)
+    y_pred = np.array(y_pred)
     
-    train_in = water[0:trainLen, :18]
-    train_out = water[0:trainLen, 18:]
-    val_in = water[trainLen:valLen, :18]
-    val_out = water[trainLen:valLen, 18:]
-    test_in = water[valLen:, :18]
-    test_out = water[valLen:, 18:]
-    return train_in, train_out, val_in, val_out, test_in, test_out
+    rmse = np.sqrt(np.mean((y_true - y_pred)**2))
+    mean_norm = np.linalg.norm(np.mean(y_true))
+    
+    error = rmse / mean_norm
+    if math.isnan(error):
+        return np.inf
+    else:
+        return error
+    
+def r_squared(y_true, y_pred):
+    y_true = np.array(y_true)
+    y_pred = np.array(y_pred)
+    numerator = np.sum((y_true - y_pred)**2)
+    denominator = np.sum((y_true - np.mean(y_true))**2)
+    r2 = 1 - (numerator / denominator)
+    if math.isnan(r2):
+        return 0
+    else:
+        return 1 - (numerator / denominator)
 
-trainX, trainY, valX, valY, testX, testY = getData()
+def square(val):
+    time.sleep(val)
+    print("Done")
+    return val*val
 
-def checkTrainTime(architecture, numInputs):
-    start = time.time()
-    evaluateArchitecture(architecture, trainX[:numInputs], trainY[:numInputs], valX[:numInputs], valY[:numInputs])
-    timeTaken = time.time() - start
-    return timeTaken
+def worker(queue, func, args, n_jobs):
+    dataStore = [None] * len(args)
+    queue.put(dataStore)
+    def funcWrapper(jobIndex, *args):
+        result = func(*args)
+        dataStore[jobIndex] = result
+        while not queue.empty():
+            queue.get() # Call get on queue to empty it
+        queue.put(dataStore)
+        
+    parallel = Parallel(n_jobs=n_jobs, require='sharedmem')
+    parallel(delayed(funcWrapper)(i, *args[i]) for i in range(len(args)))
 
-
-def wait():
-    while True:
-        pass
+def parallelProcessing(func, args, n_jobs, timeout):
+    queue = multiprocessing.Queue()
+    p = multiprocessing.Process(target=worker, args=(queue, func, args, n_jobs))
+    p.start()
+    p.join(timeout=timeout)
+    if p.is_alive():
+        p.terminate()
+        p.join()
+    result = queue.get_nowait()
+    return result
 
 if __name__ == "__main__":
-    start = time.time()
-    try:
-        parallel = Parallel(n_jobs=5, timeout=3, require='sharedmem')
-        parallel(delayed(wait)() for i in range(5))
-    except multiprocessing.context.TimeoutError:
-        print("Task failed successfully", time.time() - start)
-        pass
-    # runtimes = []
-    # architecture = {'nodes': [{'type': 'Input', 'params': {'input_dim': 18}}, {'type': 'IPReservoir', 'params': {'units': 1516, 'lr': 0.3794160763282813, 'sr': 0.9412495273142261, 'mu': 0.09315428782964497, 'sigma': 1.9996893018324113, 'learning_rate': 0.007115438623711385, 'input_connectivity': 0.19270834464023434, 'rc_connectivity': 0.4139009070019663, 'fb_connectivity': 0.4407973219740993}}, {'type': 'LMS', 'params': {'output_dim': 18, 'alpha': 0.3507005013535671}}, {'type': 'NVAR', 'params': {'delay': 5, 'order': 2, 'strides': 3}}, {'type': 'Ridge', 'params': {'output_dim': 18, 'ridge': 6.563310358305086e-06}}, {'type': 'IPReservoir', 'params': {'units': 68, 'lr': 0.8788496628894418, 'sr': 0.660379110102254, 'mu': 0.16625820180299722, 'sigma': 0.5806266716741275, 'learning_rate': 0.008367985016205044, 'input_connectivity': 0.16643347500247355, 'rc_connectivity': 0.136383107016403, 'fb_connectivity': 0.11601073175108537}}, {'type': 'Ridge', 'params': {'output_dim': 18, 'ridge': 2.2092030120388196e-05}}], 'edges': [[0, 1], [1, 2], [2, 3], [1, 4], [2, 5], [3, 6], [4, 6], [5, 6]]}
-
-
-    # print(isValidArchitecture(architecture, 4000, 1024, 480))
-    # start = time.time()
-    # perf = evaluateArchitecture(architecture, trainX, trainY, valX, valY)
-    # print(time.time() - start)
-    # print(perf)
-    # for i in range(10, 50, 10):
-    #     timeTaken = checkTrainTime(architecture, i)
-    #     print(timeTaken)
-    #     runtimes.append(timeTaken)
-    # plt.plot(runtimes)
-    # plt.show()
+    # results1 = parallelProcessing(square, [(2,), (3,), (8,)], 3, 6)
+    # print(results1)
+    # results2 = parallelProcessing(square, [(4,), (15,), (6,)], 3, 11)
+    # print(results2)
+    
+    file = open("./backup/sunspots/backup_0.obj", 'rb')
+    ga = pickle.load(file)
+    print(ga.population)
