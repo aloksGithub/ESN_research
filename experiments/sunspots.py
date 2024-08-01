@@ -32,7 +32,6 @@ def getData():
     test_in = data[trainLen+valLen:trainLen+valLen+testLen]
     test_out = data[trainLen+valLen+1:trainLen+valLen+testLen+1]
     return train_in, train_out, val_in, val_out, test_in, test_out
-
 trainX, trainY, valX, valY, testX, testY = getData()
 
 def nrmse(y_true, y_pred):
@@ -44,30 +43,71 @@ def nrmse(y_true, y_pred):
     else:
         return error
     
-def loadSavedGA(index):
-    file = open('backup/sunspots/backup_{}.obj'.format(index), 'rb')
-    ga = pickle.load(file)
-    return ga
+def r_squared(y_true, y_pred):
+    y_true = np.array(y_true)
+    y_pred = np.array(y_pred)
+    numerator = np.sum((y_true - y_pred)**2)
+    denominator = np.sum((y_true - np.mean(y_true))**2)
+    r2 = 1 - (numerator / denominator)
+    if math.isnan(r2):
+        return 0
+    else:
+        return r2
+    
+def readSavedExperiment(path):
+    file = open(path, 'rb')
+    return pickle.load(file)
+
+def printSavedResults():
+    nrmseErrors = []
+    rSquaredValues = []
+    for i in range(5):
+        ga = readSavedExperiment('backup/sunspots/backup_{}.obj'.format(i))
+        model = ga.bestModel
+        preds = runModel(model, testX)
+        nrmseError = nrmse(testY, preds)
+        r2Error = r_squared(testY, preds)
+        nrmseErrors.append(nrmseError)
+        rSquaredValues.append(r2Error)
+    print("Errors:")
+    print(nrmseErrors)
+    print(rSquaredValues)
+    print("Averaged errors:")
+    print("NRMSE: {} ({})".format(np.average(nrmseErrors), np.std(nrmseErrors)))
+    print("R2: {} ({})".format(np.average(rSquaredValues), np.std(rSquaredValues)))
 
 if __name__ == "__main__":
-    for i in [1, 2, 3]:
+    nrmseErrors = []
+    rSquaredValues = []
+    for i in [0, 1, 2, 3, 4]:
         ga = ESN_NAS(
             trainX,
             trainY,
             valX,
             valY,
-            10,
             50,
+            100,
             trainY.shape[-1],
             n_jobs=10,
-            errorMetrics=[nrmse],
-            defaultErrors=[np.inf, np.inf],
+            errorMetrics=[nrmse, r_squared],
+            defaultErrors=[np.inf, 0],
             timeout=180,
             numEvals=3,
             saveLocation='backup/sunspots/backup_{}.obj'.format(i),
-            memoryLimit=756
+            memoryLimit=756,
+            isAutoRegressive=False
         )
         gaResults = ga.run()
         model = ga.bestModel
         preds = runModel(model, testX)
-        print("NRMSE:", nrmse(testY, preds))
+        nrmseError = nrmse(testY, preds)
+        r2Error = r_squared(testY, preds)
+        nrmseErrors.append(nrmseError)
+        rSquaredValues.append(r2Error)
+        print("Result:", nrmseError, r2Error)
+    print("Errors:")
+    print(nrmseErrors)
+    print(rSquaredValues)
+    print("Averaged errors:")
+    print("NRMSE: {} ({})".format(np.average(nrmseErrors), np.std(nrmseErrors)))
+    print("R2: {} ({})".format(np.average(rSquaredValues), np.std(rSquaredValues)))
