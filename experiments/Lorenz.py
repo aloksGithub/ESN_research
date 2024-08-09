@@ -69,11 +69,25 @@ def getData():
     test_out = data[trainLen+valLen+1:trainLen+valLen+testLen+1]
     return train_in, train_out, val_in, val_out, test_in, test_out
 
-def printSavedResults():
+def printSavedResults100():
     nrmseErrors = []
     r2_squaredValues = []
     for i in range(5):
-        ga = readSavedExperiment('backup/lorenz/backup_{}.obj'.format(i))
+        ga = readSavedExperiment('backup_100/lorenz/backup_{}.obj'.format(i))
+        nrmseErrors.append(ga.bestFitness[0])
+        r2_squaredValues.append(ga.bestFitness[1])
+    print("Errors:")
+    print(nrmseErrors)
+    print(r2_squaredValues)
+    print("Averaged errors:")
+    print("NRMSE: {} ({})".format(np.average(nrmseErrors), np.std(nrmseErrors)))
+    print("R2: {} ({})".format(np.average(r2_squaredValues), np.std(r2_squaredValues)))
+
+def printSavedResults50():
+    nrmseErrors = []
+    r2_squaredValues = []
+    for i in range(5):
+        ga = readSavedExperiment('backup_50/lorenz/backup_{}.obj'.format(i))
         nrmseErrors.append(ga.bestFitness[0])
         r2_squaredValues.append(ga.bestFitness[1])
     print("Errors:")
@@ -112,14 +126,14 @@ if __name__ == "__main__":
             valX,
             valY,
             50,
-            50,
+            100,
             trainY.shape[-1],
             n_jobs=10,
             errorMetrics=[nrmse, r_squared],
             defaultErrors=[np.inf, 0],
             timeout=180,
             numEvals=3,
-            saveLocation='backup/lorenz/backup_{}.obj'.format(i),
+            saveLocation='backup_100/lorenz/backup_{}.obj'.format(i),
             memoryLimit=756,
             isAutoRegressive=True
         )
