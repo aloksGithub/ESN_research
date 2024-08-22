@@ -58,11 +58,11 @@ def readSavedExperiment(path):
     file = open(path, 'rb')
     return pickle.load(file)
 
-def printSavedResults():
+def printSavedResults(version):
     nrmseErrors = []
     rSquaredValues = []
     for i in range(5):
-        ga = readSavedExperiment('backup/sunspots/backup_{}.obj'.format(i))
+        ga = readSavedExperiment('backup_{}/sunspots/backup_{}.obj'.format(version, i))
         model = ga.bestModel
         preds = runModel(model, testX)
         nrmseError = nrmse(testY, preds)
@@ -86,14 +86,14 @@ if __name__ == "__main__":
             valX,
             valY,
             50,
-            100,
+            50,
             trainY.shape[-1],
             n_jobs=10,
             errorMetrics=[nrmse, r_squared],
             defaultErrors=[np.inf, 0],
             timeout=180,
             numEvals=3,
-            saveLocation='backup/sunspots/backup_{}.obj'.format(i),
+            saveLocation='backup_50/sunspots/backup_{}.obj'.format(i),
             memoryLimit=756,
             isAutoRegressive=False
         )
