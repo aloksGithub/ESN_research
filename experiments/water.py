@@ -1,3 +1,4 @@
+import pickle
 import reservoirpy as rpy
 import numpy as np
 import sys
@@ -33,20 +34,18 @@ def getDataSingleCol():
     test_out = allData[valLen:]
     return train_in, train_out, val_in, val_out, test_in, test_out, water
 
-def getData():
-    water = pd.read_csv("./datasets/Water.csv").to_numpy()
-    trainLen = math.floor(len(water)*0.5)
-    valLen = math.floor(len(water)*0.7)
+# def getData():
+#     water = pd.read_csv("./datasets/Water.csv").to_numpy()
+#     trainLen = math.floor(len(water)*0.5)
+#     valLen = math.floor(len(water)*0.7)
     
-    train_in = water[0:trainLen, :18]
-    train_out = water[0:trainLen, 18:]
-    val_in = water[trainLen:valLen, :18]
-    val_out = water[trainLen:valLen, 18:]
-    test_in = water[valLen:, :18]
-    test_out = water[valLen:, 18:]
-    return train_in, train_out, val_in, val_out, test_in, test_out
-
-trainX, trainY, valX, valY, testX, testY, allData = getDataSingleCol()
+#     train_in = water[0:trainLen, :18]
+#     train_out = water[0:trainLen, 18:]
+#     val_in = water[trainLen:valLen, :18]
+#     val_out = water[trainLen:valLen, 18:]
+#     test_in = water[valLen:, :18]
+#     test_out = water[valLen:, 18:]
+#     return train_in, train_out, val_in, val_out, test_in, test_out
 
 def nrmse(y_true, y_pred):
     y_true = np.array(y_true)
@@ -54,8 +53,7 @@ def nrmse(y_true, y_pred):
     
     rmse = np.sqrt(np.mean((y_true - y_pred)**2))
     mean_norm = np.linalg.norm(np.mean(y_true))
-    
-    error = rmse / mean_norm
+    error = rmse/mean_norm
     if math.isnan(error):
         return np.inf
     else:
@@ -70,31 +68,66 @@ def r_squared(y_true, y_pred):
     if math.isnan(r2):
         return 0
     else:
-        return 1 - (numerator / denominator)
+        return r2
+    
+def readSavedExperiment(path):
+    file = open(path, 'rb')
+    return pickle.load(file)
+
+def printSavedResults():
+    nrmseErrors = []
+    rSquaredValues = []
+    for i in range(5):
+        ga = readSavedExperiment('backup_50/water/backup_{}.obj'.format(i))
+        model = ga.bestModel
+        preds = runModel(model, testX)
+        nrmseError = nrmse(testY, preds)
+        r2Error = r_squared(testY, preds)
+        nrmseErrors.append(nrmseError)
+        rSquaredValues.append(r2Error)
+    print("Errors:")
+    print(nrmseErrors)
+    print(rSquaredValues)
+    print("Averaged errors:")
+    print("NRMSE: {} ({})".format(np.average(nrmseErrors), np.std(nrmseErrors)))
+    print("R2: {} ({})".format(np.average(rSquaredValues), np.std(rSquaredValues)))
 
 if __name__ == "__main__":
-    for i in range(1):
+    trainX, trainY, valX, valY, testX, testY, allData = getDataSingleCol()
+    nrmseErrors = []
+    rSquaredValues = []
+    for i in [0, 1, 2, 3, 4]:
         ga = ESN_NAS(
             trainX,
             trainY,
             valX,
             valY,
-            5,
-            10,
+            50,
+            50,
             trainY.shape[-1],
-            n_jobs=5,
+            n_jobs=10,
             errorMetrics=[nrmse, r_squared],
             defaultErrors=[np.inf, 0],
-            timeout=60,
-            numEvals=1,
-            saveLocation='backup/water/backup_0.obj',
-            memoryLimit=1024
+            timeout=180,
+            numEvals=3,
+            saveLocation='backup_50/water/backup_{}.obj'.format(i),
+            memoryLimit=756,
+            isAutoRegressive=False
         )
-        ga.run()
+        gaResults = ga.run()
         model = ga.bestModel
         preds = runModel(model, testX)
-        print("NRMSE:", mse(testY, preds))
-        print("R2:", r_squared(testY, preds))
+        nrmseError = nrmse(testY, preds)
+        r2Error = r_squared(testY, preds)
+        nrmseErrors.append(nrmseError)
+        rSquaredValues.append(r2Error)
+        print("Result:", nrmseError, r2Error)
+    print("Errors:")
+    print(nrmseErrors)
+    print(rSquaredValues)
+    print("Averaged errors:")
+    print("NRMSE: {} ({})".format(np.average(nrmseErrors), np.std(nrmseErrors)))
+    print("R2: {} ({})".format(np.average(rSquaredValues), np.std(rSquaredValues)))
 
 
     # model1 = copy.deepcopy(model)
