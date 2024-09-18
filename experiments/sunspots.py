@@ -7,32 +7,16 @@ current_dir = os.path.abspath(os.path.dirname(__file__))
 parent_dir = os.path.dirname(current_dir)
 sys.path.insert(0, parent_dir)
 from NAS.ESN_NAS import ESN_NAS
-from NAS.utils import runModel, smape, trainModel
+from utils import getDataSunspots
+from NAS.error_metrics import r_squared
+from NAS.utils import runModel
 warnings.filterwarnings("ignore")
 import sys
 import pandas as pd
 import math
 from reservoirpy.observables import (mse)
 import pickle
-
 rpy.verbosity(0)
-
-def getData():
-    sunspots = pd.read_csv("./datasets/Sunspots.csv")
-    data = sunspots.loc[:,"Monthly Mean Total Sunspot Number"].to_numpy()
-    data = np.expand_dims(data, axis=1)
-
-    trainLen = 1600
-    valLen = 500
-    testLen = 1074
-    train_in = data[0:trainLen]
-    train_out = data[0+1:trainLen+1]
-    val_in = data[trainLen:trainLen+valLen]
-    val_out = data[trainLen+1:trainLen+valLen+1]
-    test_in = data[trainLen+valLen:trainLen+valLen+testLen]
-    test_out = data[trainLen+valLen+1:trainLen+valLen+testLen+1]
-    return train_in, train_out, val_in, val_out, test_in, test_out
-trainX, trainY, valX, valY, testX, testY = getData()
 
 def nrmse(y_true, y_pred):
     mseError = mse(y_true, y_pred)
@@ -43,22 +27,12 @@ def nrmse(y_true, y_pred):
     else:
         return error
     
-def r_squared(y_true, y_pred):
-    y_true = np.array(y_true)
-    y_pred = np.array(y_pred)
-    numerator = np.sum((y_true - y_pred)**2)
-    denominator = np.sum((y_true - np.mean(y_true))**2)
-    r2 = 1 - (numerator / denominator)
-    if math.isnan(r2):
-        return 0
-    else:
-        return r2
-    
 def readSavedExperiment(path):
     file = open(path, 'rb')
     return pickle.load(file)
 
 def printSavedResults(version):
+    _, _, _, _, testX, testY = getDataSunspots()
     nrmseErrors = []
     rSquaredValues = []
     for i in range(5):
@@ -77,6 +51,7 @@ def printSavedResults(version):
     print("R2: {} ({})".format(np.average(rSquaredValues), np.std(rSquaredValues)))
 
 if __name__ == "__main__":
+    trainX, trainY, valX, valY, testX, testY = getDataSunspots()
     nrmseErrors = []
     rSquaredValues = []
     for i in [0, 1, 2, 3, 4]:

@@ -1,109 +1,20 @@
-import math
 import reservoirpy as rpy
 import numpy as np
-from functools import partial
 import sys
 import os
 import warnings
 current_dir = os.path.abspath(os.path.dirname(__file__))
 parent_dir = os.path.dirname(current_dir)
 sys.path.insert(0, parent_dir)
-
 from NAS.ESN_NAS import ESN_NAS
-from NAS.utils import runModel
-current_dir = os.path.abspath(os.path.dirname(__file__))
-parent_dir = os.path.dirname(current_dir)
-sys.path.insert(0, parent_dir)
-from NAS import NAS
+from utils import getDataDDE, printSavedResults
+from NAS.error_metrics import nrmse, r_squared
+
 warnings.filterwarnings("ignore")
-import sys
-import pickle
-
 rpy.verbosity(0)
-def nrmse(y_true, y_pred):
-    y_true = np.array(y_true)
-    y_pred = np.array(y_pred)
-    
-    rmse = np.sqrt(np.mean((y_true - y_pred)**2))
-    mean_norm = np.linalg.norm(np.mean(y_true))
-    error = rmse/mean_norm
-    if math.isnan(error):
-        return np.inf
-    else:
-        return error
-    
-def r_squared(y_true, y_pred):
-    y_true = np.array(y_true)
-    y_pred = np.array(y_pred)
-    numerator = np.sum((y_true - y_pred)**2)
-    denominator = np.sum((y_true - np.mean(y_true))**2)
-    r2 = 1 - (numerator / denominator)
-    if math.isnan(r2):
-        return 0
-    else:
-        return r2
-
-def readSavedExperiment(path):
-    file = open(path, 'rb')
-    return pickle.load(file)
-
-# https://www.sciencedirect.com/science/article/pii/S0925231222014291
-# Parameterizing echo state networks for multi-step time series prediction
-# Neutral Normed DDE dataset
-
-def getData():
-    data = np.load('./data/Neutral_normed_2801.npy')
-    from scipy import stats
-    data = stats.zscore(data)
-    data.shape
-
-    trainLen = 2000
-    valLen = 500
-    testLen = 500
-    train_in = data[0:trainLen]
-    train_out = data[0+1:trainLen+1]
-    val_in = data[trainLen:trainLen+valLen]
-    val_out = data[trainLen+1:trainLen+valLen+1]
-    test_in = data[trainLen+valLen:trainLen+valLen+testLen]
-    test_out = data[trainLen+valLen+1:trainLen+valLen+testLen+1]
-    return train_in, train_out, val_in, val_out, test_in, test_out
-
-trainX, trainY, valX, valY, testX, testY = getData()
-
-def printSavedResults():
-    nrmseErrors = []
-    r2_squaredValues = []
-    for i in range(5):
-        ga = readSavedExperiment('backup/dde/backup_{}.obj'.format(i))
-        nrmseErrors.append(ga.bestFitness[0])
-        r2_squaredValues.append(ga.bestFitness[1])
-    print("Errors:")
-    print(nrmseErrors)
-    print(r2_squaredValues)
-    print("Averaged errors:")
-    print("NRMSE: {} ({})".format(np.average(nrmseErrors), np.std(nrmseErrors)))
-    print("R2: {} ({})".format(np.average(r2_squaredValues), np.std(r2_squaredValues)))
-
-def printOldSavedResults():
-    nrmseErrors = []
-    r2_squaredValues = []
-    total = 0
-    r2_total = 0
-    for i in range(5):
-        data = readSavedExperiment('old_backup/dde/backup_{}.obj'.format(i))
-        total+=min(data["allFitnesses"])
-        nrmseErrors.append(min(data["allFitnesses"]))
-        r2_squaredValues.append(data["fitnesses2"][data["allFitnesses"].index(min(data["allFitnesses"]))])
-        r2_total+=data["fitnesses2"][data["allFitnesses"].index(min(data["allFitnesses"]))]
-    print("Errors:")
-    print(nrmseErrors)
-    print(r2_squaredValues)
-    print("Averaged errors:")
-    print("NRMSE: {} ({})".format(np.average(nrmseErrors), np.std(nrmseErrors)))
-    print("R2: {} ({})".format(np.average(r2_squaredValues), np.std(r2_squaredValues)))
 
 if __name__ == "__main__":
-    trainX, trainY, valX, valY, testX, testY = getData()
+    trainX, trainY, valX, valY, testX, testY = getDataDDE()
     nrmseErrors = []
     r2_squaredValues = []
     for i in [0, 1, 2, 3, 4]:
