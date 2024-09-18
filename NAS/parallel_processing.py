@@ -47,3 +47,41 @@ def executeParallel(func, args, n_jobs, timeout):
         time.sleep(timeout)
         pool.terminate()
     return results
+
+def executeParallelImproved(func, args, n_jobs, timeout):
+    """
+    Improves upon executeParallel. executeParallel has two limitations
+    - Even if all processes finish before timeout, executeParallel won't return
+    - The order of the results may not be the same as that of args
+    """
+    with Pool(processes=n_jobs) as pool:
+        async_results = []
+        for arg in args:
+            async_result = pool.apply_async(func, args=arg)
+            async_results.append(async_result)
+        
+        # Wait for all tasks to complete or timeout
+        start_time = time.time()
+        results = [None] * len(args)
+        completed = [False] * len(args)
+        
+        while not all(completed) and time.time() - start_time < timeout:
+            for i, ar in enumerate(async_results):
+                if not completed[i] and ar.ready():
+                    try:
+                        results[i] = ar.get(timeout=0)
+                        completed[i] = True
+                    except Exception as e:
+                        results[i] = e
+                        completed[i] = True
+            time.sleep(0.1)  # Short sleep to prevent busy waiting
+        
+        # If there are any remaining tasks, terminate them
+        if not all(completed):
+            pool.terminate()
+        else:
+            pool.close()
+        
+        pool.join()
+    
+    return results
