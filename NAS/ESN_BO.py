@@ -10,7 +10,7 @@ from NAS.utils import (
 from bayes_opt import BayesianOptimization
 from reservoirpy.observables import nrmse
 import pickle
-import time
+import os
 
 class ESN_BO:
     """
@@ -71,6 +71,10 @@ class ESN_BO:
         self.paramsTested = []
         self.performances = []
         self.bestModel = None
+
+        # Make sure that save folder exists
+        directory = os.path.dirname(self.saveLocation)
+        os.makedirs(directory, exist_ok=True)
 
     def evaluate(self, individual):
         results = executeParallelImproved(

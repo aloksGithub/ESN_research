@@ -21,6 +21,25 @@ def printSavedResults(populationSize, dataset):
     print("NRMSE: {} ({})".format(np.average(nrmseErrors), np.std(nrmseErrors)))
     print("R2: {} ({})".format(np.average(r2_squaredValues), np.std(r2_squaredValues)))
 
+def printSavedBoResults(dataset):
+    nrmseErrors = []
+    rSquaredValues = []
+    for i in range(5):
+        bo = readSavedExperiment('backup_bo/{}/backup_{}.obj'.format(dataset, i))
+        mainErrors = [e[0] for e in bo.performances]
+        bestErrors = bo.performances[mainErrors.index(min(mainErrors) if bo.minimizeFitness else max(mainErrors))]
+        nrmseError = bestErrors[0]
+        r2Error = bestErrors[1]
+        nrmseErrors.append(nrmseError)
+        rSquaredValues.append(r2Error)
+        print("Result:", nrmseError, r2Error)
+    print("Errors:")
+    print(nrmseErrors)
+    print(rSquaredValues)
+    print("Averaged errors:")
+    print("NRMSE: {} ({})".format(np.average(nrmseErrors), np.std(nrmseErrors)))
+    print("R2: {} ({})".format(np.average(rSquaredValues), np.std(rSquaredValues)))
+
 def printOldSavedResults(dataset):
     nrmseErrors = []
     r2_squaredValues = []
