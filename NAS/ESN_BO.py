@@ -81,7 +81,10 @@ class ESN_BO:
             self.evaluateArchitectureAutoRegressive if self.isAutoRegressive else self.evaluateArchitecture,
             [(individual,) for _ in range(self.numEvals)], self.numEvals, self.timeout
         )
-        mainErrors = [e[0][0] for e in results]
+        for i in range(len(results)):
+            if results[i] is None:
+                results[i] = (self.defaultErrors, None)
+        mainErrors = [e[0][0] if e is not None else self.defaultErrors for e in results]
         bestMainError = min(mainErrors) if self.minimizeFitness else max(mainErrors)
         bestIndex = mainErrors.index(bestMainError)
         bestErrors = results[bestIndex][0]
