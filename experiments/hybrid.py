@@ -115,8 +115,8 @@ def findBestGaArchitecture(ga: ESN_NAS):
 
 def runAutoRegressiveExperiment(dataset, dataLoader):
     trainX, trainY, valX, valY, testX, testY = dataLoader()
-    ga, _ = readSavedExperiment('backup_50/{}/backup_{}.obj'.format(dataset, sys.argv[1]))
-    baseArchitecture = findBestGaArchitecture(ga)
+    ga = readSavedExperiment('backup_50/{}/backup_{}.obj'.format(dataset, sys.argv[1]))
+    baseArchitecture, _ = findBestGaArchitecture(ga)
     ga_bo = ESN_BO(
         trainX,
         trainY,
@@ -147,8 +147,8 @@ if __name__ == "__main__":
     
     # Non auto regressive water experiment
     trainX, trainY, valX, valY, testX, testY, _ = getDataWater()
-    ga, _ = readSavedExperiment('backup_50/{}/backup_{}.obj'.format('water', sys.argv[1]))
-    baseArchitecture = findBestGaArchitecture(ga)
+    ga = readSavedExperiment('backup_50/{}/backup_{}.obj'.format('water', sys.argv[1]))
+    baseArchitecture, _ = findBestGaArchitecture(ga)
     ga_bo = ESN_BO(
         trainX,
         trainY,
@@ -171,8 +171,8 @@ if __name__ == "__main__":
 
     # Non auto regressive sunspots experiment
     trainX, trainY, valX, valY, testX, testY = getDataSunspots()
-    ga, _ = readSavedExperiment('backup_50/{}/backup_{}.obj'.format('sunspots', sys.argv[1]))
-    baseArchitecture = findBestGaArchitecture(ga)
+    ga = readSavedExperiment('backup_50/{}/backup_{}.obj'.format('sunspots', sys.argv[1]))
+    baseArchitecture, _ = findBestGaArchitecture(ga)
     ga_bo = ESN_BO(
         trainX,
         trainY,
