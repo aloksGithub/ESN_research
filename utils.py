@@ -7,11 +7,11 @@ def readSavedExperiment(path):
     file = open(path, 'rb')
     return pickle.load(file)
 
-def printSavedResults(populationSize, dataset):
+def printSavedResults(directory, dataset):
     nrmseErrors = []
     r2_squaredValues = []
     for i in range(5):
-        ga = readSavedExperiment('backup_{}/{}/backup_{}.obj'.format(populationSize, dataset, i))
+        ga = readSavedExperiment('{}/backup_{}.obj'.format(directory, dataset, i))
         nrmseErrors.append(ga.bestFitness[0])
         r2_squaredValues.append(ga.bestFitness[1])
     print("Errors:")
