@@ -51,7 +51,7 @@ def printSavedSunspotsResults():
     _, _, _, _, testX, testY = getDataSunspots()
     nrmseErrors = []
     rSquaredValues = []
-    for i in range(5):
+    for i in [0, 1, 2, 4]:
         bo = readSavedExperiment('backup_hybrid/sunspots/backup_{}.obj'.format(i))
         model = bo.bestModel
         preds = runModel(model, testX)
@@ -72,7 +72,7 @@ def printSavedWaterResults():
     _, _, _, _, testX, testY, _ = getDataWater()
     nrmseErrors = []
     rSquaredValues = []
-    for i in range(5):
+    for i in [0, 1, 2, 4]:
         bo = readSavedExperiment('backup_hybrid/water/backup_{}.obj'.format(i))
         model = bo.bestModel
         preds = runModel(model, testX)
@@ -140,10 +140,10 @@ def runAutoRegressiveExperiment(dataset, dataLoader):
 
 if __name__ == "__main__":
     # printAllResults()
-    runAutoRegressiveExperiment("laser", getDataLaser)
-    runAutoRegressiveExperiment("dde", getDataDDE)
-    runAutoRegressiveExperiment("lorenz", getDataLorenz)
-    runAutoRegressiveExperiment("mgs", getDataMGS)
+    # runAutoRegressiveExperiment("laser", getDataLaser)
+    # runAutoRegressiveExperiment("dde", getDataDDE)
+    # runAutoRegressiveExperiment("lorenz", getDataLorenz)
+    # runAutoRegressiveExperiment("mgs", getDataMGS)
     
     # Non auto regressive water experiment
     trainX, trainY, valX, valY, testX, testY, _ = getDataWater()
