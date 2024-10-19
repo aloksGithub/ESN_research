@@ -26,7 +26,7 @@ def nrmse(y_true, y_pred):
         return error
 
 def printSavedBoResults():
-    _, _, _, _, testX, testY, _ = getDataSunspots()
+    _, _, _, _, testX, testY = getDataSunspots()
     nrmseErrors = []
     rSquaredValues = []
     for i in range(5):
