@@ -153,6 +153,7 @@ class ESN_BO:
             f=self.black_box,
             pbounds=self.pbounds,
             random_state=1,
+            allow_duplicate_points=True
         )
         # optimizer.probe(params=self.defaultParams)
 

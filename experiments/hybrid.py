@@ -140,10 +140,10 @@ def runAutoRegressiveExperiment(dataset, dataLoader):
 
 if __name__ == "__main__":
     # printAllResults()
-    runAutoRegressiveExperiment("laser", getDataLaser)
-    runAutoRegressiveExperiment("dde", getDataDDE)
-    runAutoRegressiveExperiment("lorenz", getDataLorenz)
-    runAutoRegressiveExperiment("mgs", getDataMGS)
+    # runAutoRegressiveExperiment("laser", getDataLaser)
+    # runAutoRegressiveExperiment("dde", getDataDDE)
+    # runAutoRegressiveExperiment("lorenz", getDataLorenz)
+    # runAutoRegressiveExperiment("mgs", getDataMGS)
     
     # Non auto regressive water experiment
     trainX, trainY, valX, valY, testX, testY, _ = getDataWater()
