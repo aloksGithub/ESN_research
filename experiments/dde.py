@@ -31,7 +31,7 @@ if __name__ == "__main__":
             defaultErrors=[np.inf, 0],
             timeout=180,
             numEvals=3,
-            saveLocation='backup/dde/backup_{}.obj'.format(i),
+            saveLocation='backup_50/dde/backup_{}.obj'.format(i),
             memoryLimit=756,
             isAutoRegressive=True
         )

@@ -24,14 +24,14 @@ if __name__ == "__main__":
             valX,
             valY,
             50,
-            100,
+            50,
             trainY.shape[-1],
             n_jobs=10,
             errorMetrics=[nrmse, r_squared],
             defaultErrors=[np.inf, 0],
             timeout=180,
             numEvals=3,
-            saveLocation='backup_100/lorenz/backup_{}.obj'.format(i),
+            saveLocation='backup_50/lorenz/backup_{}.obj'.format(i),
             memoryLimit=756,
             isAutoRegressive=True
         )
