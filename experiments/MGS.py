@@ -29,10 +29,10 @@ if __name__ == "__main__":
             n_jobs=10,
             errorMetrics=[nrmse, r_squared],
             defaultErrors=[np.inf, 0],
-            timeout=180,
+            timeout=60,
             numEvals=3,
-            saveLocation='backup_50/mgs/backup_{}.obj'.format(i),
-            memoryLimit=756,
+            saveLocation='temp/mgs/backup_{}.obj'.format(i),
+            memoryLimit=500,
             isAutoRegressive=True
         )
         ga.run()

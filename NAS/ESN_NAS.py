@@ -20,7 +20,8 @@ from NAS.memory_estimator import measure_memory_usage
 import copy
 warnings.filterwarnings("ignore")
 import time
-from NAS.parallel_processing import executeParallel
+from NAS.parallel_processing import executeParallelBatch
+import os
 rpy.verbosity(0)
 
 class ESN_NAS:
@@ -105,7 +106,10 @@ class ESN_NAS:
         self.diagnosisResults = []
         self.population = []
         self.bestFitness = defaultErrors
-
+        
+        # Make sure that save folder exists
+        directory = os.path.dirname(self.saveLocation)
+        os.makedirs(directory, exist_ok=True)
         
     def checkModelValidity(self, architecture):
         return isValidArchitecture(architecture, self.trainX, self.trainY, self.memoryLimit, self.timeout / self.numEvals, self.isAutoregressive ), architecture
@@ -163,7 +167,7 @@ class ESN_NAS:
                 candidates.append(child1)
                 candidates.append(child2)
             
-            validities = executeParallel(self.checkModelValidity, [(c,) for c in candidates], self.n_jobs, self.timeout)
+            validities = executeParallelBatch(self.checkModelValidity, [(c,) for c in candidates], self.n_jobs, self.timeout / self.numEvals)
             for validity in validities:
                 if validity is not None and validity[0]:
                     offspring.append(validity[1])
@@ -179,7 +183,7 @@ class ESN_NAS:
         point1 = random.randint(1, maxNodeIndex-1)
         point2 = random.randint(point1, maxNodeIndex)
         child1_nodes = ind1Copy['nodes'][:point1] + ind2Copy['nodes'][point1:point2] + ind1Copy['nodes'][point2:]
-        child2_nodes = ind1Copy['nodes'][:point1] + ind1Copy['nodes'][point1:point2] + ind2Copy['nodes'][point2:]
+        child2_nodes = ind2Copy['nodes'][:point1] + ind1Copy['nodes'][point1:point2] + ind2Copy['nodes'][point2:]
         ind1Copy["nodes"] = child1_nodes
         ind2Copy["nodes"] = child2_nodes
         return (ind1Copy, ind2Copy)
@@ -274,23 +278,13 @@ class ESN_NAS:
 
     def evaluateParallel(self, population):
         print("Evaluating population")
-        results = []
-        results = executeParallel(
+        results = executeParallelBatch(
             self.evaluateArchitectureAutoRegressive if self.isAutoregressive else self.evaluateArchitecture,
             [(individual,) for individual in population], self.n_jobs, self.timeout
         )
-        
-        for individual in population:
-            found = False
-            for result in results:
-                if result is not None and result[0]==individual:
-                    found = True
-            if not found:
-                results.append([individual, self.defaultErrors, None])
-        
-        for i in range(len(results)-1, -1, -1):
+        for i in range(len(results)):
             if results[i] is None:
-                del results[i]
+                results[i] = (population[i], self.defaultErrors, None)
         
         for result in results:
             ind, errors, model = result
@@ -308,7 +302,7 @@ class ESN_NAS:
         generatedArchitectures = []
 
         while len(generatedArchitectures)<numIndividuals:
-            results = executeParallel(
+            results = executeParallelBatch(
                 generateRandomArchitectureOld,
                 [(
                     self.trainX.shape[-1],

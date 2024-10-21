@@ -48,6 +48,12 @@ def executeParallel(func, args, n_jobs, timeout):
         pool.terminate()
     return results
 
+def executeParallelBatch(func, args, batchSize, timeout):
+    results = []
+    for i in range(0, len(args), batchSize):
+        results+=executeParallelImproved(func, args[i:i+batchSize], batchSize, timeout)
+    return results
+
 def executeParallelImproved(func, args, n_jobs, timeout):
     """
     Improves upon executeParallel. executeParallel has two limitations
