@@ -69,7 +69,7 @@ def printSavedSunspotsResults():
 
 def printSavedWaterResults():
     print("================================water================================")
-    _, _, _, _, testX, testY, _ = getDataWater()
+    _, _, _, _, testX, testY = getDataWater()
     nrmseErrors = []
     rSquaredValues = []
     for i in range(5):
@@ -146,7 +146,7 @@ if __name__ == "__main__":
     # runAutoRegressiveExperiment("mgs", getDataMGS)
     
     # Non auto regressive water experiment
-    trainX, trainY, valX, valY, testX, testY, _ = getDataWater()
+    trainX, trainY, valX, valY, testX, testY = getDataWater()
     ga = readSavedExperiment('backup_50/{}/backup_{}.obj'.format('water', sys.argv[1]))
     baseArchitecture, _ = findBestGaArchitecture(ga)
     ga_bo = ESN_BO(

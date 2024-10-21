@@ -14,7 +14,7 @@ warnings.filterwarnings("ignore")
 rpy.verbosity(0)
 
 def printSavedResults():
-    _, _, _, _, testX, testY, _ = getDataWater()
+    _, _, _, _, testX, testY = getDataWater()
     nrmseErrors = []
     rSquaredValues = []
     for i in range(5):
@@ -33,7 +33,7 @@ def printSavedResults():
     print("R2: {} ({})".format(np.average(rSquaredValues), np.std(rSquaredValues)))
 
 if __name__ == "__main__":
-    trainX, trainY, valX, valY, testX, testY, allData = getDataWater()
+    trainX, trainY, valX, valY, testX, testY = getDataWater()
     nrmseErrors = []
     rSquaredValues = []
     for i in [0, 1, 2, 3, 4]:

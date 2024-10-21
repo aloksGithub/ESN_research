@@ -15,7 +15,7 @@ from NAS.utils import runModel
 rpy.verbosity(0)
 
 def printSavedBoResults():
-    _, _, _, _, testX, testY, _ = getDataWater()
+    _, _, _, _, testX, testY = getDataWater()
     nrmseErrors = []
     rSquaredValues = []
     for i in range(5):
@@ -35,7 +35,7 @@ def printSavedBoResults():
     print("R2: {} ({})".format(np.average(rSquaredValues), np.std(rSquaredValues)))
 
 if __name__ == "__main__":
-    trainX, trainY, valX, valY, testX, testY, _ = getDataWater()
+    trainX, trainY, valX, valY, testX, testY = getDataWater()
     baseArchitecture = {'nodes': [{'type': 'Input', 'params': {'input_dim': 1}}, {'type': 'Reservoir', 'params': {'units': 1000, 'lr': 0.9, 'sr': 0.9, 'input_connectivity': 0.25, 'rc_connectivity': 0.25}}, {'type': 'Ridge', 'params': {'output_dim': 1, 'ridge': 8.0e-05}}], 'edges': [[0, 1], [1, 2]]}
     
     ga_bo = ESN_BO(

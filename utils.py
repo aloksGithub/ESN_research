@@ -175,4 +175,4 @@ def getDataWater():
     val_out = allData[trainLen:valLen]
     test_in = allData[valLen:]
     test_out = allData[valLen:]
-    return train_in, train_out, val_in, val_out, test_in, test_out, water
+    return train_in, train_out, val_in, val_out, test_in, test_out
