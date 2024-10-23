@@ -287,10 +287,7 @@ class ESN_NAS:
                 results[i] = (population[i], self.defaultErrors, None)
         
         for result in results:
-            try:
-                ind, errors, model = result
-            except:
-                ind, errors, model = (population[i], self.defaultErrors, None)
+            ind, errors, model = result
             self.fitnesses.append(errors)
             self.architectures.append(ind)
             if errors[0]<=min([elem[0] for elem in self.fitnesses]) or len(self.fitnesses)==0:

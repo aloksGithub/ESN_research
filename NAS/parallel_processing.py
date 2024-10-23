@@ -56,9 +56,10 @@ def executeParallelBatch(func, args, batchSize, timeout):
 
 def executeParallelImproved(func, args, n_jobs, timeout):
     """
-    Improves upon executeParallel. executeParallel has two limitations
-    - Even if all processes finish before timeout, executeParallel won't return
-    - The order of the results may not be the same as that of args
+    Executes functions in parallel with improved error handling:
+    - Returns None for any failed jobs
+    - Maintains argument order in results
+    - Exits early if all processes finish before timeout
     """
     with Pool(processes=n_jobs) as pool:
         async_results = []
@@ -77,8 +78,8 @@ def executeParallelImproved(func, args, n_jobs, timeout):
                     try:
                         results[i] = ar.get(timeout=0)
                         completed[i] = True
-                    except Exception as e:
-                        results[i] = e
+                    except:
+                        results[i] = None
                         completed[i] = True
             time.sleep(0.1)  # Short sleep to prevent busy waiting
         
