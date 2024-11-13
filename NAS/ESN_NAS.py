@@ -185,9 +185,7 @@ class ESN_NAS:
         point1 = random.randint(1, maxNodeIndex-1)
         point2 = random.randint(point1, maxNodeIndex)
         child1_nodes = ind1Copy['nodes'][:point1] + ind2Copy['nodes'][point1:point2] + ind1Copy['nodes'][point2:]
-        # TODO: Replace below with:
-        # child2_nodes = ind2Copy['nodes'][:point1] + ind1Copy['nodes'][point1:point2] + ind2Copy['nodes'][point2:]
-        child2_nodes = ind1Copy['nodes'][:point1] + ind1Copy['nodes'][point1:point2] + ind2Copy['nodes'][point2:]
+        child2_nodes = ind2Copy['nodes'][:point1] + ind1Copy['nodes'][point1:point2] + ind2Copy['nodes'][point2:]
         ind1Copy["nodes"] = child1_nodes
         ind2Copy["nodes"] = child2_nodes
         return (ind1Copy, ind2Copy)
