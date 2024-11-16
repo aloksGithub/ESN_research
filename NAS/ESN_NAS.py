@@ -167,9 +167,7 @@ class ESN_NAS:
                 candidates.append(child1)
                 candidates.append(child2)
             
-            # TODO: replace with:
-            # validities = executeParallelBatch(self.checkModelValidity, [(c,) for c in candidates], self.n_jobs, self.timeout / self.numEvals)
-            validities = executeParallelBatch(self.checkModelValidity, [(c,) for c in candidates], self.n_jobs, self.timeout)
+            validities = executeParallelBatch(self.checkModelValidity, [(c,) for c in candidates], self.n_jobs, self.timeout / self.numEvals)
             for validity in validities:
                 if validity is not None and validity[0]:
                     offspring.append(validity[1])
