@@ -11,7 +11,7 @@ def printSavedResults(directory, dataset):
     nrmseErrors = []
     r2_squaredValues = []
     for i in range(5):
-        ga = readSavedExperiment('{}/backup_{}.obj'.format(directory, dataset, i))
+        ga = readSavedExperiment('{}/{}/backup_{}.obj'.format(directory, dataset, i))
         nrmseErrors.append(ga.bestFitness[0])
         r2_squaredValues.append(ga.bestFitness[1])
     print("Errors:")
@@ -164,15 +164,15 @@ def getDataWater():
     water = pd.read_csv("./datasets/Water.csv").to_numpy()
     firstCol = water[:, 0]
     lastRow = water[-1, 1:]
-    allData = np.expand_dims(np.concatenate((firstCol, lastRow)), axis=1)
+    data = np.expand_dims(np.concatenate((firstCol, lastRow)), axis=1)
     
     trainLen = math.floor(len(water)*0.5)
     valLen = math.floor(len(water)*0.7)
     
-    train_in = allData[0:trainLen]
-    train_out = allData[0:trainLen]
-    val_in = allData[trainLen:valLen]
-    val_out = allData[trainLen:valLen]
-    test_in = allData[valLen:]
-    test_out = allData[valLen:]
+    train_in = data[0:trainLen]
+    train_out = data[0+1:trainLen+1]
+    val_in = data[trainLen:valLen]
+    val_out = data[trainLen+1:valLen+1]
+    test_in = data[valLen:len(data)-1]
+    test_out = data[valLen+1:]
     return train_in, train_out, val_in, val_out, test_in, test_out
