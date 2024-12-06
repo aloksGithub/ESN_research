@@ -176,3 +176,20 @@ def getDataWater():
     test_in = data[valLen:len(data)-1]
     test_out = data[valLen+1:]
     return train_in, train_out, val_in, val_out, test_in, test_out
+
+def getDataWaterMultiStep(n: int):
+    water = pd.read_csv("./datasets/Water.csv").to_numpy()
+    firstCol = water[:, 0]
+    lastRow = water[-1, 1:]
+    data = np.expand_dims(np.concatenate((firstCol, lastRow)), axis=1)
+    
+    trainLen = math.floor(len(water)*0.5)
+    valLen = math.floor(len(water)*0.7)
+    
+    train_in = data[0:trainLen]
+    train_out = data[0+n:trainLen+n]
+    val_in = data[trainLen:valLen]
+    val_out = data[trainLen+n:valLen+n]
+    test_in = data[valLen:len(data)-n]
+    test_out = data[valLen+n:]
+    return train_in, train_out, val_in, val_out, test_in, test_out
