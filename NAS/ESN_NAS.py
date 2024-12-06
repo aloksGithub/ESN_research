@@ -228,10 +228,11 @@ class ESN_NAS:
             try:
                 model = constructModel(individual)
                 model = trainModel(model, self.trainX, self.trainY)
+                model_copy = copy.deepcopy(model)
                 preds = runModel(model, self.valX)
                 modelErrors = [metric(self.valY, preds) for metric in self.errorMetrics]
                 errors.append(modelErrors)
-                models.append(model)
+                models.append(model_copy)
             except Exception as e:
                 # print(e)
                 errors.append(self.defaultErrors)
@@ -256,6 +257,7 @@ class ESN_NAS:
             try:
                 model = constructModel(individual)
                 model = trainModel(model, self.trainX, self.trainY)
+                model_copy = copy.deepcopy(model)
                 prevOutput = self.valX[0]
                 preds = []
                 for _ in range(len(self.valX)):
@@ -265,7 +267,7 @@ class ESN_NAS:
                 preds = np.array(preds)
                 modelErrors = [metric(self.valY, preds) for metric in self.errorMetrics]
                 errors.append(modelErrors)
-                models.append(model)
+                models.append(model_copy)
             except:
                 errors.append(self.defaultErrors)
                 models.append(None)
