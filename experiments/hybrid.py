@@ -170,25 +170,25 @@ if __name__ == "__main__":
     ga_bo.run()
 
     # Non auto regressive sunspots experiment
-    trainX, trainY, valX, valY, testX, testY = getDataSunspots()
-    ga = readSavedExperiment('backup_50/{}/backup_{}.obj'.format('sunspots', sys.argv[1]))
-    baseArchitecture, _ = findBestGaArchitecture(ga)
-    ga_bo = ESN_BO(
-        trainX,
-        trainY,
-        valX,
-        valY,
-        500,
-        2000,
-        trainY.shape[-1],
-        baseArchitecture,
-        3,
-        3,
-        [nrmse_sunspots, r_squared],
-        [np.inf, 0],
-        True,
-        180,
-        "backup_hybrid/{}/backup_{}.obj".format('sunspots', sys.argv[1]),
-        False
-    )
-    ga_bo.run()
+    # trainX, trainY, valX, valY, testX, testY = getDataSunspots()
+    # ga = readSavedExperiment('backup_50/{}/backup_{}.obj'.format('sunspots', sys.argv[1]))
+    # baseArchitecture, _ = findBestGaArchitecture(ga)
+    # ga_bo = ESN_BO(
+    #     trainX,
+    #     trainY,
+    #     valX,
+    #     valY,
+    #     500,
+    #     2000,
+    #     trainY.shape[-1],
+    #     baseArchitecture,
+    #     3,
+    #     3,
+    #     [nrmse_sunspots, r_squared],
+    #     [np.inf, 0],
+    #     True,
+    #     180,
+    #     "backup_hybrid/{}/backup_{}.obj".format('sunspots', sys.argv[1]),
+    #     False
+    # )
+    # ga_bo.run()
