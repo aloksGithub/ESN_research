@@ -165,10 +165,10 @@ def getDataWater():
     firstCol = water[:, 0]
     lastRow = water[-1, 1:]
     data = np.expand_dims(np.concatenate((firstCol, lastRow)), axis=1)
-    
+
     trainLen = math.floor(len(water)*0.5)
     valLen = math.floor(len(water)*0.7)
-    
+
     train_in = data[0:trainLen]
     train_out = data[0+1:trainLen+1]
     val_in = data[trainLen:valLen]
@@ -182,10 +182,10 @@ def getDataWaterMultiStep(n: int):
     firstCol = water[:, 0]
     lastRow = water[-1, 1:]
     data = np.expand_dims(np.concatenate((firstCol, lastRow)), axis=1)
-    
+
     trainLen = math.floor(len(water)*0.5)
     valLen = math.floor(len(water)*0.7)
-    
+
     train_in = data[0:trainLen]
     train_out = data[0+n:trainLen+n]
     val_in = data[trainLen:valLen]
