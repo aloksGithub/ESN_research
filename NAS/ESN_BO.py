@@ -108,9 +108,10 @@ class ESN_BO:
         try:
             model = constructModel(individual)
             model = trainModel(model, self.trainX, self.trainY)
+            model_copy = copy.deepcopy(model)
             preds = runModel(model, self.valX)
             errors = [metric(self.valY, preds) for metric in self.errorMetrics]
-            return errors, model
+            return errors, model_copy
         except Exception as e:
             errors = self.defaultErrors
             return errors, None
@@ -124,6 +125,7 @@ class ESN_BO:
         try:
             model = constructModel(individual)
             model = trainModel(model, self.trainX, self.trainY)
+            model_copy = copy.deepcopy(model)
             prevOutput = self.valX[0]
             preds = []
             for _ in range(len(self.valX)):
@@ -132,7 +134,7 @@ class ESN_BO:
                 preds.append(pred[0])
             preds = np.array(preds)
             errors = [metric(self.valY, preds) for metric in self.errorMetrics]
-            return errors, model
+            return errors, model_copy
         except:
             errors = self.defaultErrors
             return errors, None
