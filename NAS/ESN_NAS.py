@@ -21,6 +21,7 @@ import copy
 warnings.filterwarnings("ignore")
 import time
 from NAS.parallel_processing import executeParallel
+import os
 rpy.verbosity(0)
 
 class ESN_NAS:
@@ -106,6 +107,9 @@ class ESN_NAS:
         self.population = []
         self.bestFitness = defaultErrors
 
+        # Make sure that save folder exists
+        directory = os.path.dirname(self.saveLocation)
+        os.makedirs(directory, exist_ok=True)
         
     def checkModelValidity(self, architecture):
         return isValidArchitecture(architecture, self.trainX, self.trainY, self.memoryLimit, self.timeout / self.numEvals, self.isAutoregressive ), architecture
