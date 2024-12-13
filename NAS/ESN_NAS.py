@@ -106,7 +106,6 @@ class ESN_NAS:
         self.diagnosisResults = []
         self.population = []
         self.bestFitness = defaultErrors
-        
         # Make sure that save folder exists
         directory = os.path.dirname(self.saveLocation)
         os.makedirs(directory, exist_ok=True)
