@@ -32,12 +32,13 @@ def readSavedExperiment(path):
     return pickle.load(file)
 
 def printSavedResults(version):
-    _, _, _, _, testX, testY = getDataSunspots()
+    _, _, valX, _, testX, testY = getDataSunspots()
     nrmseErrors = []
     rSquaredValues = []
     for i in range(5):
         ga = readSavedExperiment('backup_{}/sunspots/backup_{}.obj'.format(version, i))
         model = ga.bestModel
+        runModel(model, valX)
         preds = runModel(model, testX)
         nrmseError = nrmse(testY, preds)
         r2Error = r_squared(testY, preds)

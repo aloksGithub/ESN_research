@@ -7,19 +7,21 @@ current_dir = os.path.abspath(os.path.dirname(__file__))
 parent_dir = os.path.dirname(current_dir)
 sys.path.insert(0, parent_dir)
 from NAS.ESN_NAS import ESN_NAS
-from utils import getDataWater, printSavedResults, readSavedExperiment
+from utils import getDataWater, getDataWaterMultiStep, printSavedResults, readSavedExperiment
 from NAS.error_metrics import nrmse, r_squared
 from NAS.utils import runModel
 warnings.filterwarnings("ignore")
 rpy.verbosity(0)
+steps = 18
 
 def printSavedResults():
-    _, _, _, _, testX, testY = getDataWater()
+    _, _, valX, _, testX, testY = getDataWater()
     nrmseErrors = []
     rSquaredValues = []
     for i in range(5):
-        ga = readSavedExperiment('backup_50/water/backup_{}.obj'.format(i))
+        ga = readSavedExperiment('backup_50/water{}/backup_{}.obj'.format("" if steps==1 else f'_{steps}', i))
         model = ga.bestModel
+        runModel(model, valX)
         preds = runModel(model, testX)
         nrmseError = nrmse(testY, preds)
         r2Error = r_squared(testY, preds)
@@ -33,7 +35,7 @@ def printSavedResults():
     print("R2: {} ({})".format(np.average(rSquaredValues), np.std(rSquaredValues)))
 
 if __name__ == "__main__":
-    trainX, trainY, valX, valY, testX, testY = getDataWater()
+    trainX, trainY, valX, valY, testX, testY = getDataWaterMultiStep(steps)
     nrmseErrors = []
     rSquaredValues = []
     for i in [0, 1, 2, 3, 4]:
@@ -50,7 +52,7 @@ if __name__ == "__main__":
             defaultErrors=[np.inf, 0],
             timeout=180,
             numEvals=3,
-            saveLocation='backup_50/water/backup_{}.obj'.format(i),
+            saveLocation='backup_50/water{}/backup_{}.obj'.format("" if steps==1 else f'_{steps}', i),
             memoryLimit=756,
             isAutoRegressive=False
         )
