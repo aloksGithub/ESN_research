@@ -16,7 +16,7 @@ rpy.verbosity(0)
 steps = 18
 
 def printSavedBoResults():
-    _, _, valX, _, testX, testY = getDataWater()
+    _, _, valX, _, testX, testY = getDataWaterMultiStep(steps)
     nrmseErrors = []
     rSquaredValues = []
     for i in range(5):
@@ -59,6 +59,7 @@ if __name__ == "__main__":
         False
     )
     errors, model = ga_bo.run()
+    runModel(model, valX)
     preds = runModel(model, testX)
     nrmseError = nrmse(testY, preds)
     r2Error = r_squared(testY, preds)
