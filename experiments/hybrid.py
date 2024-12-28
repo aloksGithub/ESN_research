@@ -8,7 +8,7 @@ parent_dir = os.path.dirname(current_dir)
 sys.path.insert(0, parent_dir)
 from NAS.error_metrics import nrmse, r_squared
 warnings.filterwarnings("ignore")
-from utils import getDataMGS, getDataLaser, getDataDDE, getDataLorenz, getDataSunspots, getDataWater, readSavedExperiment, printSavedResults
+from utils import getDataMGS, getDataLaser, getDataDDE, getDataLorenz, getDataSunspots, getDataWater, getDataWaterMultiStep, readSavedExperiment, printSavedResults
 from NAS.utils import runModel
 from NAS.ESN_BO import ESN_BO
 from NAS.ESN_NAS import ESN_NAS
@@ -16,6 +16,7 @@ from reservoirpy.observables import (mse)
 import math
 
 rpy.verbosity(0)
+water_steps = 18
 
 def nrmse_sunspots(y_true, y_pred):
     mseError = mse(y_true, y_pred)
@@ -69,12 +70,13 @@ def printSavedSunspotsResults():
 
 def printSavedWaterResults():
     print("================================water================================")
-    _, _, _, _, testX, testY = getDataWater()
+    _, _, valX, _, testX, testY = getDataWaterMultiStep(water_steps)
     nrmseErrors = []
     rSquaredValues = []
     for i in range(5):
         bo = readSavedExperiment('backup_hybrid/water/backup_{}.obj'.format(i))
         model = bo.bestModel
+        runModel(model, valX)
         preds = runModel(model, testX)
         nrmseError = nrmse(testY, preds)
         r2Error = r_squared(testY, preds)
@@ -146,8 +148,8 @@ if __name__ == "__main__":
     # runAutoRegressiveExperiment("mgs", getDataMGS)
     
     # Non auto regressive water experiment
-    trainX, trainY, valX, valY, testX, testY = getDataWater()
-    ga = readSavedExperiment('backup_50/{}/backup_{}.obj'.format('water', sys.argv[1]))
+    trainX, trainY, valX, valY, testX, testY = getDataWaterMultiStep(water_steps)
+    ga = readSavedExperiment('backup_50/{}/backup_{}.obj'.format("water" if water_steps==1 else f'water_{water_steps}', sys.argv[1]))
     baseArchitecture, _ = findBestGaArchitecture(ga)
     ga_bo = ESN_BO(
         trainX,
@@ -164,7 +166,7 @@ if __name__ == "__main__":
         [np.inf, 0],
         True,
         180,
-        "backup_hybrid/{}/backup_{}.obj".format('water', sys.argv[1]),
+        "backup_hybrid/{}/backup_{}.obj".format("water" if water_steps==1 else f'water_{water_steps}', sys.argv[1]),
         False
     )
     ga_bo.run()
