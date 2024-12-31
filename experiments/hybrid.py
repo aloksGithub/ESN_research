@@ -74,7 +74,7 @@ def printSavedWaterResults():
     nrmseErrors = []
     rSquaredValues = []
     for i in range(5):
-        bo = readSavedExperiment('backup_hybrid/water/backup_{}.obj'.format(i))
+        bo = readSavedExperiment('backup_hybrid/{}/backup_{}.obj'.format("water" if water_steps==1 else f'water_{water_steps}', i))
         model = bo.bestModel
         runModel(model, valX)
         preds = runModel(model, testX)

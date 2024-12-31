@@ -12,7 +12,7 @@ from NAS.error_metrics import nrmse, r_squared
 from NAS.utils import runModel
 warnings.filterwarnings("ignore")
 rpy.verbosity(0)
-steps = 18
+steps = 36
 
 def printSavedResults():
     _, _, valX, _, testX, testY = getDataWaterMultiStep(steps)

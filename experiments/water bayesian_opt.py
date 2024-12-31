@@ -13,7 +13,7 @@ from NAS.ESN_BO import ESN_BO
 from NAS.utils import runModel
 
 rpy.verbosity(0)
-steps = 18
+steps = 36
 
 def printSavedBoResults():
     _, _, valX, _, testX, testY = getDataWaterMultiStep(steps)
