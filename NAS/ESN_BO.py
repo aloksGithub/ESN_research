@@ -145,7 +145,7 @@ class ESN_BO:
             nodeIndex, paramName = int(param[:1]), param[2:]
             isInt = self.isInt[param]
             paramValue = int(params[param]) if isInt else params[param]
-            modifiedArchitecture["nodes"][nodeIndex][paramName] = paramValue
+            modifiedArchitecture["nodes"][nodeIndex]['params'][paramName] = paramValue
         
         errors = self.evaluate(modifiedArchitecture)
         return -errors[0]
@@ -171,7 +171,7 @@ class ESN_BO:
             nodeIndex, paramName = int(param[:1]), param[2:]
             isInt = self.isInt[param]
             paramValue = int(params[param]) if isInt else params[param]
-            bestArchitecture["nodes"][nodeIndex][paramName] = paramValue
+            bestArchitecture["nodes"][nodeIndex]['params'][paramName] = paramValue
         
         file = open(self.saveLocation, 'wb')
         pickle.dump(self, file)
