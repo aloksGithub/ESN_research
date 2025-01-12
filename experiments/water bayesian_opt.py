@@ -52,7 +52,7 @@ if __name__ == "__main__":
         3,
         3,
         [nrmse, r_squared],
-        [np.inf, 0],
+        [10000000, 0],
         True,
         180,
         "backup_bo/water{}/backup_{}.obj".format("" if steps==1 else f'_{steps}', sys.argv[1]),
