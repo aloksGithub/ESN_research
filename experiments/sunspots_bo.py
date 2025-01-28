@@ -61,7 +61,7 @@ if __name__ == "__main__":
         3,
         3,
         [nrmse, r_squared],
-        [np.inf, 0],
+        [10000, 0],
         True,
         180,
         "backup_bo/sunspots/backup_{}.obj".format(sys.argv[1]),
