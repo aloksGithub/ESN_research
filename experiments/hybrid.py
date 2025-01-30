@@ -49,12 +49,13 @@ def printSavedAutoregressiveResults(dataset):
 
 def printSavedSunspotsResults():
     print("================================Sunspots================================")
-    _, _, _, _, testX, testY = getDataSunspots()
+    _, _, valX, _, testX, testY = getDataSunspots()
     nrmseErrors = []
     rSquaredValues = []
     for i in range(5):
         bo = readSavedExperiment('backup_hybrid/sunspots/backup_{}.obj'.format(i))
         model = bo.bestModel
+        runModel(model, valX)
         preds = runModel(model, testX)
         nrmseError = nrmse_sunspots(testY, preds)
         r2Error = r_squared(testY, preds)
