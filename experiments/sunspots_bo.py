@@ -32,6 +32,7 @@ def printSavedBoResults():
     for i in range(5):
         bo = readSavedExperiment('backup_bo/sunspots/backup_{}.obj'.format(i))
         model = bo.bestModel
+        runModel(model, valX)
         preds = runModel(model, testX)
         nrmseError = nrmse(testY, preds)
         r2Error = r_squared(testY, preds)
