@@ -146,31 +146,31 @@ if __name__ == "__main__":
     # runAutoRegressiveExperiment("laser", getDataLaser)
     # runAutoRegressiveExperiment("dde", getDataDDE)
     # runAutoRegressiveExperiment("lorenz", getDataLorenz)
-    # runAutoRegressiveExperiment("mgs", getDataMGS)
+    runAutoRegressiveExperiment("mgs", getDataMGS)
     
     # Non auto regressive water experiment
-    trainX, trainY, valX, valY, testX, testY = getDataWaterMultiStep(water_steps)
-    ga = readSavedExperiment('backup_50/{}/backup_{}.obj'.format("water" if water_steps==1 else f'water_{water_steps}', sys.argv[1]))
-    baseArchitecture, _ = findBestGaArchitecture(ga)
-    ga_bo = ESN_BO(
-        trainX,
-        trainY,
-        valX,
-        valY,
-        500,
-        2000,
-        trainY.shape[-1],
-        baseArchitecture,
-        3,
-        3,
-        [nrmse, r_squared],
-        [np.inf, 0],
-        True,
-        180,
-        "backup_hybrid/{}/backup_{}.obj".format("water" if water_steps==1 else f'water_{water_steps}', sys.argv[1]),
-        False
-    )
-    ga_bo.run()
+    # trainX, trainY, valX, valY, testX, testY = getDataWaterMultiStep(water_steps)
+    # ga = readSavedExperiment('backup_50/{}/backup_{}.obj'.format("water" if water_steps==1 else f'water_{water_steps}', sys.argv[1]))
+    # baseArchitecture, _ = findBestGaArchitecture(ga)
+    # ga_bo = ESN_BO(
+    #     trainX,
+    #     trainY,
+    #     valX,
+    #     valY,
+    #     500,
+    #     2000,
+    #     trainY.shape[-1],
+    #     baseArchitecture,
+    #     3,
+    #     3,
+    #     [nrmse, r_squared],
+    #     [np.inf, 0],
+    #     True,
+    #     180,
+    #     "backup_hybrid/{}/backup_{}.obj".format("water" if water_steps==1 else f'water_{water_steps}', sys.argv[1]),
+    #     False
+    # )
+    # ga_bo.run()
 
     # Non auto regressive sunspots experiment
     # trainX, trainY, valX, valY, testX, testY = getDataSunspots()
