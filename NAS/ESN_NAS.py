@@ -85,7 +85,7 @@ class ESN_NAS:
         self.generationsSinceImprovement = 0
         self.bestModel = None
         if minimizeFitness:
-            self.defaultFitness = np.inf
+            self.defaultFitness = defaultErrors[0]
         else:
             self.defaultFitness = 0
         self.prevFitness = self.defaultFitness
