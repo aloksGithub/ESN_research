@@ -8,13 +8,13 @@ parent_dir = os.path.dirname(current_dir)
 sys.path.insert(0, parent_dir)
 from NAS.ESN_NAS2 import ESN_NAS2
 from NAS.error_metrics import nrmse, r_squared
-from utils import getDataMGS, printSavedResults
+from utils import getDataMGS, getDataDDE, getDataLorenz, printSavedResults
 import warnings
 warnings.filterwarnings("ignore")
 rpy.verbosity(0)
 
 if __name__ == "__main__":
-    trainX, trainY, valX, valY, testX, testY = getDataMGS()
+    trainX, trainY, valX, valY, testX, testY = getDataDDE()
     nrmseErrors = []
     r2_squaredValues = []
     for i in [0, 1, 2, 3, 4]:
@@ -23,19 +23,19 @@ if __name__ == "__main__":
             trainY,
             valX,
             valY,
-            5,
             10,
+            20,
             trainY.shape[-1],
-            n_jobs=10,
+            n_jobs=20,
             errorMetrics=[nrmse, r_squared],
             defaultErrors=[100000, 0],
             timeout=60,
             numEvals=3,
-            saveLocation='temp/mgs/backup_{}.obj'.format(i),
+            saveLocation='temp/dde/backup_{}.obj'.format(i),
             memoryLimit=756,
             isAutoRegressive=True,
-            bo_init=5,
-            bo_iter=5
+            bo_init=10,
+            bo_iter=10
         )
         ga.run()
         nrmseErrors.append(ga.bestFitness[0])
