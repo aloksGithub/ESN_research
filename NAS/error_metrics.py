@@ -1,6 +1,15 @@
 import math
 import numpy as np
 
+def nrmse_sunspots(y_true, y_pred):
+    mseError = mse(y_true, y_pred)
+    variance = np.asarray(y_true).var()
+    error = np.sqrt(mseError/variance)
+    if math.isnan(error):
+        return np.inf
+    else:
+        return error
+
 def nrmse(y_true, y_pred):
     y_true = np.array(y_true)
     y_pred = np.array(y_pred)
