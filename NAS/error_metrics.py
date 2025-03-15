@@ -1,5 +1,6 @@
 import math
 import numpy as np
+from reservoirpy.observables import (mse)
 
 def nrmse_sunspots(y_true, y_pred):
     mseError = mse(y_true, y_pred)
