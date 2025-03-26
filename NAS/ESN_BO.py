@@ -1,6 +1,6 @@
 import numpy as np
 import copy
-from NAS.parallel_processing import executeParallelImproved
+from NAS.parallel_processing import executeParallelBatch
 from NAS.utils import (
     nodeParameterRanges,
     constructModel,
@@ -77,9 +77,9 @@ class ESN_BO:
         os.makedirs(directory, exist_ok=True)
 
     def evaluate(self, individual):
-        results = executeParallelImproved(
+        results = executeParallelBatch(
             self.evaluateArchitectureAutoRegressive if self.isAutoRegressive else self.evaluateArchitecture,
-            [(individual,) for _ in range(self.numEvals)], self.numEvals, self.timeout
+            [(individual,) for _ in range(self.numEvals)], self.numEvals, self.timeout * self.numEvals
         )
         for i in range(len(results)):
             if results[i] is None:

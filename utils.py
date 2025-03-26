@@ -161,21 +161,7 @@ def getDataSunspots():
     return train_in, train_out, val_in, val_out, test_in, test_out
 
 def getDataWater():
-    water = pd.read_csv("./datasets/Water.csv").to_numpy()
-    firstCol = water[:, 0]
-    lastRow = water[-1, 1:]
-    data = np.expand_dims(np.concatenate((firstCol, lastRow)), axis=1)
-
-    trainLen = math.floor(len(water)*0.5)
-    valLen = math.floor(len(water)*0.7)
-
-    train_in = data[0:trainLen]
-    train_out = data[0+1:trainLen+1]
-    val_in = data[trainLen:valLen]
-    val_out = data[trainLen+1:valLen+1]
-    test_in = data[valLen:len(data)-1]
-    test_out = data[valLen+1:]
-    return train_in, train_out, val_in, val_out, test_in, test_out
+    return getDataWaterMultiStep(1)
 
 def getDataWaterMultiStep(n: int):
     water = pd.read_csv("./datasets/Water.csv").to_numpy()
