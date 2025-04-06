@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import pickle
 import math
+from NAS.utils import runModel
 
 def readSavedExperiment(path):
     file = open(path, 'rb')
@@ -21,11 +22,36 @@ def printSavedResults(directory, dataset):
     print("NRMSE: {} ({})".format(np.average(nrmseErrors), np.std(nrmseErrors)))
     print("R2: {} ({})".format(np.average(r2_squaredValues), np.std(r2_squaredValues)))
 
-def printSavedBoResults(dataset):
+def printSavedResultsAutoRegressive(directory, dataset, dataLoader):
+    _, _, _, _, testX, testY = dataLoader()
+    errors = []
+    for i in range(5):
+        ga = readSavedExperiment('{}/{}/backup_{}.obj'.format(directory, dataset, i))
+        model = ga.bestModel
+        runModel(model, ga.valX)
+        preds = runModel(model, testX)
+        experiment_errors = []
+        for metric in ga.errorMetrics:
+            experiment_errors.append(metric(testY, preds))
+        errors.append(experiment_errors)
+    averaged_errors = []
+    error_stds = []
+    for i, metric in enumerate(ga.errorMetrics):
+        averaged_error = np.average([experiment_errors[i] for experiment_errors in errors])
+        std = np.std([experiment_errors[i] for experiment_errors in errors])
+        averaged_errors.append(averaged_error)
+        error_stds.append(std)
+    print("Errors:")
+    print(errors)
+    print("Averaged errors:")
+    print(averaged_errors)
+    print(error_stds)
+
+def printSavedBoResults(directory, dataset):
     nrmseErrors = []
     rSquaredValues = []
     for i in range(5):
-        bo = readSavedExperiment('backup_bo/{}/backup_{}.obj'.format(dataset, i))
+        bo = readSavedExperiment('{}/{}/backup_{}.obj'.format(directory, dataset, i))
         mainErrors = [e[0] for e in bo.performances]
         bestErrors = bo.performances[mainErrors.index(min(mainErrors) if bo.minimizeFitness else max(mainErrors))]
         nrmseError = bestErrors[0]

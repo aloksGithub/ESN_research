@@ -20,16 +20,16 @@ def runExperiment(dataset, dataLoader, errorMetrics, isAutoregressive):
     nrmseErrors = []
     r2_squaredValues = []
     print(f'========================Starting GA for dataset {dataset}========================')
-    for i in [0]:
+    for i in range(5):
         ga = ESN_NAS2(
             trainX,
             trainY,
             valX,
             valY,
-            2,
-            2,
+            20,
+            40,
             trainY.shape[-1],
-            n_jobs=2,
+            n_jobs=20,
             errorMetrics=errorMetrics,
             defaultErrors=[100000, 0],
             timeout=60,
@@ -37,8 +37,8 @@ def runExperiment(dataset, dataLoader, errorMetrics, isAutoregressive):
             saveLocation='hybrid2_exploration/{}/backup_{}.obj'.format(dataset, i),
             memoryLimit=756,
             isAutoRegressive=isAutoregressive,
-            bo_init=1,
-            bo_iter=1
+            bo_init=3,
+            bo_iter=2
         )
         ga.run()
         if isAutoregressive:
