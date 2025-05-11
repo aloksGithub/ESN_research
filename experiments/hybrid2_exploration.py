@@ -48,8 +48,8 @@ def runExperiment(dataset, dataLoader, errorMetrics, isAutoregressive):
             model = ga.bestModel
             runModel(model, valX)
             preds = runModel(model, testX)
-            nrmseError = nrmse(testY, preds)
-            r2Error = r_squared(testY, preds)
+            nrmseError = ga.errorMetrics[0](testY, preds)
+            r2Error = ga.errorMetrics[1](testY, preds)
             nrmseErrors.append(nrmseError)
             r2_squaredValues.append(r2Error)
     print(f'========================Performance for dataset {dataset}========================')
@@ -61,12 +61,12 @@ def runExperiment(dataset, dataLoader, errorMetrics, isAutoregressive):
     print("R2: {} ({})".format(np.average(r2_squaredValues), np.std(r2_squaredValues)))
 
 def printAllSavedResults():
-    printSavedResults('hybrid2_exploration', 'mgs')
-    printSavedResults('hybrid2_exploration', 'lorenz')
-    printSavedResults('hybrid2_exploration', 'dde')
-    printSavedResults('hybrid2_exploration', 'laser')
-    printSavedResultsAutoRegressive('hybrid2_exploration', 'sunspots', getDataSunspots)
-    printSavedResultsAutoRegressive('hybrid2_exploration', 'water', getDataWater)
+    printSavedResults('hybrid2_exploration_long', 'mgs')
+    printSavedResults('hybrid2_exploration_long', 'lorenz')
+    printSavedResults('hybrid2_exploration_long', 'dde')
+    printSavedResults('hybrid2_exploration_long', 'laser')
+    printSavedResultsAutoRegressive('hybrid2_exploration_long', 'sunspots', getDataSunspots)
+    printSavedResultsAutoRegressive('hybrid2_exploration_long', 'water', getDataWater)
 
 if __name__ == "__main__":
     runExperiment('mgs', getDataMGS, [nrmse, r_squared], True)
