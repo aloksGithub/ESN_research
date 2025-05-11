@@ -26,7 +26,7 @@ def runExperiment(dataset, dataLoader, errorMetrics, isAutoregressive):
             trainY,
             valX,
             valY,
-            20,
+            40,
             40,
             trainY.shape[-1],
             n_jobs=20,
