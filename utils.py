@@ -134,9 +134,6 @@ def getDataLaser():
 # Neutral Normed DDE dataset
 def getDataDDE():
     data = np.load('./data/Neutral_normed_2801.npy')
-    from scipy import stats
-    data = stats.zscore(data)
-    data.shape
 
     trainLen = 2000
     valLen = 500
@@ -155,9 +152,6 @@ def getDataDDE():
 # Lorenz dataset
 def getDataLorenz():
     data = np.load('./data/Lorenz_normed_2801.npy')
-    from scipy import stats
-    data = stats.zscore(data)
-    data.shape
 
     trainLen = 2000
     valLen = 444

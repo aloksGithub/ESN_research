@@ -34,7 +34,7 @@ def runExperiment(dataset, dataLoader, errorMetrics, isAutoregressive):
             defaultErrors=[100000, 0],
             timeout=60,
             numEvals=3,
-            saveLocation='hybrid2_exploration/{}/backup_{}.obj'.format(dataset, i),
+            saveLocation='hybrid2_exploration_long/{}/backup_{}.obj'.format(dataset, i),
             memoryLimit=756,
             isAutoRegressive=isAutoregressive,
             bo_init=3,
@@ -69,10 +69,10 @@ def printAllSavedResults():
     printSavedResultsAutoRegressive('hybrid2_exploration_long', 'water', getDataWater)
 
 if __name__ == "__main__":
-    runExperiment('mgs', getDataMGS, [nrmse, r_squared], True)
-    runExperiment('lorenz', getDataLorenz, [nrmse, r_squared], True)
+    # runExperiment('mgs', getDataMGS, [nrmse, r_squared], True)
+    # runExperiment('lorenz', getDataLorenz, [nrmse, r_squared], True)
     runExperiment('dde', getDataDDE, [nrmse, r_squared], True)
-    runExperiment('laser', getDataLaser, [nrmse, r_squared], True)
-    runExperiment('sunspots', getDataSunspots, [nrmse_sunspots, r_squared], False)
-    runExperiment('water', getDataWater, [nrmse, r_squared], False)
+    # runExperiment('laser', getDataLaser, [nrmse, r_squared], True)
+    # runExperiment('sunspots', getDataSunspots, [nrmse_sunspots, r_squared], False)
+    # runExperiment('water', getDataWater, [nrmse, r_squared], False)
 

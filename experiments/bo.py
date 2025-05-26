@@ -37,40 +37,18 @@ def printSavedAutoregressiveResults(dataset):
     print("NRMSE: {} ({})".format(np.average(nrmseErrors), np.std(nrmseErrors)))
     print("R2: {} ({})".format(np.average(rSquaredValues), np.std(rSquaredValues)))
 
-def printSavedSunspotsResults():
-    print("================================Sunspots================================")
-    _, _, valX, _, testX, testY = getDataSunspots()
+def printSavedNonAutoRegressiveResults(dataset, dataLoader):
+    print(f"================================{dataset}================================")
+    _, _, valX, _, testX, testY = dataLoader()
     nrmseErrors = []
     rSquaredValues = []
     for i in range(5):
-        bo = readSavedExperiment('backup_bo2/sunspots/backup_{}.obj'.format(i))
+        bo: ESN_BO = readSavedExperiment('backup_bo2/{}/backup_{}.obj'.format(dataset, i))
         model = bo.bestModel
         runModel(model, valX)
         preds = runModel(model, testX)
-        nrmseError = nrmse_sunspots(testY, preds)
-        r2Error = r_squared(testY, preds)
-        nrmseErrors.append(nrmseError)
-        rSquaredValues.append(r2Error)
-        print("Result:", nrmseError, r2Error)
-    print("Errors:")
-    print(nrmseErrors)
-    print(rSquaredValues)
-    print("Averaged errors:")
-    print("NRMSE: {} ({})".format(np.average(nrmseErrors), np.std(nrmseErrors)))
-    print("R2: {} ({})".format(np.average(rSquaredValues), np.std(rSquaredValues)))
-
-def printSavedWaterResults():
-    print("================================water================================")
-    _, _, valX, _, testX, testY = getDataWater()
-    nrmseErrors = []
-    rSquaredValues = []
-    for i in range(5):
-        bo = readSavedExperiment('backup_bo2/{}/backup_{}.obj'.format("water", i))
-        model = bo.bestModel
-        runModel(model, valX)
-        preds = runModel(model, testX)
-        nrmseError = nrmse(testY, preds)
-        r2Error = r_squared(testY, preds)
+        nrmseError = bo.errorMetrics[0](testY, preds)
+        r2Error = bo.errorMetrics[1](testY, preds)
         nrmseErrors.append(nrmseError)
         rSquaredValues.append(r2Error)
         print("Result:", nrmseError, r2Error)
@@ -86,11 +64,11 @@ def printAllResults():
     printSavedAutoregressiveResults("laser")
     printSavedAutoregressiveResults("dde")
     printSavedAutoregressiveResults("lorenz")
-    printSavedWaterResults()
-    printSavedSunspotsResults()
+    printSavedNonAutoRegressiveResults("Water", getDataWater)
+    printSavedNonAutoRegressiveResults("Sunspots", getDataSunspots)
 
 def runBOExperiment(dataset, dataLoader, errorMetrics, isAutoregressive):
-    trainX, trainY, valX, valY, testX, testY = dataLoader()
+    trainX, trainY, valX, valY, _, _ = dataLoader()
     bo = ESN_BO(
         trainX,
         trainY,
@@ -114,9 +92,9 @@ def runBOExperiment(dataset, dataLoader, errorMetrics, isAutoregressive):
 
 if __name__ == "__main__":
     # printAllResults()
-    runBOExperiment("laser", getDataLaser, [nrmse, r_squared], True)
+    # runBOExperiment("laser", getDataLaser, [nrmse, r_squared], True)
     runBOExperiment("dde", getDataDDE, [nrmse, r_squared], True)
-    runBOExperiment("lorenz", getDataLorenz, [nrmse, r_squared], True)
-    runBOExperiment("mgs", getDataMGS, [nrmse, r_squared], True)
-    runBOExperiment("sunspots", getDataSunspots, [nrmse_sunspots, r_squared], False)
-    runBOExperiment("water", getDataWater, [nrmse, r_squared], False)
+    # runBOExperiment("lorenz", getDataLorenz, [nrmse, r_squared], True)
+    # runBOExperiment("mgs", getDataMGS, [nrmse, r_squared], True)
+    # runBOExperiment("sunspots", getDataSunspots, [nrmse_sunspots, r_squared], False)
+    # runBOExperiment("water", getDataWater, [nrmse, r_squared], False)
