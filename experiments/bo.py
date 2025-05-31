@@ -69,6 +69,8 @@ def printAllResults():
 
 def runBOExperiment(dataset, dataLoader, errorMetrics, isAutoregressive):
     trainX, trainY, valX, valY, _, _ = dataLoader()
+    baseArchitecture['nodes'][0]['params']['input_dim'] = trainX.shape[1]
+    baseArchitecture['nodes'][-1]['params']['output_dim'] = trainX.shape[1]
     bo = ESN_BO(
         trainX,
         trainY,
