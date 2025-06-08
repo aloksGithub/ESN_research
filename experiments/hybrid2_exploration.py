@@ -15,7 +15,8 @@ import warnings
 warnings.filterwarnings("ignore")
 rpy.verbosity(0)
 
-def runExperiment(dataset, dataLoader, errorMetrics, isAutoregressive):
+def runExperiment(dataset, dataLoader, errorMetrics, isAutoregressive, long=True):
+    location = 'hybrid2_exploration_long' if long else 'hybrid2_exploration'
     trainX, trainY, valX, valY, testX, testY = dataLoader()
     nrmseErrors = []
     r2_squaredValues = []
@@ -26,7 +27,7 @@ def runExperiment(dataset, dataLoader, errorMetrics, isAutoregressive):
             trainY,
             valX,
             valY,
-            40,
+            40 if long else 20,
             40,
             trainY.shape[-1],
             n_jobs=20,
@@ -34,7 +35,7 @@ def runExperiment(dataset, dataLoader, errorMetrics, isAutoregressive):
             defaultErrors=[100000, 0],
             timeout=60,
             numEvals=3,
-            saveLocation='hybrid2_exploration_long/{}/backup_{}.obj'.format(dataset, i),
+            saveLocation='{}}/{}/backup_{}.obj'.format(location, dataset, i),
             memoryLimit=756,
             isAutoRegressive=isAutoregressive,
             bo_init=3,
@@ -60,18 +61,19 @@ def runExperiment(dataset, dataLoader, errorMetrics, isAutoregressive):
     print("NRMSE: {} ({})".format(np.average(nrmseErrors), np.std(nrmseErrors)))
     print("R2: {} ({})".format(np.average(r2_squaredValues), np.std(r2_squaredValues)))
 
-def printAllSavedResults():
-    printSavedResults('hybrid2_exploration_long', 'mgs')
-    printSavedResults('hybrid2_exploration_long', 'lorenz')
-    printSavedResults('hybrid2_exploration_long', 'dde')
-    printSavedResults('hybrid2_exploration_long', 'laser')
-    printSavedResultsAutoRegressive('hybrid2_exploration_long', 'sunspots', getDataSunspots)
-    printSavedResultsAutoRegressive('hybrid2_exploration_long', 'water', getDataWater)
+def printAllSavedResults(long=True):
+    location = 'hybrid2_exploration_long' if long else 'hybrid2_exploration'
+    printSavedResults(location, 'mgs')
+    printSavedResults(location, 'lorenz')
+    printSavedResults(location, 'dde')
+    printSavedResults(location, 'laser')
+    printSavedResultsAutoRegressive(location, 'sunspots', getDataSunspots)
+    printSavedResultsAutoRegressive(location, 'water', getDataWater)
 
 if __name__ == "__main__":
     # runExperiment('mgs', getDataMGS, [nrmse, r_squared], True)
-    # runExperiment('lorenz', getDataLorenz, [nrmse, r_squared], True)
-    runExperiment('dde', getDataDDE, [nrmse, r_squared], True)
+    runExperiment('lorenz', getDataLorenz, [nrmse, r_squared], True, False)
+    # runExperiment('dde', getDataDDE, [nrmse, r_squared], True)
     # runExperiment('laser', getDataLaser, [nrmse, r_squared], True)
     # runExperiment('sunspots', getDataSunspots, [nrmse_sunspots, r_squared], False)
     # runExperiment('water', getDataWater, [nrmse, r_squared], False)
