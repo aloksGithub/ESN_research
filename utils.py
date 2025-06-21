@@ -91,7 +91,7 @@ def printOldSavedResults(dataset):
 def getDataMGS():
     data = np.load('./data/MG17.npy')
     data = data.reshape((data.shape[0],1))
-    data = data[:3801,:]
+    data = data[:2801,:]
     from scipy import stats
     data = stats.zscore(data)
     data.shape
@@ -114,7 +114,7 @@ def getDataLaser():
     sunspots = pd.read_csv("./data/santafelaser.csv")
     data = np.array(sunspots)
     data = data.reshape((data.shape[0],1))
-    data = data[:3801,:]
+    data = data[:2801,:]
     from scipy import stats
     data = stats.zscore(data)
 

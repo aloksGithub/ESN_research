@@ -94,9 +94,9 @@ def runBOExperiment(dataset, dataLoader, errorMetrics, isAutoregressive):
 
 if __name__ == "__main__":
     # printAllResults()
-    # runBOExperiment("laser", getDataLaser, [nrmse, r_squared], True)
-    runBOExperiment("dde", getDataDDE, [nrmse, r_squared], True)
+    runBOExperiment("laser", getDataLaser, [nrmse, r_squared], True)
+    # runBOExperiment("dde", getDataDDE, [nrmse, r_squared], True)
     # runBOExperiment("lorenz", getDataLorenz, [nrmse, r_squared], True)
-    # runBOExperiment("mgs", getDataMGS, [nrmse, r_squared], True)
-    # runBOExperiment("sunspots", getDataSunspots, [nrmse_sunspots, r_squared], False)
-    # runBOExperiment("water", getDataWater, [nrmse, r_squared], False)
+    runBOExperiment("mgs", getDataMGS, [nrmse, r_squared], True)
+    runBOExperiment("sunspots", getDataSunspots, [nrmse_sunspots, r_squared], False)
+    runBOExperiment("water", getDataWater, [nrmse, r_squared], False)
