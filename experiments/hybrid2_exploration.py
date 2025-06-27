@@ -73,8 +73,8 @@ def printAllSavedResults(long=True):
 if __name__ == "__main__":
     # runExperiment('mgs', getDataMGS, [nrmse, r_squared], True)
     # runExperiment('lorenz', getDataLorenz, [nrmse, r_squared], True, False)
-    runExperiment('dde', getDataDDE, [nrmse, r_squared], True, False)
-    # runExperiment('laser', getDataLaser, [nrmse, r_squared], True)
+    # runExperiment('dde', getDataDDE, [nrmse, r_squared], True, False)
+    runExperiment('laser', getDataLaser, [nrmse, r_squared], True)
     # runExperiment('sunspots', getDataSunspots, [nrmse_sunspots, r_squared], False)
     # runExperiment('water', getDataWater, [nrmse, r_squared], False)
 
