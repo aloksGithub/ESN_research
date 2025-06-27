@@ -82,7 +82,7 @@ class ESN_BO:
         start = time.time()
         results = executeParallelBatch(
             self.evaluateArchitectureAutoRegressive if self.isAutoRegressive else self.evaluateArchitecture,
-            [(individual,) for _ in range(self.numEvals)], self.numEvals, self.timeout * self.numEvals
+            [(individual,) for _ in range(self.numEvals)], self.numEvals, self.timeout
         )
 
         valid_results = [res for res in results if res is not None]
