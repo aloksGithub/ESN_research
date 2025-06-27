@@ -21,10 +21,16 @@ def printSavedAutoregressiveResults(dataset):
     print(f"================================{dataset}================================")
     nrmseErrors = []
     rSquaredValues = []
+    times = []
     for i in range(5):
         bo = readSavedExperiment('backup_bo2/{}/backup_{}.obj'.format(dataset, i))
         mainErrors = [e[0] for e in bo.performances]
         bestErrors = bo.performances[mainErrors.index(min(mainErrors) if bo.minimizeFitness else max(mainErrors))]
+        try:
+            totalTime = sum(bo.times)
+            times.append(totalTime)
+        except:
+            times.append(0)
         nrmseError = bestErrors[0]
         r2Error = bestErrors[1]
         nrmseErrors.append(nrmseError)
@@ -36,6 +42,9 @@ def printSavedAutoregressiveResults(dataset):
     print("Averaged errors:")
     print("NRMSE: {} ({})".format(np.average(nrmseErrors), np.std(nrmseErrors)))
     print("R2: {} ({})".format(np.average(rSquaredValues), np.std(rSquaredValues)))
+    print("Times:")
+    print(times)
+    print("Average time: {} ({})".format(np.average(times), np.std(times)))
 
 def printSavedNonAutoRegressiveResults(dataset, dataLoader):
     print(f"================================{dataset}================================")

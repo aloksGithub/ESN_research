@@ -11,6 +11,7 @@ from bayes_opt import BayesianOptimization
 from reservoirpy.observables import nrmse
 import pickle
 import os
+import time
 
 class ESN_BO:
     """
@@ -70,6 +71,7 @@ class ESN_BO:
         # Variables to keep track of models
         self.paramsTested = []
         self.performances = []
+        self.times = []
         self.bestModel = None
 
         # Make sure that save folder exists
@@ -77,27 +79,34 @@ class ESN_BO:
         os.makedirs(directory, exist_ok=True)
 
     def evaluate(self, individual):
+        start = time.time()
         results = executeParallelBatch(
             self.evaluateArchitectureAutoRegressive if self.isAutoRegressive else self.evaluateArchitecture,
             [(individual,) for _ in range(self.numEvals)], self.numEvals, self.timeout * self.numEvals
         )
-        for i in range(len(results)):
-            if results[i] is None:
-                results[i] = (self.defaultErrors, None)
-        mainErrors = [e[0][0] if e is not None else self.defaultErrors for e in results]
-        bestMainError = min(mainErrors) if self.minimizeFitness else max(mainErrors)
-        bestIndex = mainErrors.index(bestMainError)
-        bestErrors = results[bestIndex][0]
-        bestModel = results[bestIndex][1]
-        self.paramsTested.append(individual)
-        self.performances.append(bestErrors)
 
-        allMainErrors = [e[0] for e in self.performances]
-        bestOfAllTimeMainError = min(allMainErrors) if self.minimizeFitness else max(allMainErrors)
-        if bestOfAllTimeMainError==bestMainError:
+        valid_results = [res for res in results if res is not None]
+        if not valid_results:
+            errors = self.defaultErrors
+            bestModel = None
+        else:
+            main_errors = [res[0][0] for res in valid_results]
+            best_error_index = np.argmin(main_errors) if self.minimizeFitness else np.argmax(main_errors)
+            errors = valid_results[best_error_index][0]
+            bestModel = valid_results[best_error_index][1]
+
+        self.paramsTested.append(individual)
+        self.performances.append(errors)
+
+        all_main_errors = [e[0] for e in self.performances]
+        best_of_all_time_main_error = min(all_main_errors) if self.minimizeFitness else max(all_main_errors)
+        if self.minimizeFitness and best_of_all_time_main_error >= errors[0] or not self.minimizeFitness and best_of_all_time_main_error <= errors[0]:
             self.bestModel = bestModel
 
-        return bestErrors
+        end = time.time()
+        print(f"Time taken: {end - start}")
+        self.times.append(end - start)
+        return errors
 
     def evaluateArchitecture(self, individual):
         """

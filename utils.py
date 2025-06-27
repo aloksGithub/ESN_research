@@ -11,22 +11,35 @@ def readSavedExperiment(path):
 def printSavedResults(directory, dataset):
     nrmseErrors = []
     r2_squaredValues = []
+    times = []
     for i in range(5):
         ga = readSavedExperiment('{}/{}/backup_{}.obj'.format(directory, dataset, i))
         nrmseErrors.append(ga.bestFitness[0])
         r2_squaredValues.append(ga.bestFitness[1])
+        try:
+            times.append(sum(ga.generationTimes))
+        except:
+            times.append(0)
     print("Errors:")
     print(nrmseErrors)
     print(r2_squaredValues)
     print("Averaged errors:")
     print("NRMSE: {} ({})".format(np.average(nrmseErrors), np.std(nrmseErrors)))
     print("R2: {} ({})".format(np.average(r2_squaredValues), np.std(r2_squaredValues)))
+    print("Times:")
+    print(times)
+    print("Average time: {} ({})".format(np.average(times), np.std(times)))
 
 def printSavedResultsAutoRegressive(directory, dataset, dataLoader):
     _, _, _, _, testX, testY = dataLoader()
     errors = []
+    times = []
     for i in range(5):
         ga = readSavedExperiment('{}/{}/backup_{}.obj'.format(directory, dataset, i))
+        try:
+            times.append(sum(ga.generationTimes))
+        except:
+            times.append(0)
         model = ga.bestModel
         runModel(model, ga.valX)
         preds = runModel(model, testX)
@@ -46,6 +59,9 @@ def printSavedResultsAutoRegressive(directory, dataset, dataLoader):
     print("Averaged errors:")
     print(averaged_errors)
     print(error_stds)
+    print("Times:")
+    print(times)
+    print("Average time: {} ({})".format(np.average(times), np.std(times)))
 
 def printSavedBoResults(directory, dataset):
     nrmseErrors = []

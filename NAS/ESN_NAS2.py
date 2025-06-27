@@ -84,6 +84,7 @@ class ESN_NAS2:
 
         self.generation = 1
         self.fitnesses = []
+        self.generationTimes = []
         self.architectures = []
         self.models = []
         self.modelGenerationIndices = []
@@ -382,18 +383,22 @@ class ESN_NAS2:
                 numFailures+=1
         print("Best so far:", self.bestFitness)
         print("Failure rate: {}%".format(100*numFailures/self.populationSize))
+        self.generationTimes.append(time.time() - startTime)
         print("Time taken:", time.time() - startTime)
 
         file = open(self.saveLocation, 'wb')
         pickle.dump(self, file)
 
     def run(self):
+        startTime = time.time()
         random_population = self.generatePopulation(self.populationSize - len(self.seedModels))
         seed_population = [creator.Individual(individual) for individual in self.seedModels]
         self.population = seed_population + random_population
 
         _, self.population = self.evaluateParallel(self.population)
         self.modelGenerationIndices.append(0)
+        endTime = time.time()
+        self.generationTimes.append(endTime - startTime)
         
         for gen in range(self.generation, self.generations + 1):
             self.generationRun(gen)
