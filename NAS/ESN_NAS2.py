@@ -355,9 +355,11 @@ class ESN_NAS2:
         print("=======================Generation {}=======================".format(gen))
         self.generationsSinceImprovement+=1
         offspring = self.generateOffspring(list(map(self.toolbox.clone, self.population)))
+        print("Offspring generated", time.time() - startTime)
 
         # Evaluate offspring
         offSpringFitnesses, offspring = self.evaluateParallel(offspring)
+        print("Offspring evaluated", time.time() - startTime)
         if self.minimizeFitness and min(offSpringFitnesses)<self.prevFitness or not self.minimizeFitness and max(offSpringFitnesses)>self.prevFitness:
             self.prevFitness = min(offSpringFitnesses)
             self.generationsSinceImprovement = 0
@@ -368,6 +370,7 @@ class ESN_NAS2:
             self.prevFitness = self.defaultFitness
             newRandomPopulation = self.generatePopulation(self.populationSize-1)
             _, newRandomPopulation = self.evaluateParallel(newRandomPopulation)
+            print("New random population evaluated", time.time() - startTime)
             self.population[:] = self.toolbox.selectBest(self.population, 1) + newRandomPopulation
             self.modelGenerationIndices.append(gen)
         else:
