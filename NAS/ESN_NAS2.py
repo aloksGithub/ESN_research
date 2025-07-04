@@ -124,6 +124,7 @@ class ESN_NAS2:
         offspring = self.toolbox.selectBest(population, self.eliteSize)
         candidates = []
 
+        startTime = time.time()
         while len(offspring) < self.populationSize:
             while len(candidates) < self.n_jobs:
                 parent1 = self.toolbox.selectTournament(population, 1, len(population)//4)[0]
@@ -137,6 +138,7 @@ class ESN_NAS2:
                 candidates.append(child2)
             
             validities = executeParallelBatch(self.checkModelValidity, [(c,) for c in candidates], self.n_jobs, self.timeout)
+            print("Evaluated candidates in", time.time() - startTime)
             for validity in validities:
                 if validity is not None and validity[0]:
                     offspring.append(validity[1])
