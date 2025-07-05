@@ -134,8 +134,10 @@ class ESN_NAS2:
                 child1 = self.mutate(child1)
                 child2 = self.mutate(child2)
 
-                candidates.append(child1)
-                candidates.append(child2)
+                if isValidArchitecture(child1, self.trainX, self.trainY, self.memoryLimit, self.timeout, self.isAutoregressive, checkTime=False):
+                    candidates.append(child1)
+                if isValidArchitecture(child2, self.trainX, self.trainY, self.memoryLimit, self.timeout, self.isAutoregressive, checkTime=False):
+                    candidates.append(child2)
             
             validities = executeParallelBatch(self.checkModelValidity, [(c,) for c in candidates], self.n_jobs, self.timeout)
             print("Evaluated candidates in", time.time() - startTime)

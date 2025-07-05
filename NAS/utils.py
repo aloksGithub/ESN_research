@@ -136,7 +136,7 @@ def generateRandomNodeParams(nodeType, output_dim):
             params[parameterName] = random.random() * (parameterRange["upper"] - parameterRange["lower"]) + parameterRange["lower"]
     return params
 
-def isValidArchitecture(architecture, sampleInput, sampleOutput, memoryLimit, timeLimit, isAutoRegressive=False):
+def isValidArchitecture(architecture, sampleInput, sampleOutput, memoryLimit, timeLimit, isAutoRegressive=False, checkTime=True):
     ipExists = False
     forceExists = False
     for i, node in enumerate(architecture["nodes"]):
@@ -150,20 +150,21 @@ def isValidArchitecture(architecture, sampleInput, sampleOutput, memoryLimit, ti
     if memoryEstimate>memoryLimit:
         return False
     
-    try:
-        start = time.time()
-        error = evaluateArchitecture(
-            architecture, sampleInput, sampleOutput, sampleInput, sampleOutput
-        ) if not isAutoRegressive else evaluateArchitectureAutoRegressive(
-            architecture, sampleInput, sampleOutput, sampleInput, sampleOutput
-        )
-        timeTaken1 = time.time() - start
-        if timeTaken1*1.1>timeLimit:
+    if checkTime:
+        try:
+            start = time.time()
+            error = evaluateArchitecture(
+                architecture, sampleInput, sampleOutput, sampleInput, sampleOutput
+            ) if not isAutoRegressive else evaluateArchitectureAutoRegressive(
+                architecture, sampleInput, sampleOutput, sampleInput, sampleOutput
+            )
+            timeTaken1 = time.time() - start
+            if timeTaken1*1.1>timeLimit:
+                return False
+            if np.isinf(error) or np.isnan(error):
+                return False
+        except:
             return False
-        if np.isinf(error) or np.isnan(error):
-            return False
-    except:
-        return False
     return True
 
 def createRandomGraph(numNodes):
