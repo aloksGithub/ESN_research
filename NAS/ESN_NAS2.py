@@ -90,11 +90,7 @@ class ESN_NAS2:
         self.modelGenerationIndices = []
         self.generationsSinceImprovement = 0
         self.bestModel = None
-        if minimizeFitness:
-            self.defaultFitness = np.inf
-        else:
-            self.defaultFitness = 0
-        self.prevFitness = self.defaultFitness
+        self.prevFitness = self.defaultErrors[0]
 
         self.toolbox = base.Toolbox()
         
@@ -371,7 +367,7 @@ class ESN_NAS2:
         if self.generationsSinceImprovement>=self.stagnationReset:
             print("Resetting population due to stagnation")
 
-            self.prevFitness = self.defaultFitness
+            self.prevFitness = self.defaultErrors[0]
             newRandomPopulation = self.generatePopulation(self.populationSize-1)
             _, newRandomPopulation = self.evaluateParallel(newRandomPopulation)
             print("New random population evaluated", time.time() - startTime)
@@ -385,7 +381,7 @@ class ESN_NAS2:
         self.bestFitness = self.fitnesses[bestIndex]
         numFailures = 0
         for index, fitness in enumerate(self.fitnesses[-self.populationSize:]):
-            if fitness[0]==self.defaultFitness:
+            if fitness[0]==self.defaultErrors[0]:
                 # print(self.architectures[-self.populationSize:][index])
                 numFailures+=1
         print("Best so far:", self.bestFitness)
