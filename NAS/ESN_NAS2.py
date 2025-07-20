@@ -113,7 +113,7 @@ class ESN_NAS2:
         os.makedirs(directory, exist_ok=True)
         
     def checkModelValidity(self, architecture):
-        return isValidArchitecture(architecture, self.trainX, self.trainY, self.memoryLimit, self.timeout, self.isAutoregressive, checkTime=False ), architecture
+        return isValidArchitecture(architecture, self.trainX, self.trainY, self.memoryLimit, self.timeout, self.isAutoregressive, checkTime=True ), architecture
 
     def generateOffspring(self, population):
         print("Generating offspring")
