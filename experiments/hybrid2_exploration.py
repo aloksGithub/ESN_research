@@ -71,10 +71,10 @@ def printAllSavedResults(long=True):
     printSavedResultsAutoRegressive(location, 'water', getDataWater)
 
 if __name__ == "__main__":
-    # runExperiment('mgs', getDataMGS, [nrmse, r_squared], True)
-    # runExperiment('lorenz', getDataLorenz, [nrmse, r_squared], True, False)
-    # runExperiment('dde', getDataDDE, [nrmse, r_squared], True, False)
-    runExperiment('laser', getDataLaser, [nrmse, r_squared], True, False)
-    # runExperiment('sunspots', getDataSunspots, [nrmse_sunspots, r_squared], False)
-    # runExperiment('water', getDataWater, [nrmse, r_squared], False)
+    runExperiment('mgs', getDataMGS, [nrmse, r_squared], True, False)
+    runExperiment('lorenz', getDataLorenz, [nrmse, r_squared], True, False)
+    runExperiment('dde', getDataDDE, [nrmse, r_squared], True, False)
+    # runExperiment('laser', getDataLaser, [nrmse, r_squared], True, False)
+    runExperiment('sunspots', getDataSunspots, [nrmse_sunspots, r_squared], False, False)
+    runExperiment('water', getDataWater, [nrmse, r_squared], False, False)
 

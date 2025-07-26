@@ -90,11 +90,7 @@ class ESN_NAS2:
         self.modelGenerationIndices = []
         self.generationsSinceImprovement = 0
         self.bestModel = None
-        if minimizeFitness:
-            self.defaultFitness = np.inf
-        else:
-            self.defaultFitness = 0
-        self.prevFitness = self.defaultFitness
+        self.prevFitness = self.defaultErrors[0]
 
         self.toolbox = base.Toolbox()
         
@@ -112,12 +108,13 @@ class ESN_NAS2:
         self.diagnosisResults = []
         self.population = []
         self.bestFitness = defaultErrors
+        self.individualsPerGeneration = self.populationSize * (self.bo_init + self.bo_iter)
         # Make sure that save folder exists
         directory = os.path.dirname(self.saveLocation)
         os.makedirs(directory, exist_ok=True)
         
     def checkModelValidity(self, architecture):
-        return isValidArchitecture(architecture, self.trainX, self.trainY, self.memoryLimit, self.timeout, self.isAutoregressive, checkTime=False ), architecture
+        return isValidArchitecture(architecture, self.trainX, self.trainY, self.memoryLimit, self.timeout, self.isAutoregressive, checkTime=True ), architecture
 
     def generateOffspring(self, population):
         print("Generating offspring")
@@ -271,7 +268,7 @@ class ESN_NAS2:
 
         individuals = []
         individualErrors = []
-        bestError = np.inf if self.minimizeFitness else -np.inf
+        bestError = self.defaultErrors[0] if self.minimizeFitness else -self.defaultErrors[0]
         bestModel = None
         
         def black_box(**params):
@@ -292,7 +289,6 @@ class ESN_NAS2:
                 bestModel = model
 
             return -errors[0]
-        
         optimizer = BayesianOptimization(
             f=black_box,
             pbounds=pbounds,
@@ -308,6 +304,7 @@ class ESN_NAS2:
 
     def evaluateParallel(self, population):
         print("Evaluating population")
+        startTime = time.time()
         results = executeParallelBatch(self.bo, [(individual,) for individual in population], self.n_jobs, self.timeout*self.numEvals*(self.bo_init+self.bo_iter))
         for i in range(len(results)):
             if results[i] is None:
@@ -326,7 +323,7 @@ class ESN_NAS2:
             bestOverallError = min([elem[0] for elem in self.fitnesses])
             if bestBoError<=bestOverallError or len(self.fitnesses)==0:
                 self.bestModel = bestModel
-        
+        print("evaluated in", time.time() - startTime)
         return [fitness[0] for fitness in self.fitnesses[-len(population)*(self.bo_iter+self.bo_init):]], new_individuals
     
     def generatePopulation(self, numIndividuals):
@@ -371,7 +368,7 @@ class ESN_NAS2:
         if self.generationsSinceImprovement>=self.stagnationReset:
             print("Resetting population due to stagnation")
 
-            self.prevFitness = self.defaultFitness
+            self.prevFitness = self.defaultErrors[0]
             newRandomPopulation = self.generatePopulation(self.populationSize-1)
             _, newRandomPopulation = self.evaluateParallel(newRandomPopulation)
             print("New random population evaluated", time.time() - startTime)
@@ -384,12 +381,12 @@ class ESN_NAS2:
         bestIndex = objective.index(min(objective)) if self.minimizeFitness else objective.index(max(objective))
         self.bestFitness = self.fitnesses[bestIndex]
         numFailures = 0
-        for index, fitness in enumerate(self.fitnesses[-self.populationSize:]):
-            if fitness[0]==self.defaultFitness:
+        for index, fitness in enumerate(self.fitnesses[-self.individualsPerGeneration:]):
+            if fitness[0]==self.defaultErrors[0]:
                 # print(self.architectures[-self.populationSize:][index])
                 numFailures+=1
         print("Best so far:", self.bestFitness)
-        print("Failure rate: {}%".format(100*numFailures/self.populationSize))
+        print("Failure rate: {}%".format(100*numFailures/self.individualsPerGeneration))
         self.generationTimes.append(time.time() - startTime)
         print("Time taken:", time.time() - startTime)
 
