@@ -7,6 +7,7 @@ import os
 current_dir = os.path.abspath(os.path.dirname(__file__))
 parent_dir = os.path.dirname(current_dir)
 sys.path.insert(0, parent_dir)
+from NAS.ESN_NAS import EvalParams, ExperimentData, GAParams
 from NAS.utils import runModel
 from NAS.ESN_NAS2 import ESN_NAS2
 from NAS.error_metrics import nrmse, nrmse_sunspots, r_squared
@@ -15,31 +16,38 @@ import warnings
 warnings.filterwarnings("ignore")
 rpy.verbosity(0)
 
-def runExperiment(dataset, dataLoader, errorMetrics, isAutoregressive, long=True):
-    location = 'hybrid2_exploration_long' if long else 'hybrid2_exploration'
+def runExperiment(dataset, dataLoader, errorMetrics, isAutoregressive):
     trainX, trainY, valX, valY, testX, testY = dataLoader()
+    experimentData = ExperimentData(trainX, trainY, valX, valY, testX, testY)
+    evalParams = EvalParams(
+        numEvals=1,
+        errorMetrics=errorMetrics,
+        defaultErrors=[100000, 0],
+        timeout=60,
+        memoryLimit=756,
+        minimizeFitness=True,
+        isAutoRegressive=isAutoregressive,
+    )
+    gaParams = GAParams(
+        generations=2,
+        populationSize=2,
+        crossoverProbability=0.7,
+        mutationProbability=0.2,
+        eliteSize=1,
+        stagnationReset=5,
+    )
     nrmseErrors = []
     r2_squaredValues = []
     print(f'========================Starting GA for dataset {dataset}========================')
     for i in range(5):
         ga = ESN_NAS2(
-            trainX,
-            trainY,
-            valX,
-            valY,
-            40 if long else 20,
-            40,
-            trainY.shape[-1],
-            n_jobs=20,
-            errorMetrics=errorMetrics,
-            defaultErrors=[100000, 0],
-            timeout=60,
-            numEvals=3,
-            saveLocation='{}/{}/backup_{}.obj'.format(location, dataset, i),
-            memoryLimit=756,
-            isAutoRegressive=isAutoregressive,
-            bo_init=3,
-            bo_iter=2
+            experimentData,
+            evalParams,
+            gaParams,
+            n_jobs=2,
+            saveLocation='hybrid2_exploration/{}/backup_{}.obj'.format(dataset, i),
+            bo_init=1,
+            bo_iter=1
         )
         ga.run()
         if isAutoregressive:
@@ -61,7 +69,7 @@ def runExperiment(dataset, dataLoader, errorMetrics, isAutoregressive, long=True
     print("NRMSE: {} ({})".format(np.average(nrmseErrors), np.std(nrmseErrors)))
     print("R2: {} ({})".format(np.average(r2_squaredValues), np.std(r2_squaredValues)))
 
-def printAllSavedResults(long=True):
+def printAllSavedResults(long=False):
     location = 'hybrid2_exploration_long' if long else 'hybrid2_exploration'
     printSavedResults(location, 'mgs')
     printSavedResults(location, 'lorenz')
@@ -71,10 +79,10 @@ def printAllSavedResults(long=True):
     printSavedResultsAutoRegressive(location, 'water', getDataWater)
 
 if __name__ == "__main__":
-    runExperiment('mgs', getDataMGS, [nrmse, r_squared], True, False)
-    runExperiment('lorenz', getDataLorenz, [nrmse, r_squared], True, False)
-    runExperiment('dde', getDataDDE, [nrmse, r_squared], True, False)
-    # runExperiment('laser', getDataLaser, [nrmse, r_squared], True, False)
-    runExperiment('sunspots', getDataSunspots, [nrmse_sunspots, r_squared], False, False)
-    runExperiment('water', getDataWater, [nrmse, r_squared], False, False)
+    runExperiment('lorenz', getDataLorenz, [nrmse, r_squared], True)
+    runExperiment('mgs', getDataMGS, [nrmse, r_squared], True)
+    runExperiment('dde', getDataDDE, [nrmse, r_squared], True)
+    runExperiment('laser', getDataLaser, [nrmse, r_squared], True)
+    runExperiment('sunspots', getDataSunspots, [nrmse_sunspots, r_squared], False)
+    runExperiment('water', getDataWater, [nrmse, r_squared], False)
 

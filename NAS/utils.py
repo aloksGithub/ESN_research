@@ -169,15 +169,10 @@ def isValidArchitecture(
     if checkTime:
         try:
             start = time.time()
-            error = (
-                evaluateArchitecture(
-                    architecture, sampleInput, sampleOutput, sampleInput, sampleOutput
-                )
-                if not isAutoRegressive
-                else evaluateArchitectureAutoRegressive(
-                    architecture, sampleInput, sampleOutput, sampleInput, sampleOutput
-                )
+            _, errors, _ = evaluateArchitecture(
+                architecture, sampleInput, sampleOutput, sampleInput, sampleOutput, isAutoRegressive=isAutoRegressive
             )
+            error = errors[0]
             timeTaken1 = time.time() - start
             if timeTaken1 * 1.1 > timeLimit:
                 return False
@@ -374,7 +369,6 @@ def generateRandomArchitectureOld(
             edges.append([i, final_node_index])
 
     architecture = {"nodes": nodes, "edges": edges}
-
     if isValidArchitecture(
         architecture, sampleInput, sampleOutput, memoryLimit, timeLimit
     ):
@@ -384,44 +378,60 @@ def generateRandomArchitectureOld(
             inputDim, outputDim, sampleInput, sampleOutput, memoryLimit, timeLimit
         )
 
-
 def evaluateArchitecture(
-    individual, trainX, trainY, valX, valY, errorMetrics=[nrmse], defaultErrors=[np.inf]
+    individual,
+    trainX,
+    trainY,
+    valX,
+    valY,
+    numEvals=1,
+    errorMetrics=[nrmse],
+    defaultErrors=[10000],
+    isAutoRegressive=False,
 ):
-    """
-    Instantiate random models using given architecture, then train and evaluate them
-    on one step ahead prediction using errorMetrics on valX and valY.
-    """
+    """Standalone function executed in a worker process.
 
-    model = constructModel(individual)
-    model = trainModel(model, trainX, trainY)
-    preds = runModel(model, valX)
-    modelErrors = [metric(valY, preds) for metric in errorMetrics]
-
-    return modelErrors[0]
-
-
-def evaluateArchitectureAutoRegressive(
-    individual, trainX, trainY, valX, valY, errorMetrics=[nrmse], defaultErrors=[np.inf]
-):
-    """
-    Instantiate random models using given architecture, then train and evaluate them
-    on one step ahead prediction using errorMetrics on valX and valY.
+    Returns ``(individual, bestErrors, bestModel_or_None)``.  The model
+    object is returned *only if it can be pickled*; otherwise ``None`` is
+    sent back.
     """
 
-    model = constructModel(individual)
-    model = trainModel(model, trainX, trainY)
-    prevOutput = valX[0]
-    preds = []
-    for _ in range(len(valX)):
-        pred = runModel(model, prevOutput)
-        prevOutput = pred
-        preds.append(pred[0])
-    preds = np.array(preds)
-    modelErrors = [metric(valY, preds) for metric in errorMetrics]
+    errors = []
+    models = []
 
-    return modelErrors[0]
+    try:
+        for _ in range(numEvals):
+            try:
+                model = constructModel(individual)
+                model = trainModel(model, trainX, trainY)
 
+                if isAutoRegressive:
+                    prevOutput = valX[0]
+                    preds = []
+                    for _ in range(len(valX)):
+                        pred = runModel(model, prevOutput)
+                        prevOutput = pred
+                        preds.append(pred[0])
+                    preds = np.array(preds)
+                else:
+                    preds = runModel(model, valX)
+
+                modelErrors = [metric(valY, preds) for metric in errorMetrics]
+                errors.append(modelErrors)
+                models.append(model)
+            except Exception:
+                errors.append(defaultErrors)
+                models.append(None)
+
+        # Select best attempt w.r.t. the first error metric
+        error0 = [e[0] for e in errors]
+        best_idx = error0.index(min(error0)) if defaultErrors[0] != 0 else error0.index(max(error0))
+
+        return individual, errors[best_idx], models[best_idx]
+
+    except Exception:
+        # Any unexpected failure -> signal default error
+        return individual, defaultErrors, None
 
 def constructModel(architecture):
     nodes = [
