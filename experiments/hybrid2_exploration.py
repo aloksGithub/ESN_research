@@ -20,7 +20,7 @@ def runExperiment(dataset, dataLoader, errorMetrics, isAutoregressive):
     trainX, trainY, valX, valY, testX, testY = dataLoader()
     experimentData = ExperimentData(trainX, trainY, valX, valY, testX, testY)
     evalParams = EvalParams(
-        numEvals=1,
+        numEvals=3,
         errorMetrics=errorMetrics,
         defaultErrors=[100000, 0],
         timeout=60,
@@ -29,8 +29,8 @@ def runExperiment(dataset, dataLoader, errorMetrics, isAutoregressive):
         isAutoRegressive=isAutoregressive,
     )
     gaParams = GAParams(
-        generations=2,
-        populationSize=2,
+        generations=20,
+        populationSize=40,
         crossoverProbability=0.7,
         mutationProbability=0.2,
         eliteSize=1,
@@ -44,10 +44,10 @@ def runExperiment(dataset, dataLoader, errorMetrics, isAutoregressive):
             experimentData,
             evalParams,
             gaParams,
-            n_jobs=2,
+            n_jobs=20,
             saveLocation='hybrid2_exploration/{}/backup_{}.obj'.format(dataset, i),
-            bo_init=1,
-            bo_iter=1
+            bo_init=3,
+            bo_iter=2
         )
         ga.run()
         if isAutoregressive:
