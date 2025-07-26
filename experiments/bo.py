@@ -71,10 +71,10 @@ def printSavedNonAutoRegressiveResults(dataset, dataLoader):
 def printAllResults():
     printSavedAutoregressiveResults("mgs")
     printSavedAutoregressiveResults("laser")
-    printSavedAutoregressiveResults("dde")
-    printSavedAutoregressiveResults("lorenz")
-    printSavedNonAutoRegressiveResults("Water", getDataWater)
-    printSavedNonAutoRegressiveResults("Sunspots", getDataSunspots)
+    # printSavedAutoregressiveResults("dde")
+    # printSavedAutoregressiveResults("lorenz")
+    # printSavedNonAutoRegressiveResults("Water", getDataWater)
+    # printSavedNonAutoRegressiveResults("Sunspots", getDataSunspots)
 
 def runBOExperiment(dataset, dataLoader, errorMetrics, isAutoregressive):
     trainX, trainY, valX, valY, _, _ = dataLoader()
@@ -102,10 +102,10 @@ def runBOExperiment(dataset, dataLoader, errorMetrics, isAutoregressive):
 
 
 if __name__ == "__main__":
-    # printAllResults()
-    runBOExperiment("laser", getDataLaser, [nrmse, r_squared], True)
-    # runBOExperiment("dde", getDataDDE, [nrmse, r_squared], True)
-    # runBOExperiment("lorenz", getDataLorenz, [nrmse, r_squared], True)
-    runBOExperiment("mgs", getDataMGS, [nrmse, r_squared], True)
-    runBOExperiment("sunspots", getDataSunspots, [nrmse_sunspots, r_squared], False)
-    runBOExperiment("water", getDataWater, [nrmse, r_squared], False)
+    printAllResults()
+    # runBOExperiment("laser", getDataLaser, [nrmse, r_squared], True)
+    # # runBOExperiment("dde", getDataDDE, [nrmse, r_squared], True)
+    # # runBOExperiment("lorenz", getDataLorenz, [nrmse, r_squared], True)
+    # runBOExperiment("mgs", getDataMGS, [nrmse, r_squared], True)
+    # runBOExperiment("sunspots", getDataSunspots, [nrmse_sunspots, r_squared], False)
+    # runBOExperiment("water", getDataWater, [nrmse, r_squared], False)

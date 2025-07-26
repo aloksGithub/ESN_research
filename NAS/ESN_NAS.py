@@ -8,7 +8,7 @@ from NAS.utils import (
     constructModel,
     runModel,
     trainModel,
-    isValidArchitecture
+    isValidArchitecture,
 )
 from reservoirpy.observables import nrmse
 import numpy as np
@@ -18,11 +18,14 @@ import warnings
 import pickle
 from NAS.memory_estimator import measure_memory_usage
 import copy
+
 warnings.filterwarnings("ignore")
 import time
 from NAS.parallel_processing import executeParallelBatch
 import os
+
 rpy.verbosity(0)
+
 
 class ESN_NAS:
     """Genetic algorithm to obtain an optimized ESN architecture for a dataset"""
@@ -36,21 +39,21 @@ class ESN_NAS:
         generations,
         populationSize,
         outputDim,
-        crossoverProbability = 0.7,
-        mutationProbability = 0.2,
-        eliteSize = 1,
-        numEvals = 1,
-        errorMetrics = [nrmse],
-        defaultErrors = [np.inf],
+        crossoverProbability=0.7,
+        mutationProbability=0.2,
+        eliteSize=1,
+        numEvals=1,
+        errorMetrics=[nrmse],
+        defaultErrors=[np.inf],
         seedModels=[],
         n_jobs=1,
-        memoryLimit=4*1024,
+        memoryLimit=4 * 1024,
         minimizeFitness=True,
         saveModels=False,
-        timeout = 180,
-        stagnationReset = 5,
-        saveLocation = None,
-        isAutoRegressive = False
+        timeout=180,
+        stagnationReset=5,
+        saveLocation=None,
+        isAutoRegressive=False,
     ):
         if minimizeFitness:
             creator.create("Fitness", base.Fitness, weights=(-1.0,))
@@ -91,7 +94,7 @@ class ESN_NAS:
         self.prevFitness = self.defaultFitness
 
         self.toolbox = base.Toolbox()
-        
+
         self.toolbox.register("mate", self.crossover_one_point)
         self.toolbox.register("mutate", self.mutate)
         self.toolbox.register("selectTournament", tools.selTournament)
@@ -109,9 +112,19 @@ class ESN_NAS:
         # Make sure that save folder exists
         directory = os.path.dirname(self.saveLocation)
         os.makedirs(directory, exist_ok=True)
-        
+
     def checkModelValidity(self, architecture):
-        return isValidArchitecture(architecture, self.trainX, self.trainY, self.memoryLimit, self.timeout / self.numEvals, self.isAutoregressive ), architecture
+        return (
+            isValidArchitecture(
+                architecture,
+                self.trainX,
+                self.trainY,
+                self.memoryLimit,
+                self.timeout / self.numEvals,
+                self.isAutoregressive,
+            ),
+            architecture,
+        )
 
     # def generateOffspringOld(self, population):
     #     finalPopulation = []
@@ -122,12 +135,12 @@ class ESN_NAS:
     #             offspring[i], offspring[j] = self.toolbox.mate(child1, child2)
     #             del offspring[i].fitness.values
     #             del offspring[j].fitness.values
-        
+
     #     for i, mutant in enumerate(offspring):
     #         if random.random() < self.mutationProbability:
     #             offspring[i] = self.toolbox.mutate(mutant)
     #             del offspring[i].fitness.values
-        
+
     #     with ProcessPool(max_workers=self.n_jobs) as pool:
     #         future = pool.map(self.checkModelValidity, offspring, timeout=self.timeout)
     #         iterator = future.result()
@@ -156,8 +169,12 @@ class ESN_NAS:
 
         while len(offspring) < self.populationSize:
             while len(candidates) < self.n_jobs:
-                parent1 = self.toolbox.selectTournament(population, 1, len(population)//4)[0]
-                parent2 = self.toolbox.selectTournament(population, 1, len(population)//4)[0]
+                parent1 = self.toolbox.selectTournament(
+                    population, 1, len(population) // 4
+                )[0]
+                parent2 = self.toolbox.selectTournament(
+                    population, 1, len(population) // 4
+                )[0]
 
                 child1, child2 = self.crossover_one_point(parent1, parent2)
                 child1 = self.mutate(child1)
@@ -165,24 +182,38 @@ class ESN_NAS:
 
                 candidates.append(child1)
                 candidates.append(child2)
-            
-            validities = executeParallelBatch(self.checkModelValidity, [(c,) for c in candidates], self.n_jobs, self.timeout / self.numEvals)
+
+            validities = executeParallelBatch(
+                self.checkModelValidity,
+                [(c,) for c in candidates],
+                self.n_jobs,
+                self.timeout / self.numEvals,
+            )
             for validity in validities:
                 if validity is not None and validity[0]:
                     offspring.append(validity[1])
             candidates = []
-        return offspring[:self.populationSize]
-    
+        return offspring[: self.populationSize]
+
     # Crossover function
     def crossover_one_point(self, ind1, ind2):
         ind1Copy = copy.deepcopy(ind1)
         ind2Copy = copy.deepcopy(ind2)
-        if random.random() >= self.crossoverProbability: return (ind1Copy, ind2Copy)
-        maxNodeIndex = max(len(ind1Copy['nodes']), len(ind2Copy['nodes'])) - 1
-        point1 = random.randint(1, maxNodeIndex-1)
+        if random.random() >= self.crossoverProbability:
+            return (ind1Copy, ind2Copy)
+        maxNodeIndex = max(len(ind1Copy["nodes"]), len(ind2Copy["nodes"])) - 1
+        point1 = random.randint(1, maxNodeIndex - 1)
         point2 = random.randint(point1, maxNodeIndex)
-        child1_nodes = ind1Copy['nodes'][:point1] + ind2Copy['nodes'][point1:point2] + ind1Copy['nodes'][point2:]
-        child2_nodes = ind2Copy['nodes'][:point1] + ind1Copy['nodes'][point1:point2] + ind2Copy['nodes'][point2:]
+        child1_nodes = (
+            ind1Copy["nodes"][:point1]
+            + ind2Copy["nodes"][point1:point2]
+            + ind1Copy["nodes"][point2:]
+        )
+        child2_nodes = (
+            ind2Copy["nodes"][:point1]
+            + ind1Copy["nodes"][point1:point2]
+            + ind2Copy["nodes"][point2:]
+        )
         ind1Copy["nodes"] = child1_nodes
         ind2Copy["nodes"] = child2_nodes
         return (ind1Copy, ind2Copy)
@@ -195,26 +226,39 @@ class ESN_NAS:
         2. Change a parameter of a node (again excluding Input and Ridge nodes).
         """
         indCopy = copy.deepcopy(ind)
-        if random.random() >= self.mutationProbability: return indCopy
+        if random.random() >= self.mutationProbability:
+            return indCopy
         mutation_type = random.choice(["swap_node", "change_param"])
-        
+
         if mutation_type == "swap_node":
-            idx = random.randint(1, len(indCopy['nodes'])-2)  # Excluding Input and Ridge
+            idx = random.randint(
+                1, len(indCopy["nodes"]) - 2
+            )  # Excluding Input and Ridge
             node_type = random.choice(list(nodeConstructors.keys() - {"Input"}))
-            indCopy['nodes'][idx] = {"type": node_type, "params": generateRandomNodeParams(node_type, self.outputDim)}
-        
+            indCopy["nodes"][idx] = {
+                "type": node_type,
+                "params": generateRandomNodeParams(node_type, self.outputDim),
+            }
+
         elif mutation_type == "change_param":
-            idx = random.randint(1, len(indCopy['nodes'])-2)  # Excluding Input and Ridge
-            node_type = indCopy['nodes'][idx]['type']
+            idx = random.randint(
+                1, len(indCopy["nodes"]) - 2
+            )  # Excluding Input and Ridge
+            node_type = indCopy["nodes"][idx]["type"]
             param_name = random.choice(list(nodeParameterRanges[node_type].keys()))
             param_range = nodeParameterRanges[node_type][param_name]
-            
+
             if param_range["intOnly"]:
-                indCopy['nodes'][idx]['params'][param_name] = random.randint(param_range["lower"], param_range["upper"])
+                indCopy["nodes"][idx]["params"][param_name] = random.randint(
+                    param_range["lower"], param_range["upper"]
+                )
             else:
-                indCopy['nodes'][idx]['params'][param_name] = random.random() * (param_range["upper"] - param_range["lower"]) + param_range["lower"]
+                indCopy["nodes"][idx]["params"][param_name] = (
+                    random.random() * (param_range["upper"] - param_range["lower"])
+                    + param_range["lower"]
+                )
         return indCopy
-    
+
     def evaluateArchitecture(self, individual):
         """
         Instantiate random models using given architecture, then train and evaluate them
@@ -236,11 +280,15 @@ class ESN_NAS:
                 # print(e)
                 errors.append(self.defaultErrors)
                 models.append(None)
-                
+
             # Find index for model with best error metrics
             error0 = [modelErrors[0] for modelErrors in errors]
-            bestErrorIndex = error0.index(max(error0)) if self.defaultErrors[0]==0 else error0.index(min(error0))
-            
+            bestErrorIndex = (
+                error0.index(max(error0))
+                if self.defaultErrors[0] == 0
+                else error0.index(min(error0))
+            )
+
         return individual, errors[bestErrorIndex], models[bestErrorIndex]
 
     def evaluateArchitectureAutoRegressive(self, individual):
@@ -273,108 +321,144 @@ class ESN_NAS:
 
             # Find index for model with best error metrics
             error0 = [modelErrors[0] for modelErrors in errors]
-            bestErrorIndex = error0.index(max(error0)) if self.defaultErrors[0]==0 else error0.index(min(error0))
-            
+            bestErrorIndex = (
+                error0.index(max(error0))
+                if self.defaultErrors[0] == 0
+                else error0.index(min(error0))
+            )
+
         return individual, errors[bestErrorIndex], models[bestErrorIndex]
 
     def evaluateParallel(self, population):
         print("Evaluating population")
         results = executeParallelBatch(
-            self.evaluateArchitectureAutoRegressive if self.isAutoregressive else self.evaluateArchitecture,
-            [(individual,) for individual in population], self.n_jobs, self.timeout
+            (
+                self.evaluateArchitectureAutoRegressive
+                if self.isAutoregressive
+                else self.evaluateArchitecture
+            ),
+            [(individual,) for individual in population],
+            self.n_jobs,
+            self.timeout,
         )
         for i in range(len(results)):
             if results[i] is None:
                 results[i] = (population[i], self.defaultErrors, None)
-        
+
         for result in results:
             ind, errors, model = result
             self.fitnesses.append(errors)
             self.architectures.append(ind)
-            if errors[0]<=min([elem[0] for elem in self.fitnesses]) or len(self.fitnesses)==0:
+            if (
+                errors[0] <= min([elem[0] for elem in self.fitnesses])
+                or len(self.fitnesses) == 0
+            ):
                 self.bestModel = model
             if self.saveModels:
                 self.models.append(model)
             ind.fitness.values = (errors[0],)
         return [performanceData[1][0] for performanceData in results]
-    
+
     def generatePopulation(self, numIndividuals):
         print("Generating population")
         generatedArchitectures = []
 
-        while len(generatedArchitectures)<numIndividuals:
+        while len(generatedArchitectures) < numIndividuals:
             results = executeParallelBatch(
                 generateRandomArchitectureOld,
-                [(
-                    self.trainX.shape[-1],
-                    self.trainY.shape[-1],
-                    self.trainX,
-                    self.trainY,
-                    self.memoryLimit,
-                    self.timeout / self.numEvals
-                ) for _ in range(numIndividuals - len(generatedArchitectures))],
+                [
+                    (
+                        self.trainX.shape[-1],
+                        self.trainY.shape[-1],
+                        self.trainX,
+                        self.trainY,
+                        self.memoryLimit,
+                        self.timeout / self.numEvals,
+                    )
+                    for _ in range(numIndividuals - len(generatedArchitectures))
+                ],
                 self.n_jobs,
-                self.timeout
+                self.timeout,
             )
             for result in results:
                 if result is not None:
                     generatedArchitectures.append(result)
 
-        population = [creator.Individual(individual) for individual in generatedArchitectures[:self.populationSize]]
+        population = [
+            creator.Individual(individual)
+            for individual in generatedArchitectures[: self.populationSize]
+        ]
         return population
-    
+
     def generationRun(self, gen):
         startTime = time.time()
         print("=======================Generation {}=======================".format(gen))
-        self.generationsSinceImprovement+=1
-        offspring = self.generateOffspring(list(map(self.toolbox.clone, self.population)))
+        self.generationsSinceImprovement += 1
+        offspring = self.generateOffspring(
+            list(map(self.toolbox.clone, self.population))
+        )
 
         # Evaluate offspring
         offSpringFitnesses = self.evaluateParallel(offspring)
-        if self.minimizeFitness and min(offSpringFitnesses)<self.prevFitness or not self.minimizeFitness and max(offSpringFitnesses)>self.prevFitness:
+        if (
+            self.minimizeFitness
+            and min(offSpringFitnesses) < self.prevFitness
+            or not self.minimizeFitness
+            and max(offSpringFitnesses) > self.prevFitness
+        ):
             self.prevFitness = min(offSpringFitnesses)
             self.generationsSinceImprovement = 0
 
-        if self.generationsSinceImprovement>=self.stagnationReset:
+        if self.generationsSinceImprovement >= self.stagnationReset:
             print("Resetting population due to stagnation")
 
             self.prevFitness = self.defaultFitness
-            newRandomPopulation = self.generatePopulation(self.populationSize-1)
+            newRandomPopulation = self.generatePopulation(self.populationSize - 1)
             self.evaluateParallel(newRandomPopulation)
-            self.population[:] = self.toolbox.selectBest(self.population, 1) + newRandomPopulation
+            self.population[:] = (
+                self.toolbox.selectBest(self.population, 1) + newRandomPopulation
+            )
             self.modelGenerationIndices.append(gen)
         else:
             self.population[:] = offspring
-        
+
         objective = [errors[0] for errors in self.fitnesses]
-        bestIndex = objective.index(min(objective)) if self.minimizeFitness else objective.index(max(objective))
+        bestIndex = (
+            objective.index(min(objective))
+            if self.minimizeFitness
+            else objective.index(max(objective))
+        )
         self.bestFitness = self.fitnesses[bestIndex]
         numFailures = 0
-        for index, fitness in enumerate(self.fitnesses[-self.populationSize:]):
-            if fitness[0]==self.defaultFitness:
+        for index, fitness in enumerate(self.fitnesses[-self.populationSize :]):
+            if fitness[0] == self.defaultFitness:
                 # print(self.architectures[-self.populationSize:][index])
-                numFailures+=1
+                numFailures += 1
         print("Best so far:", self.bestFitness)
-        print("Failure rate: {}%".format(100*numFailures/self.populationSize))
+        print("Failure rate: {}%".format(100 * numFailures / self.populationSize))
         print("Time taken:", time.time() - startTime)
 
-        file = open(self.saveLocation, 'wb')
+        file = open(self.saveLocation, "wb")
         pickle.dump(self, file)
 
     def run(self):
-        random_population = self.generatePopulation(self.populationSize - len(self.seedModels))
-        seed_population = [creator.Individual(individual) for individual in self.seedModels]
+        random_population = self.generatePopulation(
+            self.populationSize - len(self.seedModels)
+        )
+        seed_population = [
+            creator.Individual(individual) for individual in self.seedModels
+        ]
         self.population = seed_population + random_population
 
         self.evaluateParallel(self.population)
         self.modelGenerationIndices.append(0)
-        
+
         for gen in range(self.generation, self.generations + 1):
             self.generationRun(gen)
-        
-        file = open(self.saveLocation, 'rb')
+
+        file = open(self.saveLocation, "rb")
         return pickle.load(file)
-    
+
     def diagnosis(self):
         """
         Occassionally, an individual will be spawned that might consume excessive memory and result in a crash
@@ -393,17 +477,18 @@ class ESN_NAS:
             model = trainModel(model, self.trainX, self.trainY)
             runModel(model, self.valX)
 
-        for individual in self.population[len(self.diagnosisResults):]:
+        for individual in self.population[len(self.diagnosisResults) :]:
             self.diagnosisResults.append(True)
             startTime = time.time()
             memoryUsage = measure_memory_usage(memoryCheckFunc)
             timeTaken = time.time() - startTime
-            if timeTaken<self.timeout and memoryUsage<self.memoryLimit:
+            if timeTaken < self.timeout and memoryUsage < self.memoryLimit:
                 self.diagnosisResults[-1] = False
-        
+
         numNewModels = 0
         for diagnosis in self.diagnosisResults:
-            if diagnosis: numNewModels+=1
+            if diagnosis:
+                numNewModels += 1
         newModels = self.generatePopulation(numNewModels)
 
         for diagnosis, i in enumerate(self.diagnosisResults):
