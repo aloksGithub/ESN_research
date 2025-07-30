@@ -196,6 +196,7 @@ class ESN_NAS2(GA_Base):
             self.architectures += individuals
             self.fitnesses += individualErrors
             bestBoError = min([elem[0] for elem in individualErrors])
+            print(bestBoError)
             bestOverallError = min([elem[0] for elem in self.fitnesses])
             if bestBoError <= bestOverallError or len(self.fitnesses) == 0:
                 self.bestModel = bestModel
