@@ -114,7 +114,7 @@ class GA_Base:
                 self.experimentData.trainX,
                 self.experimentData.trainY,
                 self.evalParams.memoryLimit,
-                self.evalParams.timeout / self.evalParams.numEvals,
+                self.evalParams.timeout,
                 self.evalParams.isAutoRegressive,
                 checkTime,
             ),
@@ -152,7 +152,7 @@ class GA_Base:
                         self.experimentData.trainX,
                         self.experimentData.trainY,
                         self.evalParams.memoryLimit,
-                        self.evalParams.timeout / self.evalParams.numEvals,
+                        self.evalParams.timeout,
                     )
                     for _ in range(numIndividuals - len(generatedArchitectures))
                 ],
@@ -301,49 +301,13 @@ class ESN_NAS(GA_Base):
     ):
         super().__init__(experimentData, evalParams, gaParams, seedModels, n_jobs, saveModels, saveLocation)
 
-    # def generateOffspringOld(self, population):
-    #     finalPopulation = []
-
-    #     offspring = list(map(self.toolbox.clone, population))
-    #     for child1, child2, i, j in zip(offspring[::2], offspring[1::2], range(0, len(offspring), 2), range(1, len(offspring), 2)):
-    #         if random.random() < self.crossoverProbability:
-    #             offspring[i], offspring[j] = self.toolbox.mate(child1, child2)
-    #             del offspring[i].fitness.values
-    #             del offspring[j].fitness.values
-
-    #     for i, mutant in enumerate(offspring):
-    #         if random.random() < self.mutationProbability:
-    #             offspring[i] = self.toolbox.mutate(mutant)
-    #             del offspring[i].fitness.values
-
-    #     with ProcessPool(max_workers=self.n_jobs) as pool:
-    #         future = pool.map(self.checkModelValidity, offspring, timeout=self.timeout)
-    #         iterator = future.result()
-
-    #         while True:
-    #             try:
-    #                 result = next(iterator)
-    #                 if result[0]:
-    #                     finalPopulation.append(result[1])
-    #             except StopIteration:
-    #                 break
-    #             except TimeoutError as error:
-    #                 print("function took longer than %d seconds" % error.args[1])
-    #             except ProcessExpired as error:
-    #                 print("%s. Exit code: %d" % (error, error.exitcode))
-    #             except Exception as error:
-    #                 print("function raised %s" % error)
-    #                 print(error.traceback)
-
-    #     return self.toolbox.selectBest(population, len(population) - len(finalPopulation)) + finalPopulation
-
     def evaluateParallel(self, population):
         print("Evaluating population")
         results = executeParallelBatch(
             (self.evaluateArchitecture),
             [(individual,) for individual in population],
             self.n_jobs,
-            self.evalParams.timeout,
+            self.evalParams.timeout * self.evalParams.numEvals,
         )
         for i in range(len(results)):
             if results[i] is None:
@@ -409,12 +373,14 @@ class ESN_NAS(GA_Base):
                 numFailures += 1
         print("Best so far:", self.bestFitness)
         print("Failure rate: {}%".format(100 * numFailures / self.gaParams.populationSize))
+        self.generationTimes.append(time.time() - startTime)
         print("Time taken:", time.time() - startTime)
 
         file = open(self.saveLocation, "wb")
         pickle.dump(self, file)
 
     def run(self):
+        startTime = time.time()
         random_population = self.generatePopulation(
             self.gaParams.populationSize - len(self.seedModels)
         )
@@ -425,6 +391,8 @@ class ESN_NAS(GA_Base):
 
         self.evaluateParallel(self.population)
         self.modelGenerationIndices.append(0)
+        endTime = time.time()
+        self.generationTimes.append(endTime - startTime)
 
         for gen in range(self.generation, self.gaParams.generations + 1):
             self.generationRun(gen)

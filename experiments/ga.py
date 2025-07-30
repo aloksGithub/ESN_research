@@ -29,8 +29,8 @@ def runExperiment(dataset, dataLoader, errorMetrics, isAutoregressive):
         isAutoRegressive=isAutoregressive,
     )
     gaParams = GAParams(
-        generations=20,
-        populationSize=40,
+        generations=40,
+        populationSize=8,
         crossoverProbability=0.7,
         mutationProbability=0.2,
         eliteSize=1,
@@ -44,10 +44,8 @@ def runExperiment(dataset, dataLoader, errorMetrics, isAutoregressive):
             experimentData,
             evalParams,
             gaParams,
-            n_jobs=10,
-            saveLocation='hybrid2_exploration/{}/backup_{}.obj'.format(dataset, i),
-            bo_init=3,
-            bo_iter=2
+            n_jobs=4,
+            saveLocation='ga_results/{}/backup_{}.obj'.format(dataset, i),
         )
         ga.run()
         if isAutoregressive:
@@ -70,12 +68,12 @@ def runExperiment(dataset, dataLoader, errorMetrics, isAutoregressive):
     print("R2: {} ({})".format(np.average(r2_squaredValues), np.std(r2_squaredValues)))
 
 def printAllSavedResults():
-    printSavedResults('hybrid2_exploration', 'mgs')
-    printSavedResults('hybrid2_exploration', 'lorenz')
-    printSavedResults('hybrid2_exploration', 'dde')
-    printSavedResults('hybrid2_exploration', 'laser')
-    printSavedResultsAutoRegressive('hybrid2_exploration', 'sunspots', getDataSunspots)
-    printSavedResultsAutoRegressive('hybrid2_exploration', 'water', getDataWater)
+    printSavedResults('ga_results', 'mgs')
+    printSavedResults('ga_results', 'lorenz')
+    printSavedResults('ga_results', 'dde')
+    printSavedResults('ga_results', 'laser')
+    printSavedResultsAutoRegressive('ga_results', 'sunspots', getDataSunspots)
+    printSavedResultsAutoRegressive('ga_results', 'water', getDataWater)
 
 if __name__ == "__main__":
     runExperiment('lorenz', getDataLorenz, [nrmse, r_squared], True)

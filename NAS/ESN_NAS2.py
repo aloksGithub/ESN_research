@@ -3,6 +3,7 @@ import reservoirpy as rpy
 from NAS.ESN_NAS import EvalParams, ExperimentData, GA_Base, GAParams
 from NAS.utils import (
     evaluateArchitecture,
+    isValidArchitecture,
     nodeParameterRanges,
 )
 from deap import creator
@@ -69,6 +70,20 @@ class ESN_NAS2(GA_Base):
         self.bo_iter = bo_iter
         self.individualsPerGeneration = self.gaParams.populationSize * (
             self.bo_init + self.bo_iter
+        )
+    
+    def checkModelValidity(self, architecture, checkTime=False):
+        return (
+            isValidArchitecture(
+                architecture,
+                self.experimentData.trainX,
+                self.experimentData.trainY,
+                self.evalParams.memoryLimit,
+                self.evalParams.timeout / self.evalParams.numEvals,
+                self.evalParams.isAutoRegressive,
+                checkTime,
+            ),
+            architecture,
         )
 
     def calculateBounds(self, individual):
@@ -302,6 +317,7 @@ class ESN_NAS2(GA_Base):
 
             return future.result(timeout=self.evalParams.timeout)
         except cf.TimeoutError:
+            print("Timeout error")
             future.cancel()
             return individual, self.evalParams.defaultErrors, None
         finally:
