@@ -175,10 +175,12 @@ class ESN_NAS2(GA_Base):
                 idx = futures[future]
                 try:
                     results[idx] = future.result()
-                except Exception:
+                except Exception as e:
+                    print(e)
                     results[idx] = None
 
         for i in range(len(results)):
+            print(i, results[i])
             if results[i] is None:
                 results[i] = (
                     [population[i]] * (self.bo_iter + self.bo_init),
@@ -186,7 +188,7 @@ class ESN_NAS2(GA_Base):
                     None,
                 )
         new_individuals = []
-        for result in results:
+        for i, result in enumerate(results):
             individuals, individualErrors, bestModel = result
             for i, individual in enumerate(individuals):
                 ga_individual = creator.Individual(individual)
@@ -196,7 +198,7 @@ class ESN_NAS2(GA_Base):
             self.architectures += individuals
             self.fitnesses += individualErrors
             bestBoError = min([elem[0] for elem in individualErrors])
-            print(bestBoError)
+            print(i, bestBoError)
             bestOverallError = min([elem[0] for elem in self.fitnesses])
             if bestBoError <= bestOverallError or len(self.fitnesses) == 0:
                 self.bestModel = bestModel
