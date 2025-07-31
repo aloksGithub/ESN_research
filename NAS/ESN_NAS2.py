@@ -37,8 +37,28 @@ _POOL_SIZE = int(os.environ.get("EVAL_POOL_SIZE", os.cpu_count()))
 
 _WORKER_SEM = threading.BoundedSemaphore(_POOL_SIZE)
 
-# Single, global pool that will live for the life of the interpreter.
-EVAL_POOL = cf.ProcessPoolExecutor(max_workers=_POOL_SIZE, mp_context=_MP_CTX)
+# Global pool management - we need to replace the pool when it gets corrupted by timeouts
+_EVAL_POOL = None
+_POOL_LOCK = threading.Lock()
+
+def get_pool():
+    """Get the current evaluation pool, creating one if necessary."""
+    global _EVAL_POOL
+    with _POOL_LOCK:
+        if _EVAL_POOL is None:
+            _EVAL_POOL = cf.ProcessPoolExecutor(max_workers=_POOL_SIZE, mp_context=_MP_CTX)
+        return _EVAL_POOL
+
+def replace_pool():
+    """Replace the current pool with a fresh one (used when the pool gets corrupted)."""
+    global _EVAL_POOL
+    with _POOL_LOCK:
+        if _EVAL_POOL is not None:
+            try:
+                _EVAL_POOL.shutdown(wait=False, cancel_futures=True)
+            except:
+                pass  # Pool might already be broken
+        _EVAL_POOL = cf.ProcessPoolExecutor(max_workers=_POOL_SIZE, mp_context=_MP_CTX)
 
 
 class ESN_NAS2(GA_Base):
@@ -180,7 +200,6 @@ class ESN_NAS2(GA_Base):
                     results[idx] = None
 
         for i in range(len(results)):
-            print(i, results[i])
             if results[i] is None:
                 results[i] = (
                     [population[i]] * (self.bo_iter + self.bo_init),
@@ -305,7 +324,9 @@ class ESN_NAS2(GA_Base):
         _WORKER_SEM.acquire()
 
         try:
-            future = EVAL_POOL.submit(
+            # Try with the current pool first
+            pool = get_pool()
+            future = pool.submit(
                 evaluateArchitecture,
                 individual,
                 self.experimentData.trainX,
@@ -320,8 +341,39 @@ class ESN_NAS2(GA_Base):
 
             return future.result(timeout=self.evalParams.timeout)
         except cf.TimeoutError:
-            print("Timeout error")
-            future.cancel()
+            print("Timeout error - replacing pool")
+            try:
+                future.cancel()
+            except:
+                pass  # Future might not be cancellable
+            replace_pool()  # Replace the corrupted pool
             return individual, self.evalParams.defaultErrors, None
+        except (cf.process.BrokenProcessPool, RuntimeError) as e:
+            if "process pool" in str(e).lower() or "abruptly" in str(e).lower():
+                print(f"Pool corruption detected: {e} - replacing pool and retrying")
+                replace_pool()
+                # Retry once with the fresh pool
+                try:
+                    pool = get_pool()
+                    future = pool.submit(
+                        evaluateArchitecture,
+                        individual,
+                        self.experimentData.trainX,
+                        self.experimentData.trainY,
+                        self.experimentData.valX,
+                        self.experimentData.valY,
+                        self.evalParams.numEvals,
+                        self.evalParams.errorMetrics,
+                        self.evalParams.defaultErrors,
+                        self.evalParams.isAutoRegressive,
+                    )
+                    return future.result(timeout=self.evalParams.timeout)
+                except:
+                    print("Retry failed - returning default errors")
+                    return individual, self.evalParams.defaultErrors, None
+            else:
+                # Some other error - just return default
+                print(f"Unexpected error: {e}")
+                return individual, self.evalParams.defaultErrors, None
         finally:
             _WORKER_SEM.release()

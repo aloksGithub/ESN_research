@@ -44,7 +44,7 @@ def runExperiment(dataset, dataLoader, errorMetrics, isAutoregressive):
             experimentData,
             evalParams,
             gaParams,
-            n_jobs=10,
+            n_jobs=20,
             saveLocation='hybrid2_exploration/{}/backup_{}.obj'.format(dataset, i),
             bo_init=3,
             bo_iter=2
