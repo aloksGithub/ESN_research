@@ -176,7 +176,7 @@ class ESN_NAS2(GA_Base):
                 try:
                     results[idx] = future.result()
                 except Exception as e:
-                    print(e)
+                    print("Error", e)
                     results[idx] = None
 
         for i in range(len(results)):
@@ -190,9 +190,9 @@ class ESN_NAS2(GA_Base):
         new_individuals = []
         for i, result in enumerate(results):
             individuals, individualErrors, bestModel = result
-            for i, individual in enumerate(individuals):
+            for j, individual in enumerate(individuals):
                 ga_individual = creator.Individual(individual)
-                ga_individual.fitness.values = (individualErrors[i][0],)
+                ga_individual.fitness.values = (individualErrors[j][0],)
                 new_individuals.append(ga_individual)
 
             self.architectures += individuals
