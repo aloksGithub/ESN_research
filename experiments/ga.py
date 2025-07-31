@@ -30,7 +30,7 @@ def runExperiment(dataset, dataLoader, errorMetrics, isAutoregressive):
     )
     gaParams = GAParams(
         generations=40,
-        populationSize=8,
+        populationSize=100,
         crossoverProbability=0.7,
         mutationProbability=0.2,
         eliteSize=1,
@@ -44,7 +44,7 @@ def runExperiment(dataset, dataLoader, errorMetrics, isAutoregressive):
             experimentData,
             evalParams,
             gaParams,
-            n_jobs=4,
+            n_jobs=20,
             saveLocation='ga_results/{}/backup_{}.obj'.format(dataset, i),
         )
         ga.run()
