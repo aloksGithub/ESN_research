@@ -7,7 +7,7 @@ import os
 current_dir = os.path.abspath(os.path.dirname(__file__))
 parent_dir = os.path.dirname(current_dir)
 sys.path.insert(0, parent_dir)
-from NAS.ESN_NAS import EvalParams, ExperimentData, GAParams
+from NAS.ESN_NAS import ESN_NAS, EvalParams, ExperimentData, GAParams
 from NAS.utils import runModel
 from NAS.ESN_NAS2 import ESN_NAS2
 from NAS.error_metrics import nrmse, nrmse_sunspots, r_squared
@@ -40,7 +40,7 @@ def runExperiment(dataset, dataLoader, errorMetrics, isAutoregressive):
     r2_squaredValues = []
     print(f'========================Starting GA for dataset {dataset}========================')
     for i in range(5):
-        ga = ESN_NAS2(
+        ga = ESN_NAS(
             experimentData,
             evalParams,
             gaParams,
