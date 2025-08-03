@@ -107,7 +107,7 @@ class GA_Base:
         directory = os.path.dirname(self.saveLocation)
         os.makedirs(directory, exist_ok=True)
     
-    def checkModelValidity(self, architecture, checkTime=True):
+    def checkModelValidity(self, architecture, checkTime=False):
         return (
             isValidArchitecture(
                 architecture,
