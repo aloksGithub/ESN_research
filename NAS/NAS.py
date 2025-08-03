@@ -1,7 +1,8 @@
 import reservoirpy as rpy
-from reservoirpy.nodes import (Reservoir, IPReservoir, NVAR, RLS, Input)
+from reservoirpy.nodes import Reservoir, IPReservoir, NVAR, RLS, Input
 from NAS.Ridge_parallel import Ridge
 from NAS.LMS_serializable import LMS
+
 # from reservoirpy.observables import (rmse, rsquare, nrmse, mse)
 import numpy as np
 from functools import reduce
@@ -18,10 +19,12 @@ from queue import Queue
 import queue
 import warnings
 import pickle
+
 warnings.filterwarnings("ignore")
 
 rpy.verbosity(0)
 output_dim = 3
+
 
 class VotingEnsemble:
     def __init__(self, models, threshold):
@@ -35,19 +38,22 @@ class VotingEnsemble:
             downVotes = 0
             for model in self.models:
                 pred = runModel(model, dataPoint)[0][0]
-                if pred<-self.threshold:
-                    downVotes+=1
-                if pred>self.threshold:
-                    upVotes+=1
-            if upVotes>=2 and downVotes<=1:
-                preds.append(self.threshold*1.1)
-            elif downVotes>=2 and upVotes<=1:
-                preds.append(-self.threshold*1.1)
+                if pred < -self.threshold:
+                    downVotes += 1
+                if pred > self.threshold:
+                    upVotes += 1
+            if upVotes >= 2 and downVotes <= 1:
+                preds.append(self.threshold * 1.1)
+            elif downVotes >= 2 and upVotes <= 1:
+                preds.append(-self.threshold * 1.1)
         return np.expand_dims(np.array(preds), axis=1)
+
 
 class StackedEnsemble:
     def __init__(self, models):
-        self.finalLayer = Reservoir(600, sr=0.8, rc_connectivity=0.01, noise_in=1e-10) >> Ridge(output_dim=output_dim, ridge=1e-5)
+        self.finalLayer = Reservoir(
+            600, sr=0.8, rc_connectivity=0.01, noise_in=1e-10
+        ) >> Ridge(output_dim=output_dim, ridge=1e-5)
         self.models = models
 
     def train(self, trainX, trainY):
@@ -69,6 +75,7 @@ class StackedEnsemble:
         finalPreds = self.finalLayer.run(np.concatenate([preds, x], axis=1))
         return finalPreds
 
+
 class Ensemble:
     def __init__(self, models):
         self.models = models
@@ -81,7 +88,8 @@ class Ensemble:
         preds = []
         for model in self.models:
             preds.append(runModel(model, x))
-        return sum(arr for arr in preds)/len(preds)
+        return sum(arr for arr in preds) / len(preds)
+
 
 nodeConstructors = {
     "Input": Input,
@@ -90,7 +98,7 @@ nodeConstructors = {
     "NVAR": NVAR,
     "Ridge": Ridge,
     "LMS": LMS,
-    "RLS": RLS
+    "RLS": RLS,
 }
 
 nodeParameterRanges = {
@@ -101,7 +109,7 @@ nodeParameterRanges = {
         "sr": {"lower": 0.5, "upper": 2, "intOnly": False},
         "input_connectivity": {"lower": 0.05, "upper": 0.5, "intOnly": False},
         "rc_connectivity": {"lower": 0.05, "upper": 0.5, "intOnly": False},
-        "fb_connectivity": {"lower": 0.05, "upper": 0.5, "intOnly": False}
+        "fb_connectivity": {"lower": 0.05, "upper": 0.5, "intOnly": False},
     },
     "IPReservoir": {
         "units": {"lower": 10, "upper": 3000, "intOnly": True},
@@ -112,79 +120,85 @@ nodeParameterRanges = {
         "learning_rate": {"lower": 0, "upper": 0.01, "intOnly": False},
         "input_connectivity": {"lower": 0.05, "upper": 0.5, "intOnly": False},
         "rc_connectivity": {"lower": 0.05, "upper": 0.5, "intOnly": False},
-        "fb_connectivity": {"lower": 0.05, "upper": 0.5, "intOnly": False}
+        "fb_connectivity": {"lower": 0.05, "upper": 0.5, "intOnly": False},
     },
     "NVAR": {
         "delay": {"lower": 1, "upper": 4, "intOnly": True},
         "order": {"lower": 1, "upper": 2, "intOnly": True},
-        "strides": {"lower": 1, "upper": 2, "intOnly": True}
+        "strides": {"lower": 1, "upper": 2, "intOnly": True},
     },
-    "Ridge": {
-        "ridge": {"lower": 0, "upper": 0.0001, "intOnly": False}
-    },
-    "LMS": {
-        "alpha": {"lower": 0, "upper": 1, "intOnly": False}
-    },
-    "RLS": {
-        "alpha": {"lower": 0, "upper": 1, "intOnly": False}
-    }
+    "Ridge": {"ridge": {"lower": 0, "upper": 0.0001, "intOnly": False}},
+    "LMS": {"alpha": {"lower": 0, "upper": 1, "intOnly": False}},
+    "RLS": {"alpha": {"lower": 0, "upper": 1, "intOnly": False}},
 }
+
 
 def generateRandomNodeParams(nodeType):
     params = {}
-    if nodeType=="Ridge" or nodeType=="LMS" or nodeType=="RLS":
+    if nodeType == "Ridge" or nodeType == "LMS" or nodeType == "RLS":
         params["output_dim"] = output_dim
     parameterRanges = nodeParameterRanges[nodeType]
     for parameterName in parameterRanges:
         parameterRange = parameterRanges[parameterName]
         if parameterRange["intOnly"]:
-            params[parameterName] = random.randint(parameterRange["lower"], parameterRange["upper"])
+            params[parameterName] = random.randint(
+                parameterRange["lower"], parameterRange["upper"]
+            )
         else:
-            params[parameterName] = random.random() * (parameterRange["upper"] - parameterRange["lower"]) + parameterRange["lower"]
+            params[parameterName] = (
+                random.random() * (parameterRange["upper"] - parameterRange["lower"])
+                + parameterRange["lower"]
+            )
     return params
+
 
 def isValidArchitecture(architecture):
     ipExists = False
     forceExists = False
     for i, node in enumerate(architecture["nodes"]):
-        if node["type"]=="IPReservoir":
+        if node["type"] == "IPReservoir":
             ipExists = True
-        if node["type"]=="LMS" or node["type"]=="RLS":
+        if node["type"] == "LMS" or node["type"] == "RLS":
             forceExists = True
-        if node["type"]=="NVAR":
+        if node["type"] == "NVAR":
             for connection in architecture["edges"]:
-                if connection[1]!=i:
+                if connection[1] != i:
                     continue
                 prevNode = architecture["nodes"][connection[0]]
-                if prevNode["type"]=="Reservoir" or prevNode["type"]=="IPReservoir" or prevNode["type"]=="NVAR":
+                if (
+                    prevNode["type"] == "Reservoir"
+                    or prevNode["type"] == "IPReservoir"
+                    or prevNode["type"] == "NVAR"
+                ):
                     return False
     if ipExists and forceExists:
         return False
     return True
 
+
 def generateRandomArchitecture(sampleX, sampleY, validThreshold, numVal=100):
     num_nodes = random.randint(2, 3)
 
-    nodes = [
-        {"type": "Input", "params": {}}
-    ]
+    nodes = [{"type": "Input", "params": {}}]
 
     for i in range(num_nodes):
         available_node_types = list(nodeConstructors.keys())
-        if i==0:
+        if i == 0:
             available_node_types.remove("LMS")
             available_node_types.remove("RLS")
             available_node_types.remove("Ridge")
         available_node_types.remove("Input")
         for node in nodes:
-            if node["type"]=="IPReservoir":
+            if node["type"] == "IPReservoir":
                 if "LMS" in available_node_types:
                     available_node_types.remove("LMS")
                 if "RLS" in available_node_types:
                     available_node_types.remove("RLS")
-            if (node["type"]=="LMS" or node["type"]=="RLS") and "IPReservoir" in available_node_types:
+            if (
+                node["type"] == "LMS" or node["type"] == "RLS"
+            ) and "IPReservoir" in available_node_types:
                 available_node_types.remove("IPReservoir")
-        
+
         node_type = random.choice(available_node_types)
 
         node_params = generateRandomNodeParams(node_type)
@@ -192,16 +206,24 @@ def generateRandomArchitecture(sampleX, sampleY, validThreshold, numVal=100):
 
     edges = []
     connected_nodes = {0}  # start with the first node being "connected"
-    
+
     for i in range(1, len(nodes)):
-        while (True):
-            source = random.choice([node for node in list(connected_nodes) if node != i])
-            if (nodes[source]['type']=="Reservoir" or nodes[source]['type']=="IPReservoir" or nodes[source]['type']=="NVAR") and nodes[i]["type"]=="NVAR":
+        while True:
+            source = random.choice(
+                [node for node in list(connected_nodes) if node != i]
+            )
+            if (
+                nodes[source]["type"] == "Reservoir"
+                or nodes[source]["type"] == "IPReservoir"
+                or nodes[source]["type"] == "NVAR"
+            ) and nodes[i]["type"] == "NVAR":
                 continue
-            if nodes[source]['type']=="IPReservoir" and (nodes[i]["type"]=="RLS" or nodes[i]["type"]=="LLS"):
+            if nodes[source]["type"] == "IPReservoir" and (
+                nodes[i]["type"] == "RLS" or nodes[i]["type"] == "LLS"
+            ):
                 continue
             if [source, i] not in edges and [i, source] not in edges:
-                edges.append([source, i]) 
+                edges.append([source, i])
                 connected_nodes.add(i)
                 break
 
@@ -213,21 +235,18 @@ def generateRandomArchitecture(sampleX, sampleY, validThreshold, numVal=100):
         #         print("B", [i, additional_target], connected_nodes)
         #         connected_nodes.add(additional_target)
 
-
     # Adding the readout node
     ipExists = False
     for node in nodes:
-        if node["type"]=="IPReservoir":
+        if node["type"] == "IPReservoir":
             ipExists = True
     if ipExists:
-        readouts = [
-            {"type": "Ridge", "params": generateRandomNodeParams("Ridge")}
-        ]
+        readouts = [{"type": "Ridge", "params": generateRandomNodeParams("Ridge")}]
     else:
         readouts = [
             {"type": "Ridge", "params": generateRandomNodeParams("Ridge")},
             {"type": "LMS", "params": generateRandomNodeParams("LMS")},
-            {"type": "RLS", "params": generateRandomNodeParams("RLS")}
+            {"type": "RLS", "params": generateRandomNodeParams("RLS")},
         ]
     nodes.append(random.choice(readouts))
 
@@ -235,7 +254,8 @@ def generateRandomArchitecture(sampleX, sampleY, validThreshold, numVal=100):
     for i in range(final_node_index):
         isOutputNode = True
         for edge in edges:
-            if edge[0]==i: isOutputNode = False
+            if edge[0] == i:
+                isOutputNode = False
         if isOutputNode:
             edges.append([i, final_node_index])
 
@@ -246,30 +266,48 @@ def generateRandomArchitecture(sampleX, sampleY, validThreshold, numVal=100):
     try:
         # performance, _ = evaluateArchitecture(architecture, sampleX, sampleY, sampleX, sampleY, 1, 1)
         # model = constructModel(architecture)
-        performance, _, _ = evaluateArchitecture2(architecture, sampleX[:-numVal], sampleY[:-numVal], sampleX[-numVal:], sampleY[-numVal:], 1)
-        if math.isnan(performance) or np.isinf(performance) or performance>validThreshold: raise Exception("Bad Model")
+        performance, _, _ = evaluateArchitecture2(
+            architecture,
+            sampleX[:-numVal],
+            sampleY[:-numVal],
+            sampleX[-numVal:],
+            sampleY[-numVal:],
+            1,
+        )
+        if (
+            math.isnan(performance)
+            or np.isinf(performance)
+            or performance > validThreshold
+        ):
+            raise Exception("Bad Model")
         return architecture
     except Exception as e:
         return generateRandomArchitecture(sampleX, sampleY, validThreshold, numVal)
 
+
 def constructModel(architecture):
-    nodes = [nodeConstructors[nodeData['type']](**nodeData['params']) for nodeData in architecture['nodes']]
+    nodes = [
+        nodeConstructors[nodeData["type"]](**nodeData["params"])
+        for nodeData in architecture["nodes"]
+    ]
 
     # Start with the first connection
-    model = nodes[architecture['edges'][0][0]] >> nodes[architecture['edges'][0][1]]
+    model = nodes[architecture["edges"][0][0]] >> nodes[architecture["edges"][0][1]]
 
     # Continue with the rest of the edges
-    for edge in architecture['edges'][1:]:
+    for edge in architecture["edges"][1:]:
         model = model & (nodes[edge[0]] >> nodes[edge[1]])
 
     return model
 
+
 class TimeoutException(Exception):
-    def __init__(self, msg=''):
+    def __init__(self, msg=""):
         self.msg = msg
 
+
 @contextmanager
-def time_limit(seconds, msg=''):
+def time_limit(seconds, msg=""):
     timer = threading.Timer(seconds, lambda: _thread.interrupt_main())
     timer.start()
     try:
@@ -280,16 +318,21 @@ def time_limit(seconds, msg=''):
         # if the action ends in specified time, timer is canceled
         timer.cancel()
 
+
 def trainUnderTime(queue, model, trainX, trainY):
     try:
         model = trainModel(model, trainX, trainY)
         queue.put(model)
     except:
         queue.put(None)
-    
-    
+
+
 def trainModel(model, trainX, trainY):
-    if isinstance(model, Ensemble) or isinstance(model, StackedEnsemble)  or isinstance(model, VotingEnsemble):
+    if (
+        isinstance(model, Ensemble)
+        or isinstance(model, StackedEnsemble)
+        or isinstance(model, VotingEnsemble)
+    ):
         model.train(trainX, trainY)
         return model
     nodes = [node.name for node in model.nodes]
@@ -308,15 +351,20 @@ def trainModel(model, trainX, trainY):
     outputNode = output_nodes[0]
     isOutputNodeOffline = "Ridge" in outputNode
     if hasOfflineNode:
-        model.fit(trainX, trainY, warmup=min(int(len(trainX)/10), 82))
+        model.fit(trainX, trainY, warmup=min(int(len(trainX) / 10), 82))
     if hasOnlineNode:
         model.train(trainX, trainY)
     if isOutputNodeOffline:
-        model.fit(trainX, trainY, warmup=min(int(len(trainX)/10), 82))
+        model.fit(trainX, trainY, warmup=min(int(len(trainX) / 10), 82))
     return model
 
+
 def runModel(model, x):
-    if isinstance(model, Ensemble) or isinstance(model, StackedEnsemble)  or isinstance(model, VotingEnsemble):
+    if (
+        isinstance(model, Ensemble)
+        or isinstance(model, StackedEnsemble)
+        or isinstance(model, VotingEnsemble)
+    ):
         return model.run(x)
     nodes = [node.name for node in model.nodes]
     notLastNodes = []
@@ -329,22 +377,25 @@ def runModel(model, x):
         return nodePreds
     else:
         return nodePreds[output_nodes[-1]]
-    
+
+
 def nrmse(y_true, y_pred):
     y_true = np.array(y_true)
     y_pred = np.array(y_pred)
-    
-    rmse = np.sqrt(np.mean((y_true - y_pred)**2))
+
+    rmse = np.sqrt(np.mean((y_true - y_pred) ** 2))
     mean_norm = np.linalg.norm(np.mean(y_true))
-    
+
     return rmse / mean_norm
-    
+
+
 def r_squared(y_true, y_pred):
     y_true = np.array(y_true)
     y_pred = np.array(y_pred)
-    numerator = np.sum((y_true - y_pred)**2)
-    denominator = np.sum((y_true - np.mean(y_true))**2)
+    numerator = np.sum((y_true - y_pred) ** 2)
+    denominator = np.sum((y_true - np.mean(y_true)) ** 2)
     return 1 - (numerator / denominator)
+
 
 def evaluateModelAutoRegressive2(model, trainX, trainY, valX, valY):
     try:
@@ -360,7 +411,8 @@ def evaluateModelAutoRegressive2(model, trainX, trainY, valX, valY):
     except Exception as e:
         # print(e)
         return np.inf, 0
-    
+
+
 def evaluateModelAutoRegressive(model, trainX, trainY, valX, valY):
     try:
         model = trainModel(model, trainX, trainY)
@@ -376,6 +428,7 @@ def evaluateModelAutoRegressive(model, trainX, trainY, valX, valY):
         # print(e)
         return np.inf
 
+
 def evaluateModel(model, trainX, trainY, valX, valY):
     try:
         model = trainModel(model, trainX, trainY)
@@ -385,7 +438,10 @@ def evaluateModel(model, trainX, trainY, valX, valY):
         # print(e)
         return np.inf
 
-def evaluateArchitecture(individual, trainX, trainY, valX, valY, numEvals=3, timeout=60):
+
+def evaluateArchitecture(
+    individual, trainX, trainY, valX, valY, numEvals=3, timeout=60
+):
     if not isValidArchitecture(individual):
         return np.inf, constructModel(individual)
     q = queue.Queue()
@@ -414,14 +470,19 @@ def evaluateArchitecture(individual, trainX, trainY, valX, valY, numEvals=3, tim
             models.append(model)
     return min(performances), models[performances.index(min(performances))]
 
-def evaluateArchitecture2(individual, trainX, trainY, valX, valY, numEvals=3, timeout=180):
+
+def evaluateArchitecture2(
+    individual, trainX, trainY, valX, valY, numEvals=3, timeout=180
+):
     if not isValidArchitecture(individual):
         return np.inf, 0, constructModel(individual)
     q = queue.Queue()
 
     def work():
         model = constructModel(individual)
-        nrmse, r_square = evaluateModelAutoRegressive2(model, trainX, trainY, valX, valY)
+        nrmse, r_square = evaluateModelAutoRegressive2(
+            model, trainX, trainY, valX, valY
+        )
         q.put([nrmse, r_square, model])
 
     nrmses = []
@@ -445,17 +506,29 @@ def evaluateArchitecture2(individual, trainX, trainY, valX, valY, numEvals=3, ti
                 nrmses.append(nrmse)
                 r_squared_vals.append(r_square)
             models.append(model)
-    return min(nrmses), r_squared_vals[nrmses.index(min(nrmses))], models[nrmses.index(min(nrmses))]
+    return (
+        min(nrmses),
+        r_squared_vals[nrmses.index(min(nrmses))],
+        models[nrmses.index(min(nrmses))],
+    )
+
 
 # Crossover function
 def crossover_one_point(ind1, ind2):
-    maxNodeIndex = max(len(ind1['nodes']), len(ind2['nodes'])) - 1
-    point1 = random.randint(1, maxNodeIndex-1)
+    maxNodeIndex = max(len(ind1["nodes"]), len(ind2["nodes"])) - 1
+    point1 = random.randint(1, maxNodeIndex - 1)
     point2 = random.randint(point1, maxNodeIndex)
-    child1_nodes = ind1['nodes'][:point1] + ind2['nodes'][point1:point2] + ind1['nodes'][point2:]
-    child2_nodes = ind2['nodes'][:point1] + ind1['nodes'][point1:point2] + ind2['nodes'][point2:]
+    child1_nodes = (
+        ind1["nodes"][:point1] + ind2["nodes"][point1:point2] + ind1["nodes"][point2:]
+    )
+    child2_nodes = (
+        ind2["nodes"][:point1] + ind1["nodes"][point1:point2] + ind2["nodes"][point2:]
+    )
 
-    return ({"nodes": child1_nodes, "edges": ind1['edges']}, {"nodes": child2_nodes, "edges": ind2['edges']})
+    return (
+        {"nodes": child1_nodes, "edges": ind1["edges"]},
+        {"nodes": child2_nodes, "edges": ind2["edges"]},
+    )
 
 
 # Mutation function
@@ -466,31 +539,41 @@ def mutate(ind):
     2. Change a parameter of a node (again excluding Input and Ridge nodes).
     """
     mutation_type = random.choice(["swap_node", "change_param"])
-    
+
     if mutation_type == "swap_node":
-        idx = random.randint(1, len(ind['nodes'])-2)  # Excluding Input and Ridge
+        idx = random.randint(1, len(ind["nodes"]) - 2)  # Excluding Input and Ridge
         node_type = random.choice(list(nodeConstructors.keys() - {"Input"}))
-        ind['nodes'][idx] = {"type": node_type, "params": generateRandomNodeParams(node_type)}
-    
+        ind["nodes"][idx] = {
+            "type": node_type,
+            "params": generateRandomNodeParams(node_type),
+        }
+
     elif mutation_type == "change_param":
-        idx = random.randint(1, len(ind['nodes'])-2)  # Excluding Input and Ridge
-        node_type = ind['nodes'][idx]['type']
+        idx = random.randint(1, len(ind["nodes"]) - 2)  # Excluding Input and Ridge
+        node_type = ind["nodes"][idx]["type"]
         param_name = random.choice(list(nodeParameterRanges[node_type].keys()))
         param_range = nodeParameterRanges[node_type][param_name]
-        
+
         if param_range["intOnly"]:
-            ind['nodes'][idx]['params'][param_name] = random.randint(param_range["lower"], param_range["upper"])
+            ind["nodes"][idx]["params"][param_name] = random.randint(
+                param_range["lower"], param_range["upper"]
+            )
         else:
-            ind['nodes'][idx]['params'][param_name] = random.random() * (param_range["upper"] - param_range["lower"]) + param_range["lower"]
-    
+            ind["nodes"][idx]["params"][param_name] = (
+                random.random() * (param_range["upper"] - param_range["lower"])
+                + param_range["lower"]
+            )
+
     return ind
+
 
 def generateArchitectures(generator, n, n_jobs):
     architectures = Parallel(n_jobs=n_jobs)(delayed(generator)() for i in range(n))
     return architectures
 
-def runGA(params, useBackup = False):
-    if params['minimizeFitness']:
+
+def runGA(params, useBackup=False):
+    if params["minimizeFitness"]:
         creator.create("Fitness", base.Fitness, weights=(-1.0,))
     else:
         creator.create("Fitness", base.Fitness, weights=(1.0,))
@@ -504,22 +587,29 @@ def runGA(params, useBackup = False):
         modelGenerationIndices = []
         generationsSinceImprovement = 0
         earlyStopReached = False
-        if params['minimizeFitness']:
+        if params["minimizeFitness"]:
             defaultFitness = np.inf
         else:
             defaultFitness = 0
         prevFitness = defaultFitness
     else:
-        file = open('backup/{}/backup_{}.obj'.format(params["dataset"], params["experimentIndex"]), 'rb')
+        file = open(
+            "backup/{}/backup_{}.obj".format(
+                params["dataset"], params["experimentIndex"]
+            ),
+            "rb",
+        )
         data = pickle.load(file)
-        
+
         generation = data["generation"] + 1
         allFitnesses = data["allFitnesses"]
         fitnesses2 = data["fitnesses2"]
         allArchitectures = data["allArchitectures"]
         modelGenerationIndices = data["modelGenerationIndices"]
         generationsSinceImprovement = data["generationsSinceImprovement"]
-        population = [creator.Individual(individual) for individual in data["population"]]
+        population = [
+            creator.Individual(individual) for individual in data["population"]
+        ]
         earlyStopReached = data["earlyStopReached"]
         prevFitness = data["prevFitness"]
         params = data["params"]
@@ -531,57 +621,82 @@ def runGA(params, useBackup = False):
         return icls(content)
 
     def initPopulation(pcls, ind_init, individuals):
-        results = Parallel(n_jobs=params["n_jobs"])(delayed(ind_init)(c) for c in individuals)
+        results = Parallel(n_jobs=params["n_jobs"])(
+            delayed(ind_init)(c) for c in individuals
+        )
         return pcls(results)
-    
-    
-    toolbox.register("individual", tools.initIterate, creator.Individual, params["generator"])
+
+    toolbox.register(
+        "individual", tools.initIterate, creator.Individual, params["generator"]
+    )
     toolbox.register("population", tools.initRepeat, list, toolbox.individual)
     toolbox.register("individual_guess", initIndividual, creator.Individual)
-    toolbox.register("population_seed", initPopulation, list, toolbox.individual_guess, params["seedModels"])
+    toolbox.register(
+        "population_seed",
+        initPopulation,
+        list,
+        toolbox.individual_guess,
+        params["seedModels"],
+    )
     toolbox.register("mate", crossover_one_point)
     toolbox.register("mutate", mutate)
     toolbox.register("select", tools.selBest)
     toolbox.register("selectWorst", tools.selWorst)
     toolbox.register("evaluate", params["evaluator"])
-    
+
     if not useBackup:
-        random_population = [creator.Individual(individual) for individual in  generateArchitectures(params["generator"], params["populationSize"] - len(params["seedModels"]), params["n_jobs"])]
-        seed_population = [creator.Individual(individual) for individual in params["seedModels"]]
+        random_population = [
+            creator.Individual(individual)
+            for individual in generateArchitectures(
+                params["generator"],
+                params["populationSize"] - len(params["seedModels"]),
+                params["n_jobs"],
+            )
+        ]
+        seed_population = [
+            creator.Individual(individual) for individual in params["seedModels"]
+        ]
         population = seed_population + random_population
 
-        fitnesses = Parallel(n_jobs=params["n_jobs"])(delayed(params["evaluator"])(architecture) for architecture in population)
+        fitnesses = Parallel(n_jobs=params["n_jobs"])(
+            delayed(params["evaluator"])(architecture) for architecture in population
+        )
         for ind, fitness_model in zip(population, fitnesses):
             fit, fit2, model = fitness_model
             allFitnesses.append(fit)
             fitnesses2.append(fit2)
             allArchitectures.append(ind)
-            if ((fit <= params['earlyStop'] and params['minimizeFitness']) or 
-                (not params['minimizeFitness'] and fit >= params['earlyStop'])):
+            if (fit <= params["earlyStop"] and params["minimizeFitness"]) or (
+                not params["minimizeFitness"] and fit >= params["earlyStop"]
+            ):
                 earlyStopReached = True
             if params["logModels"]:
                 print(fit, ind)
             ind.fitness.values = (fit,)
         modelGenerationIndices.append(0)
-    
+
     for gen in range(generation, params["generations"] + 1):
         if earlyStopReached:
             print("Early stopping criteria met")
             break
-        generationsSinceImprovement+=1
+        generationsSinceImprovement += 1
         if params["logModels"]:
             print("Generation:", gen)
         elites = toolbox.select(population, params["eliteSize"])
-        offspring = toolbox.selectWorst(population, params["populationSize"] - (params["eliteSize"]))
+        offspring = toolbox.selectWorst(
+            population, params["populationSize"] - (params["eliteSize"])
+        )
         offspring = list(map(toolbox.clone, offspring))
 
-        prevFitnesses = allFitnesses[-params["populationSize"]:]
-        prevFitnesses2 = fitnesses2[-params["populationSize"]:]
-        prevArchitectures = allArchitectures[-params["populationSize"]:]
-        eliteIndices = sorted(range(len(prevFitnesses)), key=lambda i: prevFitnesses[i])[:params["eliteSize"]]
-        allFitnesses+=[prevFitnesses[i] for i in eliteIndices]
-        fitnesses2+=[prevFitnesses2[i] for i in eliteIndices]
-        allArchitectures+=[prevArchitectures[i] for i in eliteIndices]
+        prevFitnesses = allFitnesses[-params["populationSize"] :]
+        prevFitnesses2 = fitnesses2[-params["populationSize"] :]
+        prevArchitectures = allArchitectures[-params["populationSize"] :]
+        eliteIndices = sorted(
+            range(len(prevFitnesses)), key=lambda i: prevFitnesses[i]
+        )[: params["eliteSize"]]
+        allFitnesses += [prevFitnesses[i] for i in eliteIndices]
+        fitnesses2 += [prevFitnesses2[i] for i in eliteIndices]
+        allArchitectures += [prevArchitectures[i] for i in eliteIndices]
 
         # Crossover
         for child1, child2 in zip(offspring[::2], offspring[1::2]):
@@ -597,41 +712,59 @@ def runGA(params, useBackup = False):
                 del mutant.fitness.values
 
         # Evaluate offspring
-        fitnesses = Parallel(n_jobs=params["n_jobs"])(delayed(params["evaluator"])(architecture) for architecture in offspring)
+        fitnesses = Parallel(n_jobs=params["n_jobs"])(
+            delayed(params["evaluator"])(architecture) for architecture in offspring
+        )
         for ind, fitness_model in zip(offspring, fitnesses):
             fit, fit2, model = fitness_model
             allFitnesses.append(fit)
             fitnesses2.append(fit2)
             allArchitectures.append(ind)
-            if ((fit<=params['earlyStop'] and params['minimizeFitness']) or (not params['minimizeFitness'] and fit>=params['earlyStop'])):
+            if (fit <= params["earlyStop"] and params["minimizeFitness"]) or (
+                not params["minimizeFitness"] and fit >= params["earlyStop"]
+            ):
                 earlyStopReached = True
-            if (params['minimizeFitness'] and fit < prevFitness) or (not params['minimizeFitness'] and fit > prevFitness):
+            if (params["minimizeFitness"] and fit < prevFitness) or (
+                not params["minimizeFitness"] and fit > prevFitness
+            ):
                 prevFitness = fit
                 generationsSinceImprovement = 0
             if params["logModels"]:
                 print(fit, ind)
             ind.fitness.values = (fit,)
 
-        if generationsSinceImprovement>=params["stagnationReset"]:
+        if generationsSinceImprovement >= params["stagnationReset"]:
             if params["logModels"]:
                 print("Resetting population due to stagnation")
-            prevFitnesses = allFitnesses[-params["populationSize"]:]
-            prevFitnesses2 = fitnesses2[-params["populationSize"]:]
-            prevArchitectures = allArchitectures[-params["populationSize"]:]
-            eliteIndices = sorted(range(len(prevFitnesses)), key=lambda i: prevFitnesses[i])[:1]
-            allFitnesses+=[prevFitnesses[i] for i in eliteIndices]
-            fitnesses2+=[prevFitnesses2[i] for i in eliteIndices]
-            allArchitectures+=[prevArchitectures[i] for i in eliteIndices]
+            prevFitnesses = allFitnesses[-params["populationSize"] :]
+            prevFitnesses2 = fitnesses2[-params["populationSize"] :]
+            prevArchitectures = allArchitectures[-params["populationSize"] :]
+            eliteIndices = sorted(
+                range(len(prevFitnesses)), key=lambda i: prevFitnesses[i]
+            )[:1]
+            allFitnesses += [prevFitnesses[i] for i in eliteIndices]
+            fitnesses2 += [prevFitnesses2[i] for i in eliteIndices]
+            allArchitectures += [prevArchitectures[i] for i in eliteIndices]
 
             prevFitness = defaultFitness
-            newRandomPopulation = [creator.Individual(individual) for individual in  generateArchitectures(params["generator"], params["populationSize"]-1, params["n_jobs"])]
-            fitnesses = Parallel(n_jobs=params["n_jobs"])(delayed(params["evaluator"])(architecture) for architecture in newRandomPopulation)
+            newRandomPopulation = [
+                creator.Individual(individual)
+                for individual in generateArchitectures(
+                    params["generator"], params["populationSize"] - 1, params["n_jobs"]
+                )
+            ]
+            fitnesses = Parallel(n_jobs=params["n_jobs"])(
+                delayed(params["evaluator"])(architecture)
+                for architecture in newRandomPopulation
+            )
             for ind, fitness_model in zip(newRandomPopulation, fitnesses):
                 fit, fit2, model = fitness_model
                 allFitnesses.append(fit)
                 fitnesses2.append(fit2)
                 allArchitectures.append(ind)
-                if ((fit<=params['earlyStop'] and params['minimizeFitness']) or (not params['minimizeFitness'] and fit>=params['earlyStop'])):
+                if (fit <= params["earlyStop"] and params["minimizeFitness"]) or (
+                    not params["minimizeFitness"] and fit >= params["earlyStop"]
+                ):
                     earlyStopReached = True
                 if params["logModels"]:
                     print(fit, ind)
@@ -640,7 +773,7 @@ def runGA(params, useBackup = False):
             modelGenerationIndices.append(gen)
         else:
             population[:] = elites + offspring
-        
+
         bestFitness1 = min(allFitnesses)
         bestFitness2 = fitnesses2[allFitnesses.index(min(allFitnesses))]
         print("Generation", gen, "Best so far:", bestFitness1, bestFitness2)
@@ -656,13 +789,18 @@ def runGA(params, useBackup = False):
             "earlyStopReached": earlyStopReached,
             "prevFitness": prevFitness,
             "params": params,
-            "defaultFitness": defaultFitness
+            "defaultFitness": defaultFitness,
         }
-        file = open('backup/{}/backup_{}.obj'.format(params["dataset"], params["experimentIndex"]), 'wb')
+        file = open(
+            "backup/{}/backup_{}.obj".format(
+                params["dataset"], params["experimentIndex"]
+            ),
+            "wb",
+        )
 
         # dump information to that file
         pickle.dump(checkpoint, file)
-    
+
     bestFitness1 = min(allFitnesses)
     bestFitness2 = fitnesses2[allFitnesses.index(min(allFitnesses))]
     return bestFitness1, bestFitness2
@@ -672,7 +810,7 @@ def runGA(params, useBackup = False):
     #     sorted_data = sorted(paired_data, key=lambda x: x[1], reverse=True)
     # else:
     #     sorted_data = sorted(paired_data, key=lambda x: x[1], reverse=False)
-    
+
     # for i in range(len(sorted_data)-1, 0, -1):
     #     _, performance, architecture = sorted_data[i]
     #     if (params["minimizeFitness"] and performance>100) or (not params["minimizeFitness"] and performance<=0):
