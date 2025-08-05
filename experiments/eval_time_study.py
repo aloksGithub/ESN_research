@@ -1,13 +1,13 @@
 import time
 import sys
 import os
-from NAS.parallel_processing import executeParallelBatch
-from utils import getDataMGS
 
 current_dir = os.path.abspath(os.path.dirname(__file__))
 parent_dir = os.path.dirname(current_dir)
 sys.path.insert(0, parent_dir)
 from NAS.utils import evaluateArchitecture, generateRandomArchitectureOld
+from NAS.parallel_processing import executeParallelBatch
+from utils import getDataMGS
 
 
 def main():
