@@ -2,9 +2,21 @@ import multiprocessing
 import multiprocessing.queues
 from multiprocessing import Pool
 import time
+import os
+
+os.environ['OMP_NUM_THREADS'] = '1'
+os.environ['MKL_NUM_THREADS'] = '1'
+os.environ['OPENBLAS_NUM_THREADS'] = '1'
+os.environ['VECLIB_MAXIMUM_THREADS'] = '1'
+os.environ['NUMEXPR_NUM_THREADS'] = '1'
 
 
 def executeParallel(func, args, n_jobs, timeout):
+    """
+    DEPRECATED: This function is unsafe and inefficient. It uses a blocking
+    `time.sleep()` and can terminate processes mid-calculation, leading to
+    lost work and potential errors. Please use `executeParallelBatch` instead.
+    """
     results = []
 
     def callback(result):
@@ -50,12 +62,10 @@ def executeParallelImproved(func, args, n_jobs, timeout):
                 if remaining_time < 0:
                     remaining_time = 0
                 results[i] = ar.get(timeout=remaining_time)
-            except Exception:
+            except Exception as e:
+                # IMPROVEMENT: Instead of terminating the pool, we now just log
+                # the failure and continue, allowing other jobs to complete.
+                print(f"Warning: Job {i} failed with error: {e}")
                 results[i] = None
-                # If one process times out, we should terminate the rest
-                # to avoid waiting for them unnecessarily.
-                pool.terminate()
-                pool.join()
-                break  # exit the loop
 
     return results
