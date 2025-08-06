@@ -9,20 +9,18 @@ from NAS.utils import evaluateArchitecture, generateRandomArchitectureOld
 from NAS.parallel_processing import executeParallelBatch
 from utils import getDataMGS
 
+trainX, trainY, valX, valY, testX, testY = getDataMGS()
+
+def eval_func(architecture):
+    start = time.time()
+    evaluateArchitecture(architecture, trainX, trainY, valX, valY, 3)
+    print(time.time() - start)
 
 def main():
-    trainX, trainY, valX, valY, testX, testY = getDataMGS()
-
-    def eval_func(architecture):
-        start = time.time()
-        evaluateArchitecture(architecture, trainX, trainY, valX, valY, 3)
-        print(time.time() - start)
-    
     architectures = []
     for _ in range(20):
         architectures.append(generateRandomArchitectureOld(trainX.shape[1], trainY.shape[1], trainX, trainY, 756, 60))
-    
-    executeParallelBatch(eval_func, architectures, 20, 600 * 3)
+    executeParallelBatch(eval_func, [(individual,) for individual in architectures], 20, 600 * 3)
 
 if __name__ == "__main__":
     main()
