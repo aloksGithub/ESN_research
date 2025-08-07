@@ -6,8 +6,7 @@ import numpy as np
 current_dir = os.path.abspath(os.path.dirname(__file__))
 parent_dir = os.path.dirname(current_dir)
 sys.path.insert(0, parent_dir)
-from NAS.NAS import generateRandomNodeParams, nodeConstructors
-from NAS.utils import evaluateArchitecture, generateRandomArchitectureOld
+from NAS.utils import evaluateArchitecture, generateRandomArchitectureOld, generateRandomNodeParams, nodeConstructors
 from NAS.parallel_processing import executeParallelBatch
 from utils import getDataMGS
 from NAS.memory_estimator import estimateMemory
