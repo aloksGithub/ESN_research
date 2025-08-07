@@ -164,8 +164,9 @@ def main():
             model, timeTaken = result
             print("===============================================")
             print(timeTaken)
-            for node in model.nodes:
-                print(node)
+            if model is not None:
+                for node in model.nodes:
+                    print(node)
 
 if __name__ == "__main__":
     main()
