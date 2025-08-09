@@ -8,10 +8,10 @@ parent_dir = os.path.dirname(current_dir)
 sys.path.insert(0, parent_dir)
 from NAS.utils import constructModel, evaluateArchitecture, generateRandomArchitectureOld, generateRandomNodeParams, nodeConstructors, runModel
 from NAS.parallel_processing import executeParallelBatch
-from utils import getDataMGS
+from utils import getDataMGS, getDataDDE
 from NAS.memory_estimator import estimateMemory
 
-trainX, trainY, valX, valY, testX, testY = getDataMGS()
+trainX, trainY, valX, valY, testX, testY = getDataDDE()
 
 def isValidArchitecture(
     architecture,
