@@ -162,15 +162,18 @@ def isValidArchitecture(
     if memoryEstimate > memoryLimit:
         return False
     
-    model = constructModel(architecture)
-    runModel(model, sampleInput[:1])
-    for node in model.nodes:
-        if "Ridge" in node.name and node.input_dim >1200:
-            return False
-        if "RLS" in node.name and node.input_dim >400:
-            return False
-        if "LMS" in node.name and node.input_dim >3000:
-            return False
+    try:
+        model = constructModel(architecture)
+        runModel(model, sampleInput[:1])
+        for node in model.nodes:
+            if "Ridge" in node.name and node.input_dim >1200:
+                return False
+            if "RLS" in node.name and node.input_dim >400:
+                return False
+            if "LMS" in node.name and node.input_dim >3000:
+                return False
+    except Exception:
+        return False
     return True
 
 
