@@ -106,20 +106,6 @@ class GA_Base:
         # Make sure that save folder exists
         directory = os.path.dirname(self.saveLocation)
         os.makedirs(directory, exist_ok=True)
-    
-    def checkModelValidity(self, architecture, checkTime=False):
-        return (
-            isValidArchitecture(
-                architecture,
-                self.experimentData.trainX,
-                self.experimentData.trainY,
-                self.evalParams.memoryLimit,
-                self.evalParams.timeout,
-                self.evalParams.isAutoRegressive,
-                checkTime,
-            ),
-            architecture,
-        )
 
     def evaluateArchitecture(self, individual):
         """
@@ -172,55 +158,32 @@ class GA_Base:
     def generateOffspring(self, population):
         print("Generating offspring")
         offspring = self.toolbox.selectBest(population, self.gaParams.eliteSize)
-        candidates = []
 
-        startTime = time.time()
         while len(offspring) < self.gaParams.populationSize:
-            while len(candidates) < self.n_jobs:
-                parent1 = self.toolbox.selectTournament(
-                    population, 1, len(population) // 4
-                )[0]
-                parent2 = self.toolbox.selectTournament(
-                    population, 1, len(population) // 4
-                )[0]
+            parent1 = self.toolbox.selectTournament(
+                population, 1, len(population) // 4
+            )[0]
+            parent2 = self.toolbox.selectTournament(
+                population, 1, len(population) // 4
+            )[0]
 
-                child1, child2 = self.crossover_one_point(parent1, parent2)
-                child1 = self.mutate(child1)
-                child2 = self.mutate(child2)
+            child1, child2 = self.crossover_one_point(parent1, parent2)
+            child1 = self.mutate(child1)
+            child2 = self.mutate(child2)
 
-                if isValidArchitecture(
-                    child1,
-                    self.experimentData.trainX,
-                    self.experimentData.trainY,
-                    self.evalParams.memoryLimit,
-                    self.evalParams.timeout,
-                    self.evalParams.isAutoRegressive,
-                    checkTime=False,
-                ):
-                    candidates.append(child1)
-                if isValidArchitecture(
-                    child2,
-                    self.experimentData.trainX,
-                    self.experimentData.trainY,
-                    self.evalParams.memoryLimit,
-                    self.evalParams.timeout,
-                    self.evalParams.isAutoRegressive,
-                    checkTime=False,
-                ):
-                    candidates.append(child2)
-
-            validities = executeParallelBatch(
-                self.checkModelValidity,
-                [(c,) for c in candidates],
-                self.n_jobs,
-                self.evalParams.timeout,
-            )
-            print("Evaluated candidates in", time.time() - startTime)
-            for validity in validities:
-                if validity is not None and validity[0]:
-                    offspring.append(validity[1])
-            candidates = []
-        return offspring[: self.gaParams.populationSize]
+            if isValidArchitecture(
+                child1,
+                self.experimentData.trainX,
+                self.evalParams.memoryLimit,
+            ) and len(offspring) < self.gaParams.populationSize:
+                offspring.append(child1)
+            if isValidArchitecture(
+                child2,
+                self.experimentData.trainX,
+                self.evalParams.memoryLimit,
+            ) and len(offspring) < self.gaParams.populationSize:
+                offspring.append(child2)
+        return offspring
         
     # Crossover function
     def crossover_one_point(self, ind1, ind2):
