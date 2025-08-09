@@ -62,10 +62,18 @@ def executeParallelImproved(func, args, n_jobs, timeout):
                 if remaining_time < 0:
                     remaining_time = 0
                 results[i] = ar.get(timeout=remaining_time)
+            except multiprocessing.TimeoutError:
+                # Explicitly report timeouts; string for TimeoutError is often empty
+                total_wait = time.time() - start_time
+                print(
+                    f"Warning: Job {i} timed out after waiting {total_wait:.2f}s (budget {timeout}s)"
+                )
+                results[i] = None
             except Exception as e:
                 # IMPROVEMENT: Instead of terminating the pool, we now just log
                 # the failure and continue, allowing other jobs to complete.
-                print(f"Warning: Job {i} failed with error: {e}")
+                exc_name = type(e).__name__
+                print(f"Warning: Job {i} failed with error: {exc_name}: {e}")
                 results[i] = None
 
     return results

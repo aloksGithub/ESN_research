@@ -28,6 +28,7 @@ import os
 
 rpy.verbosity(0)
 
+
 class ExperimentData:
     def __init__(self, trainX, trainY, valX, valY, testX, testY):
         self.trainX = trainX
@@ -37,17 +38,38 @@ class ExperimentData:
         self.testX = testX
         self.testY = testY
 
+
 class GAParams:
-    def __init__(self, generations, populationSize, crossoverProbability, mutationProbability, eliteSize, stagnationReset):
+    def __init__(
+        self,
+        generations,
+        populationSize,
+        crossoverProbability,
+        mutationProbability,
+        eliteSize,
+        stagnationReset,
+        earlyStop=None,
+    ):
         self.generations = generations
         self.populationSize = populationSize
         self.crossoverProbability = crossoverProbability
         self.mutationProbability = mutationProbability
         self.eliteSize = eliteSize
         self.stagnationReset = stagnationReset
+        self.earlyStop = earlyStop
+
 
 class EvalParams:
-    def __init__(self, numEvals, errorMetrics, defaultErrors, isAutoRegressive, timeout, memoryLimit, minimizeFitness):
+    def __init__(
+        self,
+        numEvals,
+        errorMetrics,
+        defaultErrors,
+        isAutoRegressive,
+        timeout,
+        memoryLimit,
+        minimizeFitness,
+    ):
         self.numEvals = numEvals
         self.errorMetrics = errorMetrics
         self.defaultErrors = defaultErrors
@@ -55,6 +77,7 @@ class EvalParams:
         self.timeout = timeout
         self.memoryLimit = memoryLimit
         self.minimizeFitness = minimizeFitness
+
 
 class GA_Base:
     def __init__(
@@ -77,7 +100,7 @@ class GA_Base:
         else:
             creator.create("Fitness", base.Fitness, weights=(1.0,))
         creator.create("Individual", dict, fitness=creator.Fitness)
-        
+
         self.toolbox = base.Toolbox()
 
         self.toolbox.register("mate", self.crossover_one_point)
@@ -85,12 +108,12 @@ class GA_Base:
         self.toolbox.register("selectTournament", tools.selTournament)
         self.toolbox.register("selectBest", tools.selBest)
         self.toolbox.register("selectWorst", tools.selWorst)
-        
+
         self.seedModels = seedModels
         self.n_jobs = n_jobs
         self.saveModels = saveModels
         self.saveLocation = saveLocation if saveLocation is not None else "temp"
-        
+
         self.generation = 1
         self.fitnesses = []
         self.generationTimes = []
@@ -102,7 +125,7 @@ class GA_Base:
         self.prevFitness = self.evalParams.defaultErrors[0]
         self.population = []
         self.bestFitness = self.evalParams.defaultErrors
-        
+
         # Make sure that save folder exists
         directory = os.path.dirname(self.saveLocation)
         os.makedirs(directory, exist_ok=True)
@@ -154,7 +177,7 @@ class GA_Base:
             for individual in generatedArchitectures[: self.gaParams.populationSize]
         ]
         return population
-    
+
     def generateOffspring(self, population):
         print("Generating offspring")
         offspring = self.toolbox.selectBest(population, self.gaParams.eliteSize)
@@ -171,20 +194,26 @@ class GA_Base:
             child1 = self.mutate(child1)
             child2 = self.mutate(child2)
 
-            if isValidArchitecture(
-                child1,
-                self.experimentData.trainX,
-                self.evalParams.memoryLimit,
-            ) and len(offspring) < self.gaParams.populationSize:
+            if (
+                isValidArchitecture(
+                    child1,
+                    self.experimentData.trainX,
+                    self.evalParams.memoryLimit,
+                )
+                and len(offspring) < self.gaParams.populationSize
+            ):
                 offspring.append(child1)
-            if isValidArchitecture(
-                child2,
-                self.experimentData.trainX,
-                self.evalParams.memoryLimit,
-            ) and len(offspring) < self.gaParams.populationSize:
+            if (
+                isValidArchitecture(
+                    child2,
+                    self.experimentData.trainX,
+                    self.evalParams.memoryLimit,
+                )
+                and len(offspring) < self.gaParams.populationSize
+            ):
                 offspring.append(child2)
         return offspring
-        
+
     # Crossover function
     def crossover_one_point(self, ind1, ind2):
         ind1Copy = copy.deepcopy(ind1)
@@ -249,6 +278,7 @@ class GA_Base:
                 )
         return indCopy
 
+
 class ESN_NAS(GA_Base):
     """Genetic algorithm to obtain an optimized ESN architecture for a dataset"""
 
@@ -262,7 +292,15 @@ class ESN_NAS(GA_Base):
         saveModels=False,
         saveLocation=None,
     ):
-        super().__init__(experimentData, evalParams, gaParams, seedModels, n_jobs, saveModels, saveLocation)
+        super().__init__(
+            experimentData,
+            evalParams,
+            gaParams,
+            seedModels,
+            n_jobs,
+            saveModels,
+            saveLocation,
+        )
 
     def evaluateParallel(self, population):
         print("Evaluating population")
@@ -313,7 +351,9 @@ class ESN_NAS(GA_Base):
             print("Resetting population due to stagnation")
 
             self.prevFitness = self.evalParams.defaultErrors[0]
-            newRandomPopulation = self.generatePopulation(self.gaParams.populationSize - 1)
+            newRandomPopulation = self.generatePopulation(
+                self.gaParams.populationSize - 1
+            )
             self.evaluateParallel(newRandomPopulation)
             self.population[:] = (
                 self.toolbox.selectBest(self.population, 1) + newRandomPopulation
@@ -330,12 +370,16 @@ class ESN_NAS(GA_Base):
         )
         self.bestFitness = self.fitnesses[bestIndex]
         numFailures = 0
-        for index, fitness in enumerate(self.fitnesses[-self.gaParams.populationSize :]):
+        for index, fitness in enumerate(
+            self.fitnesses[-self.gaParams.populationSize :]
+        ):
             if fitness[0] == self.evalParams.defaultErrors[0]:
                 # print(self.architectures[-self.populationSize:][index])
                 numFailures += 1
         print("Best so far:", self.bestFitness)
-        print("Failure rate: {}%".format(100 * numFailures / self.gaParams.populationSize))
+        print(
+            "Failure rate: {}%".format(100 * numFailures / self.gaParams.populationSize)
+        )
         self.generationTimes.append(time.time() - startTime)
         print("Time taken:", time.time() - startTime)
 
@@ -359,7 +403,13 @@ class ESN_NAS(GA_Base):
 
         for gen in range(self.generation, self.gaParams.generations + 1):
             self.generationRun(gen)
+            if self.gaParams.earlyStop is not None:
+                if self.evalParams.minimizeFitness:
+                    if self.bestFitness[0] <= self.gaParams.earlyStop:
+                        break
+                else:
+                    if self.bestFitness[0] >= self.gaParams.earlyStop:
+                        break
 
         file = open(self.saveLocation, "rb")
         return pickle.load(file)
-

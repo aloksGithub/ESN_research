@@ -71,10 +71,10 @@ def printSavedNonAutoRegressiveResults(dataset, dataLoader):
 def printAllResults():
     printSavedAutoregressiveResults("mgs")
     printSavedAutoregressiveResults("laser")
-    # printSavedAutoregressiveResults("dde")
-    # printSavedAutoregressiveResults("lorenz")
-    # printSavedNonAutoRegressiveResults("Water", getDataWater)
-    # printSavedNonAutoRegressiveResults("Sunspots", getDataSunspots)
+    printSavedAutoregressiveResults("dde")
+    printSavedAutoregressiveResults("lorenz")
+    printSavedNonAutoRegressiveResults("Water", getDataWater)
+    printSavedNonAutoRegressiveResults("Sunspots", getDataSunspots)
 
 def runBOExperiment(dataset, dataLoader, errorMetrics, isAutoregressive):
     trainX, trainY, valX, valY, _, _ = dataLoader()
