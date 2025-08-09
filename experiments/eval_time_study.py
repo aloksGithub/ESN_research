@@ -6,7 +6,7 @@ import numpy as np
 current_dir = os.path.abspath(os.path.dirname(__file__))
 parent_dir = os.path.dirname(current_dir)
 sys.path.insert(0, parent_dir)
-from NAS.utils import evaluateArchitecture, generateRandomArchitectureOld, generateRandomNodeParams, nodeConstructors
+from NAS.utils import constructModel, evaluateArchitecture, generateRandomArchitectureOld, generateRandomNodeParams, nodeConstructors, runModel
 from NAS.parallel_processing import executeParallelBatch
 from utils import getDataMGS
 from NAS.memory_estimator import estimateMemory
@@ -16,11 +16,7 @@ trainX, trainY, valX, valY, testX, testY = getDataMGS()
 def isValidArchitecture(
     architecture,
     sampleInput,
-    sampleOutput,
     memoryLimit,
-    timeLimit,
-    isAutoRegressive=False,
-    checkTime=True,
 ):
     ipExists = False
     forceExists = False
@@ -35,19 +31,14 @@ def isValidArchitecture(
     if memoryEstimate > memoryLimit:
         return False
 
-    if checkTime:
-        try:
-            start = time.time()
-            _, errors, _ = evaluateArchitecture(
-                architecture, sampleInput, sampleOutput, sampleInput, sampleOutput, isAutoRegressive=isAutoRegressive
-            )
-            error = errors[0]
-            timeTaken1 = time.time() - start
-            if timeTaken1 * 1.1 > timeLimit:
-                return False
-            if np.isinf(error) or np.isnan(error):
-                return False
-        except:
+    model = constructModel(architecture)
+    runModel(model, sampleInput[:1])
+    for node in model.nodes:
+        if "Ridge" in node.name and node.input_dim >1200:
+            return False
+        if "RLS" in node.name and node.input_dim >400:
+            return False
+        if "LMS" in node.name and node.input_dim >3000:
             return False
     return True
 
@@ -139,9 +130,7 @@ def generateRandomArchitectureOld(
             edges.append([i, final_node_index])
 
     architecture = {"nodes": nodes, "edges": edges}
-    if isValidArchitecture(
-        architecture, sampleInput, sampleOutput, memoryLimit, timeLimit, checkTime=False
-    ):
+    if isValidArchitecture(architecture, sampleInput, memoryLimit):
         return architecture
     else:
         return generateRandomArchitectureOld(
