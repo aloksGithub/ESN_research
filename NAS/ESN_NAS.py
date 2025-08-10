@@ -180,39 +180,48 @@ class GA_Base:
 
     def generateOffspring(self, population):
         print("Generating offspring")
+        startTime = time.time()
         offspring = self.toolbox.selectBest(population, self.gaParams.eliteSize)
+        candidates = []
 
         while len(offspring) < self.gaParams.populationSize:
-            parent1 = self.toolbox.selectTournament(
-                population, 1, len(population) // 4
-            )[0]
-            parent2 = self.toolbox.selectTournament(
-                population, 1, len(population) // 4
-            )[0]
+            while len(candidates) < self.n_jobs:
+                parent1 = self.toolbox.selectTournament(
+                    population, 1, len(population) // 4
+                )[0]
+                parent2 = self.toolbox.selectTournament(
+                    population, 1, len(population) // 4
+                )[0]
 
-            child1, child2 = self.crossover_one_point(parent1, parent2)
-            child1 = self.mutate(child1)
-            child2 = self.mutate(child2)
+                child1, child2 = self.crossover_one_point(parent1, parent2)
+                child1 = self.mutate(child1)
+                child2 = self.mutate(child2)
+                candidates.append(child1)
+                candidates.append(child2)
+            
+            validities = executeParallelBatch(
+                self.checkModelValidity,
+                [(c,) for c in candidates[:self.n_jobs]],
+                self.n_jobs,
+                10,
+            )
+            for validity in validities:
+                if validity is not None and validity[0]:
+                    offspring.append(validity[1])
+            candidates = []
 
-            if (
-                isValidArchitecture(
-                    child1,
-                    self.experimentData.trainX,
-                    self.evalParams.memoryLimit,
-                )
-                and len(offspring) < self.gaParams.populationSize
-            ):
-                offspring.append(child1)
-            if (
-                isValidArchitecture(
-                    child2,
-                    self.experimentData.trainX,
-                    self.evalParams.memoryLimit,
-                )
-                and len(offspring) < self.gaParams.populationSize
-            ):
-                offspring.append(child2)
-        return offspring
+        print(f"Time taken to generate offspring: {time.time() - startTime} seconds")
+        return offspring[: self.gaParams.populationSize]
+    
+    def checkModelValidity(self, architecture):
+        return (
+            isValidArchitecture(
+                architecture,
+                self.experimentData.trainX,
+                self.evalParams.memoryLimit,
+            ),
+            architecture,
+        )
 
     # Crossover function
     def crossover_one_point(self, ind1, ind2):
