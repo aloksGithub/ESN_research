@@ -156,17 +156,14 @@ class GA_Base:
                 generateRandomArchitectureOld,
                 [
                     (
-                        self.experimentData.trainX.shape[-1],
                         self.experimentData.trainY.shape[-1],
                         self.experimentData.trainX,
-                        self.experimentData.trainY,
                         self.evalParams.memoryLimit,
-                        self.evalParams.timeout,
                     )
                     for _ in range(numIndividuals - len(generatedArchitectures))
                 ],
                 self.n_jobs,
-                self.evalParams.timeout,
+                10,
             )
             for result in results:
                 if result is not None:

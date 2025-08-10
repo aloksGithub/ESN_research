@@ -216,10 +216,10 @@ def createRandomGraph(numNodes):
 
 
 def generateRandomArchitecture(
-    inputDim, outputDim, sampleInput, sampleOutput, memoryLimit=4 * 1024, timeLimit=180
+    outputDim, sampleInput, memoryLimit=4 * 1024
 ):
     num_nodes = random.randint(4, 7)
-    nodes = [{"type": "Input", "params": {"input_dim": inputDim}}]
+    nodes = [{"type": "Input", "params": {"input_dim": sampleInput.shape[-1]}}]
     for i in range(num_nodes - 1):
         available_node_types = list(nodeConstructors.keys())
         if i == 0:
@@ -271,16 +271,15 @@ def generateRandomArchitecture(
         return architecture
     else:
         return generateRandomArchitecture(
-            inputDim, outputDim, sampleInput, sampleOutput, memoryLimit, timeLimit
+            outputDim, sampleInput, memoryLimit
         )
 
-
 def generateRandomArchitectureOld(
-    inputDim, outputDim, sampleInput, sampleOutput, memoryLimit=4 * 1024, timeLimit=180
+    outputDim, sampleInput, memoryLimit=4 * 1024
 ):
     num_nodes = random.randint(2, 4)
 
-    nodes = [{"type": "Input", "params": {"input_dim": inputDim}}]
+    nodes = [{"type": "Input", "params": {"input_dim": sampleInput.shape[-1]}}]
 
     for i in range(num_nodes):
         available_node_types = list(nodeConstructors.keys())
@@ -369,7 +368,7 @@ def generateRandomArchitectureOld(
         return architecture
     else:
         return generateRandomArchitectureOld(
-            inputDim, outputDim, sampleInput, sampleOutput, memoryLimit, timeLimit
+            outputDim, sampleInput, memoryLimit
         )
 
 def evaluateArchitecture(
