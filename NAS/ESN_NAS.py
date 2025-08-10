@@ -163,7 +163,8 @@ class GA_Base:
                     for _ in range(numIndividuals - len(generatedArchitectures))
                 ],
                 self.n_jobs,
-                10,
+                10,     # Only a small timeout is needed to check architecture validity
+                log_level=0,
             )
             for result in results:
                 if result is not None:
@@ -201,6 +202,7 @@ class GA_Base:
                 [(c,) for c in candidates[:self.n_jobs]],
                 self.n_jobs,
                 10,
+                0,
             )
             for validity in validities:
                 if validity is not None and validity[0]:

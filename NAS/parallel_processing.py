@@ -34,16 +34,16 @@ def executeParallel(func, args, n_jobs, timeout):
     return results
 
 
-def executeParallelBatch(func, args, batchSize, timeout):
+def executeParallelBatch(func, args, batchSize, timeout, log_level=2):
     results = []
     for i in range(0, len(args), batchSize):
         results += executeParallelImproved(
-            func, args[i : i + batchSize], batchSize, timeout
+            func, args[i : i + batchSize], batchSize, timeout, log_level
         )
     return results
 
 
-def executeParallelImproved(func, args, n_jobs, timeout):
+def executeParallelImproved(func, args, n_jobs, timeout, log_level=2):
     """
     Executes functions in parallel with improved error handling:
     - Returns None for any failed jobs
@@ -65,15 +65,17 @@ def executeParallelImproved(func, args, n_jobs, timeout):
             except multiprocessing.TimeoutError:
                 # Explicitly report timeouts; string for TimeoutError is often empty
                 total_wait = time.time() - start_time
-                print(
-                    f"Warning: Job {i} timed out after waiting {total_wait:.2f}s (budget {timeout}s)"
-                )
+                if log_level >= 2:
+                    print(
+                        f"Warning: Job {i} timed out after waiting {total_wait:.2f}s (budget {timeout}s)"
+                    )
                 results[i] = None
             except Exception as e:
                 # IMPROVEMENT: Instead of terminating the pool, we now just log
                 # the failure and continue, allowing other jobs to complete.
                 exc_name = type(e).__name__
-                print(f"Warning: Job {i} failed with error: {exc_name}: {e}")
+                if log_level >= 1:
+                    print(f"Warning: Job {i} failed with error: {exc_name}: {e}")
                 results[i] = None
 
     return results
