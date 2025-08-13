@@ -1,8 +1,10 @@
 from bayes_opt import BayesianOptimization
 import reservoirpy as rpy
 from NAS.ESN_NAS import EvalParams, ExperimentData, GA_Base, GAParams
+from NAS.parallel_processing import executeParallelBatch
 from NAS.utils import (
     evaluateArchitecture,
+    isValidArchitecture,
     nodeParameterRanges,
 )
 from deap import creator
@@ -106,10 +108,10 @@ class ESN_NAS2(GA_Base):
                     param
                 ]["intOnly"]
                 defaultParams[str(i + 1) + "_" + param] = node["params"][param]
-        return pbounds, isInt
+        return pbounds, isInt, defaultParams
 
     def bo(self, individual):
-        pbounds, isInt = self.calculateBounds(individual)
+        pbounds, isInt, defaultParams = self.calculateBounds(individual)
 
         individuals = []
         individualErrors = []
@@ -128,9 +130,29 @@ class ESN_NAS2(GA_Base):
                 modifiedArchitecture["nodes"][nodeIndex]["params"][
                     paramName
                 ] = paramValue
+            
+            is_valid = isValidArchitecture(
+                modifiedArchitecture,
+                self.experimentData.trainX,
+                self.evalParams.memoryLimit
+            )
 
-            # Evaluate the architecture with a hard per-evaluation timeout.
-            currIndividual, errors, model = self.safe_evaluate(modifiedArchitecture)
+            if is_valid:
+                currIndividual, errors, model = evaluateArchitecture(
+                    modifiedArchitecture,
+                    self.experimentData.trainX,
+                    self.experimentData.trainY,
+                    self.experimentData.valX,
+                    self.experimentData.valY,
+                    self.evalParams.numEvals,
+                    self.evalParams.errorMetrics,
+                    self.evalParams.defaultErrors,
+                    self.evalParams.isAutoRegressive,
+                )
+            else:
+                currIndividual = modifiedArchitecture
+                errors = self.evalParams.defaultErrors
+                model = None
 
             individuals.append(currIndividual)
             individualErrors.append(errors)
@@ -154,6 +176,7 @@ class ESN_NAS2(GA_Base):
             allow_duplicate_points=True,
             verbose=0,
         )
+        optimizer.probe(params=defaultParams)
         optimizer.maximize(
             init_points=self.bo_init,
             n_iter=self.bo_iter,
@@ -163,46 +186,33 @@ class ESN_NAS2(GA_Base):
     def evaluateParallel(self, population):
         print("Evaluating population")
         startTime = time.time()
-        import concurrent.futures as cf
-
-        results = [None] * len(population)
-
-        # Run the BO for each individual concurrently using threads; the heavy
-        # evaluations happen inside the shared *EVAL_POOL* so threads here are
-        # mostly orchestrating work and do not create additional processes.
-        with cf.ThreadPoolExecutor(max_workers=self.n_jobs) as executor:
-            futures = {
-                executor.submit(self.bo, individual): idx
-                for idx, individual in enumerate(population)
-            }
-
-            for future in cf.as_completed(futures):
-                idx = futures[future]
-                try:
-                    results[idx] = future.result()
-                except Exception as e:
-                    print("Error", e)
-                    results[idx] = None
-
+        results = executeParallelBatch(
+            self.bo,
+            [(individual,) for individual in population],
+            self.n_jobs,
+            self.evalParams.timeout * self.evalParams.numEvals * (self.bo_init + self.bo_iter),
+        )
+        
         for i in range(len(results)):
             if results[i] is None:
                 results[i] = (
                     [population[i]] * (self.bo_iter + self.bo_init),
-                    [self.evalParams.defaultErrors] * (self.bo_iter + self.bo_init),
+                    [self.defaultErrors] * (self.bo_iter + self.bo_init),
                     None,
                 )
+
         new_individuals = []
-        for i, result in enumerate(results):
+        for result in results:
             individuals, individualErrors, bestModel = result
-            for j, individual in enumerate(individuals):
+            for i, individual in enumerate(individuals):
                 ga_individual = creator.Individual(individual)
-                ga_individual.fitness.values = (individualErrors[j][0],)
+                ga_individual.fitness.values = (individualErrors[i][0],)
                 new_individuals.append(ga_individual)
 
             self.architectures += individuals
             self.fitnesses += individualErrors
             bestBoError = min([elem[0] for elem in individualErrors])
-            print(i, bestBoError)
+
             bestOverallError = min([elem[0] for elem in self.fitnesses])
             if bestBoError <= bestOverallError or len(self.fitnesses) == 0:
                 self.bestModel = bestModel
@@ -297,68 +307,3 @@ class ESN_NAS2(GA_Base):
 
         file = open(self.saveLocation, "rb")
         return pickle.load(file)
-
-    def safe_evaluate(self, individual):
-        """Evaluate *individual* in the global pool with a hard timeout.
-
-        Falls back to ``defaultErrors`` if the evaluation overruns.
-        """
-
-        # Block until a worker is available so that the timeout counts only
-        # the time actually spent executing inside the worker.
-        _WORKER_SEM.acquire()
-
-        try:
-            # Try with the current pool first
-            pool = get_pool()
-            future = pool.submit(
-                evaluateArchitecture,
-                individual,
-                self.experimentData.trainX,
-                self.experimentData.trainY,
-                self.experimentData.valX,
-                self.experimentData.valY,
-                self.evalParams.numEvals,
-                self.evalParams.errorMetrics,
-                self.evalParams.defaultErrors,
-                self.evalParams.isAutoRegressive,
-            )
-
-            return future.result(timeout=self.evalParams.timeout)
-        except cf.TimeoutError:
-            print("Timeout error - replacing pool")
-            try:
-                future.cancel()
-            except:
-                pass  # Future might not be cancellable
-            replace_pool()  # Replace the corrupted pool
-            return individual, self.evalParams.defaultErrors, None
-        except (cf.process.BrokenProcessPool, RuntimeError) as e:
-            if "process pool" in str(e).lower() or "abruptly" in str(e).lower():
-                print(f"Pool corruption detected: {e} - replacing pool and retrying")
-                replace_pool()
-                # Retry once with the fresh pool
-                try:
-                    pool = get_pool()
-                    future = pool.submit(
-                        evaluateArchitecture,
-                        individual,
-                        self.experimentData.trainX,
-                        self.experimentData.trainY,
-                        self.experimentData.valX,
-                        self.experimentData.valY,
-                        self.evalParams.numEvals,
-                        self.evalParams.errorMetrics,
-                        self.evalParams.defaultErrors,
-                        self.evalParams.isAutoRegressive,
-                    )
-                    return future.result(timeout=self.evalParams.timeout)
-                except:
-                    print("Retry failed - returning default errors")
-                    return individual, self.evalParams.defaultErrors, None
-            else:
-                # Some other error - just return default
-                print(f"Unexpected error: {e}")
-                return individual, self.evalParams.defaultErrors, None
-        finally:
-            _WORKER_SEM.release()
