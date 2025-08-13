@@ -197,7 +197,7 @@ class ESN_NAS2(GA_Base):
             if results[i] is None:
                 results[i] = (
                     [population[i]] * (self.bo_iter + self.bo_init),
-                    [self.defaultErrors] * (self.bo_iter + self.bo_init),
+                    [self.evalParams.defaultErrors] * (self.bo_iter + self.bo_init),
                     None,
                 )
 
