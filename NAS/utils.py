@@ -166,11 +166,11 @@ def isValidArchitecture(
         model = constructModel(architecture)
         runModel(model, sampleInput[:1])
         for node in model.nodes:
-            if "Ridge" in node.name and node.input_dim >1200:
+            if "Ridge" in node.name and node.input_dim > 2200:
                 return False
-            if "RLS" in node.name and node.input_dim >400:
+            if "RLS" in node.name and node.input_dim > 400:
                 return False
-            if "LMS" in node.name and node.input_dim >3000:
+            if "LMS" in node.name and node.input_dim > 3000:
                 return False
     except Exception:
         return False
