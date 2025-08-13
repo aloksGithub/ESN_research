@@ -16,7 +16,7 @@ import warnings
 warnings.filterwarnings("ignore")
 rpy.verbosity(0)
 
-def runExperiment(dataset, dataLoader, errorMetrics, isAutoregressive):
+def runExperiment(dataset, dataLoader, errorMetrics, isAutoregressive, earlyStop=None):
     trainX, trainY, valX, valY, testX, testY = dataLoader()
     experimentData = ExperimentData(trainX, trainY, valX, valY, testX, testY)
     evalParams = EvalParams(
@@ -35,6 +35,7 @@ def runExperiment(dataset, dataLoader, errorMetrics, isAutoregressive):
         mutationProbability=0.2,
         eliteSize=1,
         stagnationReset=5,
+        earlyStop=earlyStop,
     )
     nrmseErrors = []
     r2_squaredValues = []
@@ -78,10 +79,10 @@ def printAllSavedResults():
     printSavedResultsAutoRegressive('hybrid2', 'water', getDataWater)
 
 if __name__ == "__main__":
-    runExperiment('lorenz', getDataLorenz, [nrmse, r_squared], True)
-    runExperiment('mgs', getDataMGS, [nrmse, r_squared], True)
-    runExperiment('dde', getDataDDE, [nrmse, r_squared], True)
-    runExperiment('laser', getDataLaser, [nrmse, r_squared], True)
-    runExperiment('sunspots', getDataSunspots, [nrmse_sunspots, r_squared], False)
-    runExperiment('water', getDataWater, [nrmse, r_squared], False)
+    runExperiment('lorenz', getDataLorenz, [nrmse, r_squared], True, 0.001)
+    runExperiment('mgs', getDataMGS, [nrmse, r_squared], True, 0.02)
+    runExperiment('dde', getDataDDE, [nrmse, r_squared], True, 0.0003)
+    runExperiment('laser', getDataLaser, [nrmse, r_squared], True, 1.1)
+    runExperiment('sunspots', getDataSunspots, [nrmse_sunspots, r_squared], False, None)
+    runExperiment('water', getDataWater, [nrmse, r_squared], False, None)
 
