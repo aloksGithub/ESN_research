@@ -19,7 +19,7 @@ def nrmse(y_true, y_pred):
     mean_norm = np.linalg.norm(np.mean(y_true))
     error = rmse/mean_norm
     if math.isnan(error):
-        return np.inf
+        return 100000
     else:
         return error
     
