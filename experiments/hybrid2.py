@@ -58,8 +58,8 @@ def runExperiment(dataset, dataLoader, errorMetrics, isAutoregressive, earlyStop
             model = ga.bestModel
             runModel(model, valX)
             preds = runModel(model, testX)
-            nrmseError = ga.errorMetrics[0](testY, preds)
-            r2Error = ga.errorMetrics[1](testY, preds)
+            nrmseError = ga.evalParams.errorMetrics[0](testY, preds)
+            r2Error = ga.evalParams.errorMetrics[1](testY, preds)
             nrmseErrors.append(nrmseError)
             r2_squaredValues.append(r2Error)
     print(f'========================Performance for dataset {dataset}========================')
