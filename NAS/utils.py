@@ -275,9 +275,9 @@ def generateRandomArchitecture(
         )
 
 def generateRandomArchitectureOld(
-    outputDim, sampleInput, memoryLimit=4 * 1024
+    outputDim, sampleInput, memoryLimit=4 * 1024, num_nodes_range=(2, 4)
 ):
-    num_nodes = random.randint(2, 4)
+    num_nodes = random.randint(num_nodes_range[0], num_nodes_range[1])
 
     nodes = [{"type": "Input", "params": {"input_dim": sampleInput.shape[-1]}}]
 

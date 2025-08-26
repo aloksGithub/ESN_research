@@ -78,6 +78,10 @@ class EvalParams:
         self.memoryLimit = memoryLimit
         self.minimizeFitness = minimizeFitness
 
+class ModelParams:
+    def __init__(self, num_nodes_range=(2, 4)):
+        self.num_nodes_range = num_nodes_range
+
 
 class GA_Base:
     def __init__(
@@ -85,6 +89,7 @@ class GA_Base:
         experimentData: ExperimentData,
         evalParams: EvalParams,
         gaParams: GAParams,
+        modelParams: ModelParams,
         seedModels=[],
         n_jobs=1,
         saveModels=False,
@@ -93,6 +98,7 @@ class GA_Base:
         self.experimentData = experimentData
         self.evalParams = evalParams
         self.gaParams = gaParams
+        self.modelParams = modelParams
         self.outputDim = self.experimentData.trainY.shape[-1]
 
         if self.evalParams.minimizeFitness:
@@ -159,6 +165,7 @@ class GA_Base:
                         self.experimentData.trainY.shape[-1],
                         self.experimentData.trainX,
                         self.evalParams.memoryLimit,
+                        self.modelParams.num_nodes_range,
                     )
                     for _ in range(numIndividuals - len(generatedArchitectures))
                 ],
@@ -295,6 +302,7 @@ class ESN_NAS(GA_Base):
         experimentData: ExperimentData,
         evalParams: EvalParams,
         gaParams: GAParams,
+        modelParams: ModelParams,
         seedModels=[],
         n_jobs=1,
         saveModels=False,
@@ -304,6 +312,7 @@ class ESN_NAS(GA_Base):
             experimentData,
             evalParams,
             gaParams,
+            modelParams,
             seedModels,
             n_jobs,
             saveModels,

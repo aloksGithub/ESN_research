@@ -1,6 +1,6 @@
 from bayes_opt import BayesianOptimization
 import reservoirpy as rpy
-from NAS.ESN_NAS import EvalParams, ExperimentData, GA_Base, GAParams
+from NAS.ESN_NAS import EvalParams, ExperimentData, GA_Base, GAParams, ModelParams
 from NAS.parallel_processing import executeParallelBatch
 from NAS.utils import (
     evaluateArchitecture,
@@ -70,6 +70,7 @@ class ESN_NAS2(GA_Base):
         experimentData: ExperimentData,
         evalParams: EvalParams,
         gaParams: GAParams,
+        modelParams: ModelParams,
         seedModels=[],
         n_jobs=1,
         saveModels=False,
@@ -81,6 +82,7 @@ class ESN_NAS2(GA_Base):
             experimentData,
             evalParams,
             gaParams,
+            modelParams,
             seedModels,
             n_jobs,
             saveModels,
