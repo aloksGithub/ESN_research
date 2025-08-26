@@ -16,7 +16,7 @@ import warnings
 warnings.filterwarnings("ignore")
 rpy.verbosity(0)
 
-def runExperiment(dataset, dataLoader, errorMetrics, isAutoregressive, earlyStop=None):
+def runExperiment(dataset, dataLoader, errorMetrics, isAutoregressive, earlyStop=None, save_folder='hybrid2'):
     trainX, trainY, valX, valY, testX, testY = dataLoader()
     experimentData = ExperimentData(trainX, trainY, valX, valY, testX, testY)
     evalParams = EvalParams(
@@ -38,7 +38,7 @@ def runExperiment(dataset, dataLoader, errorMetrics, isAutoregressive, earlyStop
         earlyStop=earlyStop,
     )
     modelParams = ModelParams(
-        num_nodes_range=(2, 4),
+        num_nodes_range=(1, 2),
     )
     nrmseErrors = []
     r2_squaredValues = []
@@ -50,7 +50,7 @@ def runExperiment(dataset, dataLoader, errorMetrics, isAutoregressive, earlyStop
             gaParams,
             modelParams,
             n_jobs=20,
-            saveLocation='hybrid2/{}/backup_{}.obj'.format(dataset, i),
+            saveLocation='{}/{}/backup_{}.obj'.format(save_folder, dataset, i),
             bo_init=0,
             bo_iter=5
         )
@@ -74,19 +74,19 @@ def runExperiment(dataset, dataLoader, errorMetrics, isAutoregressive, earlyStop
     print("NRMSE: {} ({})".format(np.average(nrmseErrors), np.std(nrmseErrors)))
     print("R2: {} ({})".format(np.average(r2_squaredValues), np.std(r2_squaredValues)))
 
-def printAllSavedResults():
-    printSavedResults('hybrid2', 'mgs')
-    printSavedResults('hybrid2', 'lorenz')
-    printSavedResults('hybrid2', 'dde')
-    printSavedResults('hybrid2', 'laser')
-    printSavedResultsAutoRegressive('hybrid2', 'sunspots', getDataSunspots)
-    printSavedResultsAutoRegressive('hybrid2', 'water', getDataWater)
+def printAllSavedResults(save_folder='hybrid2'):
+    printSavedResults(save_folder, 'mgs')
+    printSavedResults(save_folder, 'lorenz')
+    printSavedResults(save_folder, 'dde')
+    printSavedResults(save_folder, 'laser')
+    printSavedResultsAutoRegressive(save_folder, 'sunspots', getDataSunspots)
+    printSavedResultsAutoRegressive(save_folder, 'water', getDataWater)
 
 if __name__ == "__main__":
-    runExperiment('lorenz', getDataLorenz, [nrmse, r_squared], True, 0.001)
-    runExperiment('mgs', getDataMGS, [nrmse, r_squared], True, 0.02)
-    runExperiment('dde', getDataDDE, [nrmse, r_squared], True, 0.0003)
-    runExperiment('laser', getDataLaser, [nrmse, r_squared], True, 1.1)
-    runExperiment('sunspots', getDataSunspots, [nrmse_sunspots, r_squared], False, None)
-    runExperiment('water', getDataWater, [nrmse, r_squared], False, None)
+    # runExperiment('lorenz', getDataLorenz, [nrmse, r_squared], True, 0.001)
+    # runExperiment('mgs', getDataMGS, [nrmse, r_squared], True, 0.02)
+    # runExperiment('dde', getDataDDE, [nrmse, r_squared], True, 0.0003)
+    # runExperiment('laser', getDataLaser, [nrmse, r_squared], True, 1.1)
+    # runExperiment('sunspots', getDataSunspots, [nrmse_sunspots, r_squared], False, None)
+    runExperiment('water', getDataWater, [nrmse, r_squared], False, None, 'hybrid2_small_models')
 
