@@ -2,6 +2,8 @@ import pandas as pd
 import numpy as np
 import pickle
 import math
+from NAS.ESN_BO import ESN_BO
+from NAS.ESN_NAS import ESN_NAS
 from NAS.utils import runModel
 
 
@@ -15,7 +17,7 @@ def printSavedResults(directory, dataset):
     r2_squaredValues = []
     times = []
     for i in range(5):
-        ga = readSavedExperiment("{}/{}/backup_{}.obj".format(directory, dataset, i))
+        ga: ESN_NAS = readSavedExperiment("{}/{}/backup_{}.obj".format(directory, dataset, i))
         nrmseErrors.append(ga.bestFitness[0])
         r2_squaredValues.append(ga.bestFitness[1])
         try:
@@ -38,21 +40,21 @@ def printSavedResultsAutoRegressive(directory, dataset, dataLoader):
     errors = []
     times = []
     for i in range(5):
-        ga = readSavedExperiment("{}/{}/backup_{}.obj".format(directory, dataset, i))
+        ga: ESN_NAS = readSavedExperiment("{}/{}/backup_{}.obj".format(directory, dataset, i))
         try:
             times.append(sum(ga.generationTimes))
         except:
             times.append(0)
         model = ga.bestModel
-        runModel(model, ga.valX)
+        runModel(model, ga.experimentData.valX)
         preds = runModel(model, testX)
         experiment_errors = []
-        for metric in ga.errorMetrics:
+        for metric in ga.evalParams.errorMetrics:
             experiment_errors.append(metric(testY, preds))
         errors.append(experiment_errors)
     averaged_errors = []
     error_stds = []
-    for i, metric in enumerate(ga.errorMetrics):
+    for i, metric in enumerate(ga.evalParams.errorMetrics):
         averaged_error = np.average(
             [experiment_errors[i] for experiment_errors in errors]
         )
@@ -73,7 +75,7 @@ def printSavedBoResults(directory, dataset):
     nrmseErrors = []
     rSquaredValues = []
     for i in range(5):
-        bo = readSavedExperiment("{}/{}/backup_{}.obj".format(directory, dataset, i))
+        bo: ESN_BO = readSavedExperiment("{}/{}/backup_{}.obj".format(directory, dataset, i))
         mainErrors = [e[0] for e in bo.performances]
         bestErrors = bo.performances[
             mainErrors.index(min(mainErrors) if bo.minimizeFitness else max(mainErrors))

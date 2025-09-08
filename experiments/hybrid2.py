@@ -38,7 +38,7 @@ def runExperiment(dataset, dataLoader, errorMetrics, isAutoregressive, earlyStop
         earlyStop=earlyStop,
     )
     modelParams = ModelParams(
-        num_nodes_range=(4, 8),
+        num_nodes_range=(3, 5),
     )
     nrmseErrors = []
     r2_squaredValues = []
@@ -87,6 +87,6 @@ if __name__ == "__main__":
     # runExperiment('mgs', getDataMGS, [nrmse, r_squared], True, 0.02)
     # runExperiment('dde', getDataDDE, [nrmse, r_squared], True, 0.0003)
     # runExperiment('laser', getDataLaser, [nrmse, r_squared], True, 1.1)
-    runExperiment('sunspots', getDataSunspots, [nrmse_sunspots, r_squared], False, None, 'hybrid2_big_models')
+    runExperiment('sunspots', getDataSunspots, [nrmse_sunspots, r_squared], False, None, 'hybrid2_sunspots_tests')
     # runExperiment('water', getDataWater, [nrmse, r_squared], False, None, 'hybrid2_small_models')
 
