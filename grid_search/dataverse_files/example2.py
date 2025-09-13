@@ -45,6 +45,9 @@ import ESN_Torch as ESN
 import tracemalloc
 from scipy.stats import uniform
 from sklearn.metrics import r2_score
+import sys
+import multiprocessing as mp
+import os
 
 def set_seed(seed=None):
     """Making the seed (for random values) variable if None"""
@@ -213,7 +216,7 @@ def getDataLaser():
     data = data[:2801,:]
     from scipy import stats
     data = stats.zscore(data)
-    params = [1024, 0.41, 0.906, 0.84, 1, 8.1e-7, 1, S_T, S_I, 0, 'spawW', 0.84, 100]
+    params = [1024, 0.41, 0.906, 0.84, 1, 8.1e-7, 1, S_T, 74, 0, 'spawW', 0.84, 100]
     return data, params
 
 def getDataDDE():
@@ -225,7 +228,7 @@ def getDataDDE():
     data = data[:2801,:]
     # from scipy import stats
     # data = stats.zscore(data)
-    params = [256, 0.84, 0.995, 0.91, 1, 8.3e-7, 1, S_T, S_I, 0, 'sparW', 0.91, 500]
+    params = [256, 0.84, 0.995, 0.91, 1, 8.3e-7, 1, S_T, 49, 0, 'sparW', 0.91, 500]
     return data, params
 
 def getDataLorenz():
@@ -233,11 +236,8 @@ def getDataLorenz():
     dim = 3
     # data = getDataLaser()
     data = np.load('Samples/Lorenz_normed_2801.npy')
-    # data = data.reshape((data.shape[0],1))
-    data = data[:2801,:]
-    from scipy import stats
-    data = stats.zscore(data)
-    params = [2048, 0.88, 0, 0, 1, 1.1e-6, 1, S_T, S_I, 0, 'sparW', 0, 444]
+    
+    params = [2048, 0.88, 0, 0, 1, 1.1e-6, 1, S_T, 59, 0, 'sparW', 0, 444]
     return data, params
 
 def getDataMGS():
@@ -248,32 +248,31 @@ def getDataMGS():
     data = data[:2801,:]
     from scipy import stats
     data = stats.zscore(data)
-    params = [2048, 0.68, 1.406, 0.44, 1, 6e-7, 1, S_T, S_I, 0, 'sparW', 0.44, 286]
+    params = [2048, 0.68, 1.406, 0.44, 1, 6e-7, 1, S_T, 82, 0, 'sparW', 0.44, 286]
     return data, params
+
+
+
+def _init_worker(shared_data, shared_dim):
+    # Initialize per-process globals (Windows spawn)
+    global data, dim
+    data = shared_data
+    dim = int(shared_dim)
+
+def _eval_seed(args):
+    seed, base_params = args
+    p = list(base_params)
+    p[9] = int(seed)
+    result = network(p)
+    print(result[0], result[2])
+    return result
 
 if __name__ == '__main__':
     tracemalloc.start()
-    data, best_params = getDataLorenz()
-    
-    #hyperparameters
-    gamma = 1
+    datasets = [getDataDDE, getDataLorenz, getDataMGS, getDataLaser]
+    data, best_params = datasets[int(sys.argv[1])]()
 
-    rho = .995
 
-    N_n = 256#1024
-
-    sparW = 1
-    sparWin = 1
-
-    beta = 1e-6
-
-    sigma = 1
-
-    S_I = 300
-    S_T = 2000
-
-    params = [100, 1, .9, 1, 1, 1e-6, 1, 2000, 300, 128, 10]
-    
     cluster = 15
     seedNum = 100
     ret = np.zeros((3, cluster+1,seedNum))
@@ -281,15 +280,6 @@ if __name__ == '__main__':
     #Read 100 fixed seeds for reproducibility
     seedSet = np.genfromtxt('seeds.csv')
     
-    
-    ####
-    # N_n tested for 256, ..., 2048
-    ####
-    N_n = 2048
-    
-    ####
-    # Select Hyper-parameter
-    ####
 
     spar = np.linspace(0.1,1,10)
     #N_n = [256, 512, 1024, 2048]
@@ -299,17 +289,22 @@ if __name__ == '__main__':
     cluster = spar.shape[0]
     ret = np.zeros((3, cluster, seedNum))
 
-    best = 999999
-    allResults = []
-    for i in range(len(seedSet)):
-        best_params[9] = seedSet[i]
-        result = network(best_params)
-        allResults.append(result[0])
-        if result[0]<best:
-            best = result[0]
-        print(best, result[0])
-    print(allResults)
-    print((allResults[49] + allResults[50]) / 2)
+    # Parallel evaluation across seeds
+    cpu_count = max(1, (os.cpu_count() or 1) - 1)
+    with mp.get_context("spawn").Pool(processes=25, initializer=_init_worker, initargs=(data, dim)) as pool:
+        results = list(pool.map(_eval_seed, [(int(s), best_params) for s in seedSet]))
+
+    # results: list of [nrmse, mse, r2, intMAE]
+    results = np.asarray(results)
+    best_r2 = float(np.max(results[:,2]))
+    best_nrmse = float(np.min(results[:,0]))
+    med_r2 = float(np.median(results[:,2]))
+    med_nrmse = float(np.median(results[:,0]))
+
+    print(f"Best R2 over {len(results)} seeds: {best_r2}")
+    print(f"Median R2: {med_r2}")
+    print(f"Best NRMSE: {best_nrmse}")
+    print(f"Median NRMSE: {med_nrmse}")
 
     # for j in range(cluster):
     #     for i in range(seedNum):
