@@ -291,7 +291,7 @@ if __name__ == '__main__':
 
     # Parallel evaluation across seeds
     cpu_count = max(1, (os.cpu_count() or 1) - 1)
-    with mp.get_context("spawn").Pool(processes=10, initializer=_init_worker, initargs=(data, dim)) as pool:
+    with mp.get_context("spawn").Pool(processes=5, initializer=_init_worker, initargs=(data, dim)) as pool:
         results = list(pool.map(_eval_seed, [(int(s), best_params) for s in seedSet]))
 
     # results: list of [nrmse, mse, r2, intMAE]
