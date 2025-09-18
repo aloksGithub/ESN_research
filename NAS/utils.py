@@ -5,12 +5,11 @@ from NAS.LMS_serializable import LMS
 from reservoirpy.observables import nrmse
 import numpy as np
 import random
-import math
 import warnings
 from NAS.memory_estimator import estimateMemory
-import time
 import networkx as nx
 import random
+import copy
 
 warnings.filterwarnings("ignore")
 
@@ -397,6 +396,7 @@ def evaluateArchitecture(
             try:
                 model = constructModel(individual)
                 model = trainModel(model, trainX, trainY)
+                model_copy = copy.deepcopy(model)
 
                 if isAutoRegressive:
                     prevOutput = valX[0]
@@ -411,7 +411,7 @@ def evaluateArchitecture(
 
                 modelErrors = [metric(valY, preds) for metric in errorMetrics]
                 errors.append(modelErrors)
-                models.append(model)
+                models.append(model_copy)
             except Exception:
                 errors.append(defaultErrors)
                 models.append(None)
@@ -466,11 +466,11 @@ def trainModel(model, trainX, trainY):
     outputNode = output_nodes[0]
     isOutputNodeOffline = "Ridge" in outputNode
     if hasOfflineNode:
-        model.fit(trainX, trainY, warmup=min(int(len(trainX) / 10), 82))
+        model.fit(trainX, trainY, warmup=82)
     if hasOnlineNode:
         model.train(trainX, trainY)
     if isOutputNodeOffline:
-        model.fit(trainX, trainY, warmup=min(int(len(trainX) / 10), 82))
+        model.fit(trainX, trainY, warmup=82)
     return model
 
 
