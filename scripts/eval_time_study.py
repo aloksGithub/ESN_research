@@ -6,10 +6,10 @@ import numpy as np
 current_dir = os.path.abspath(os.path.dirname(__file__))
 parent_dir = os.path.dirname(current_dir)
 sys.path.insert(0, parent_dir)
-from NAS.utils import constructModel, evaluateArchitecture, generateRandomArchitectureOld, generateRandomNodeParams, nodeConstructors, runModel
-from NAS.parallel_processing import executeParallelBatch
-from utils import getDataMGS, getDataDDE
-from NAS.memory_estimator import estimateMemory
+from src.utils import constructModel, evaluateArchitecture, generateRandomArchitectureOld, generateRandomNodeParams, nodeConstructors, runModel
+from src.parallel_processing import executeParallelBatch
+from src.datasets import getDataMGS, getDataDDE
+from src.memory_estimator import estimateMemory
 
 trainX, trainY, valX, valY, testX, testY = getDataDDE()
 

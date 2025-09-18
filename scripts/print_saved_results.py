@@ -4,13 +4,12 @@ import sys
 import os
 import pickle
 
-from src.algorithms.ESN_BO import ESN_BO
-from src.algorithms.ESN_GA import ESN_GA
-
 current_dir = os.path.abspath(os.path.dirname(__file__))
 parent_dir = os.path.dirname(current_dir)
 sys.path.insert(0, parent_dir)
 from src.utils import runModel
+from src.algorithms.ESN_BO import ESN_BO
+from src.algorithms.ESN_GA import ESN_GA
 
 def readSavedExperiment(path):
     file = open(path, "rb")

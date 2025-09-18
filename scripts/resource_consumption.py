@@ -5,22 +5,23 @@ import warnings
 current_dir = os.path.abspath(os.path.dirname(__file__))
 parent_dir = os.path.dirname(current_dir)
 sys.path.insert(0, parent_dir)
-from NAS.ESN_NAS import ESN_NAS
-from NAS.utils import trainModel, runModel
-from NAS.error_metrics import nrmse, r_squared
-from NAS.memory_estimator import measure_memory_usage, estimateMemory
-from utils import readSavedExperiment, getDataDDE, getDataLaser, getDataLorenz, getDataMGS, getDataSunspots, getDataWater
+from src.algorithms.ESN_GA import ESN_GA
+from src.utils import trainModel, runModel
+from src.error_metrics import nrmse, r_squared
+from src.memory_estimator import measure_memory_usage, estimateMemory
+from src.datasets import getDataDDE, getDataLaser, getDataLorenz, getDataMGS, getDataSunspots, getDataWater
+from src.utils import readSavedExperiment
 import time
 import numpy as np
 
-def findBestGaArchitecture(ga: ESN_NAS):
+def findBestGaArchitecture(ga: ESN_GA):
     errors = [errors[0] for errors in ga.fitnesses]
     gaBestError = min(errors)
     gaBestErrorIndex = errors.index(gaBestError)
     gaBestModel = ga.architectures[gaBestErrorIndex]
     return gaBestModel, gaBestError
 
-def findBestGasArchitecture(gas: list[ESN_NAS]):
+def findBestGasArchitecture(gas: list[ESN_GA]):
     bestError = np.inf
     bestArchitecture = None
     for ga in gas:
@@ -29,7 +30,7 @@ def findBestGasArchitecture(gas: list[ESN_NAS]):
             bestArchitecture = architecture
     return bestArchitecture
 
-def findBestGa(gas: list[ESN_NAS]):
+def findBestGa(gas: list[ESN_GA]):
     bestError = np.inf
     bestGa = None
     for ga in gas:

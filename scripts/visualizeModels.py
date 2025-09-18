@@ -1,8 +1,8 @@
 import networkx as nx
 import matplotlib.pyplot as plt
-from NAS.ESN_NAS import ESN_NAS
-from NAS.error_metrics import nrmse, r_squared
-from utils import readSavedExperiment
+from src.algorithms.ESN_GA import ESN_GA
+from src.error_metrics import nrmse, r_squared
+from src.utils import readSavedExperiment
 import numpy as np
 
 def visualize_esn_architecture(architecture):
@@ -62,14 +62,14 @@ def visualize_esn_architecture(architecture):
     plt.tight_layout()
     plt.show()
 
-def findBestGaArchitecture(ga: ESN_NAS):
+def findBestGaArchitecture(ga: ESN_GA):
     errors = [errors[0] for errors in ga.fitnesses]
     gaBestError = min(errors)
     gaBestErrorIndex = errors.index(gaBestError)
     gaBestModel = ga.architectures[gaBestErrorIndex]
     return gaBestModel, gaBestError
 
-def findBestGasArchitecture(gas: list[ESN_NAS]):
+def findBestGasArchitecture(gas: list[ESN_GA]):
     bestError = np.inf
     bestArchitecture = None
     for ga in gas:
