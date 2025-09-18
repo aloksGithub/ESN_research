@@ -38,17 +38,18 @@ def findBestGa(gas: list[ESN_NAS]):
             bestGa = ga
     return bestGa
 
-
+# Stub function to avoid import errors
 def nrmse_sunspots(y_true, y_pred):
     return 0
 
 if __name__ == "__main__":
-    dataNames = ['water']
-    datasets = [getDataWater]
+    dataNames = ['dde', 'laser', 'lorenz', 'mgs', 'sunspots', 'water']
+    datasets = [getDataDDE, getDataLaser, getDataLorenz, getDataMGS, getDataSunspots, getDataWater]
+    esnas_save_locations = ['hybrid2', 'hybrid2', 'hybrid2', 'hybrid2', 'hybrid2_sunspots_tests', 'hybrid2_small_models']
     for i, getDataset in enumerate(datasets):
         trainX, trainY, valX, valY, testX, testY = getDataset()
         print(len(trainX))
-        bos = [readSavedExperiment('./backup_bo/{}/backup_{}.obj'.format(dataNames[i], j)) for j in [0, 1, 2, 4]]
+        bos = [readSavedExperiment('./backup_bo2/{}/backup_{}.obj'.format(dataNames[i], j)) for j in range(5)]
         maxMemory = 0
         maxTime = 0
         for bo in bos:
@@ -68,7 +69,7 @@ if __name__ == "__main__":
                 pass
         print(f'BO_{dataNames[i]}: {maxMemory} MB       {maxTime}s')
 
-        gas = [readSavedExperiment(f'./backup_50/{dataNames[i]}/backup_{j}.obj') for j in [0, 1, 2, 4]]
+        gas = [readSavedExperiment(f'./{esnas_save_locations[i]}/{dataNames[i]}/backup_{j}.obj') for j in range(5)]
         maxMemory = 0
         maxTime = 0
         for ga in gas:
@@ -87,23 +88,3 @@ if __name__ == "__main__":
             except:
                 pass
         print(f'ESNAS_{dataNames[i]}: {maxMemory} MB       {maxTime}s')
-        
-        hybrid = [readSavedExperiment('./backup_hybrid/{}/backup_{}.obj'.format(dataNames[i], j)) for j in [0, 1, 2, 4]]
-        maxMemory = 0
-        maxTime = 0
-        for ga in hybrid:
-            model = ga.bestModel
-            def func():
-                trainModel(model, trainX, trainY)
-                runModel(model, valX)
-            startTime = time.time()
-            try:
-                accurate = measure_memory_usage(func)
-                timeTaken = time.time() - startTime
-                if accurate>maxMemory:
-                    maxMemory = accurate
-                if timeTaken>maxTime:
-                    maxTime = timeTaken
-            except:
-                pass
-        print(f'ESNAS+BO_{dataNames[i]}: {maxMemory} MB       {maxTime}s')
