@@ -1,5 +1,4 @@
 from bayes_opt import BayesianOptimization
-import reservoirpy as rpy
 from NAS.ESN_NAS import EvalParams, ExperimentData, GA_Base, GAParams, ModelParams
 from NAS.parallel_processing import executeParallelBatch
 from NAS.utils import (
@@ -8,59 +7,9 @@ from NAS.utils import (
     nodeParameterRanges,
 )
 from deap import creator
-import warnings
 import pickle
 import copy
-import multiprocessing as mp
-import concurrent.futures as cf
-
-warnings.filterwarnings("ignore")
 import time
-import os
-
-rpy.verbosity(0)
-
-# Concurrency control: ensure we do not start the timeout clock while a job is
-# merely waiting in the pool's queue.  Each `safe_evaluate` call acquires the
-# semaphore, which blocks until a free worker is available, thereby guaranteeing
-# that the evaluation receives its full allotted time.
-
-import threading
-
-_MP_CTX = mp.get_context("spawn")
-# Size of the pool = number of logical CPUs by default.  Adjust via
-# the ``EVAL_POOL_SIZE`` env var if you want a manual limit.
-_POOL_SIZE = int(os.environ.get("EVAL_POOL_SIZE", os.cpu_count()))
-
-# Bounds the number of concurrent evaluations and lets us block until a worker
-# is actually free.  That way the timeout applies strictly to time *inside* the
-# worker process.
-
-_WORKER_SEM = threading.BoundedSemaphore(_POOL_SIZE)
-
-# Global pool management - we need to replace the pool when it gets corrupted by timeouts
-_EVAL_POOL = None
-_POOL_LOCK = threading.Lock()
-
-def get_pool():
-    """Get the current evaluation pool, creating one if necessary."""
-    global _EVAL_POOL
-    with _POOL_LOCK:
-        if _EVAL_POOL is None:
-            _EVAL_POOL = cf.ProcessPoolExecutor(max_workers=_POOL_SIZE, mp_context=_MP_CTX)
-        return _EVAL_POOL
-
-def replace_pool():
-    """Replace the current pool with a fresh one (used when the pool gets corrupted)."""
-    global _EVAL_POOL
-    with _POOL_LOCK:
-        if _EVAL_POOL is not None:
-            try:
-                _EVAL_POOL.shutdown(wait=False, cancel_futures=True)
-            except:
-                pass  # Pool might already be broken
-        _EVAL_POOL = cf.ProcessPoolExecutor(max_workers=_POOL_SIZE, mp_context=_MP_CTX)
-
 
 class ESN_NAS2(GA_Base):
     """Genetic algorithm to obtain an optimized ESN architecture for a dataset"""
