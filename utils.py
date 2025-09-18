@@ -2,7 +2,6 @@ import pandas as pd
 import numpy as np
 import pickle
 import math
-from NAS.ESN_BO import ESN_BO
 from NAS.ESN_NAS import ESN_NAS
 from NAS.utils import runModel
 
@@ -12,32 +11,9 @@ def readSavedExperiment(path):
     return pickle.load(file)
 
 
-def printSavedResults(directory, dataset):
+def printSavedResults(directory, dataset, isAutoregressive=True):
     nrmseErrors = []
     r2_squaredValues = []
-    times = []
-    for i in range(5):
-        ga: ESN_NAS = readSavedExperiment("{}/{}/backup_{}.obj".format(directory, dataset, i))
-        nrmseErrors.append(ga.bestFitness[0])
-        r2_squaredValues.append(ga.bestFitness[1])
-        try:
-            times.append(sum(ga.generationTimes))
-        except:
-            times.append(0)
-    print("Errors:")
-    print(nrmseErrors)
-    print(r2_squaredValues)
-    print("Averaged errors:")
-    print("NRMSE: {} ({})".format(np.average(nrmseErrors), np.std(nrmseErrors)))
-    print("R2: {} ({})".format(np.average(r2_squaredValues), np.std(r2_squaredValues)))
-    print("Times:")
-    print(times)
-    print("Average time: {} ({})".format(np.average(times), np.std(times)))
-
-
-def printSavedResultsAutoRegressive(directory, dataset, dataLoader):
-    _, _, _, _, testX, testY = dataLoader()
-    errors = []
     times = []
     for i in range(5):
         ga: ESN_NAS = readSavedExperiment("{}/{}/backup_{}.obj".format(directory, dataset, i))
@@ -45,76 +21,36 @@ def printSavedResultsAutoRegressive(directory, dataset, dataLoader):
             times.append(sum(ga.generationTimes))
         except:
             times.append(0)
-        model = ga.bestModel
-        runModel(model, ga.experimentData.valX)
-        preds = runModel(model, testX)
-        experiment_errors = []
-        for metric in ga.evalParams.errorMetrics:
-            experiment_errors.append(metric(testY, preds))
-        errors.append(experiment_errors)
-    averaged_errors = []
-    error_stds = []
-    for i, metric in enumerate(ga.evalParams.errorMetrics):
-        averaged_error = np.average(
-            [experiment_errors[i] for experiment_errors in errors]
-        )
-        std = np.std([experiment_errors[i] for experiment_errors in errors])
-        averaged_errors.append(averaged_error)
-        error_stds.append(std)
-    print("Errors:")
-    print(errors)
-    print("Averaged errors:")
-    print(averaged_errors)
-    print(error_stds)
-    print("Times:")
-    print(times)
-    print("Average time: {} ({})".format(np.average(times), np.std(times)))
+        best_model = ga.bestModel
+        if isAutoregressive:
+            runModel(best_model, ga.experimentData.trainX)
+            prevOutput = ga.experimentData.valX[0]
+            preds = []
+            for _ in range(len(ga.experimentData.valX)):
+                pred = runModel(best_model, prevOutput)
+                prevOutput = pred
+                preds.append(pred[0])
+            preds = np.array(preds)
+            nrmse_error = ga.evalParams.errorMetrics[0](ga.experimentData.valY, preds)
+            r2_error = ga.evalParams.errorMetrics[1](ga.experimentData.valY, preds)
+        else:
+            runModel(best_model, ga.experimentData.valX)
+            preds = runModel(best_model, ga.experimentData.testX)
+            nrmse_error = ga.evalParams.errorMetrics[0](ga.experimentData.testY, preds)
+            r2_error = ga.evalParams.errorMetrics[1](ga.experimentData.testY, preds)
 
-
-def printSavedBoResults(directory, dataset):
-    nrmseErrors = []
-    rSquaredValues = []
-    for i in range(5):
-        bo: ESN_BO = readSavedExperiment("{}/{}/backup_{}.obj".format(directory, dataset, i))
-        mainErrors = [e[0] for e in bo.performances]
-        bestErrors = bo.performances[
-            mainErrors.index(min(mainErrors) if bo.minimizeFitness else max(mainErrors))
-        ]
-        nrmseError = bestErrors[0]
-        r2Error = bestErrors[1]
-        nrmseErrors.append(nrmseError)
-        rSquaredValues.append(r2Error)
-        print("Result:", nrmseError, r2Error)
-    print("Errors:")
-    print(nrmseErrors)
-    print(rSquaredValues)
-    print("Averaged errors:")
-    print("NRMSE: {} ({})".format(np.average(nrmseErrors), np.std(nrmseErrors)))
-    print("R2: {} ({})".format(np.average(rSquaredValues), np.std(rSquaredValues)))
-
-
-def printOldSavedResults(dataset):
-    nrmseErrors = []
-    r2_squaredValues = []
-    total = 0
-    r2_total = 0
-    for i in range(5):
-        data = readSavedExperiment("old_backup/{}/backup_{}.obj".format(dataset, i))
-        total += min(data["allFitnesses"])
-        nrmseErrors.append(min(data["allFitnesses"]))
-        r2_squaredValues.append(
-            data["fitnesses2"][data["allFitnesses"].index(min(data["allFitnesses"]))]
-        )
-        r2_total += data["fitnesses2"][
-            data["allFitnesses"].index(min(data["allFitnesses"]))
-        ]
-    print("Errors:")
-    print(nrmseErrors)
-    print(r2_squaredValues)
+        nrmseErrors.append(nrmse_error)
+        r2_squaredValues.append(r2_error)
+    print("==============================================================")
+    print("{} Errors:".format(dataset))
+    print("NRMSE:", nrmseErrors)
+    print("R2:", r2_squaredValues)
     print("Averaged errors:")
     print("NRMSE: {} ({})".format(np.average(nrmseErrors), np.std(nrmseErrors)))
     print("R2: {} ({})".format(np.average(r2_squaredValues), np.std(r2_squaredValues)))
-
+    print("Times:")
+    print(times)
+    print("Average time: {} ({})".format(np.average(times), np.std(times)))
 
 # https://www.sciencedirect.com/science/article/pii/S0925231222014291
 # Parameterizing echo state networks for multi-step time series prediction
@@ -128,9 +64,9 @@ def getDataMGS():
     data = stats.zscore(data)
     data.shape
 
-    trainLen = 2000
+    trainLen = 2300
     valLen = 286
-    testLen = 286
+    testLen = 0
     train_in = data[0:trainLen]
     train_out = data[0 + 1 : trainLen + 1]
     val_in = data[trainLen : trainLen + valLen]
@@ -152,9 +88,9 @@ def getDataLaser():
 
     data = stats.zscore(data)
 
-    trainLen = 2000
+    trainLen = 2300
     valLen = 100
-    testLen = 100
+    testLen = 0
     train_in = data[0:trainLen]
     train_out = data[0 + 1 : trainLen + 1]
     val_in = data[trainLen : trainLen + valLen]
@@ -170,9 +106,9 @@ def getDataLaser():
 def getDataDDE():
     data = np.load("./data/Neutral_normed_2801.npy")
 
-    trainLen = 2000
+    trainLen = 2300
     valLen = 500
-    testLen = 500
+    testLen = 0
     train_in = data[0:trainLen]
     train_out = data[0 + 1 : trainLen + 1]
     val_in = data[trainLen : trainLen + valLen]
@@ -188,9 +124,9 @@ def getDataDDE():
 def getDataLorenz():
     data = np.load("./data/Lorenz_normed_2801.npy")
 
-    trainLen = 2000
+    trainLen = 2300
     valLen = 444
-    testLen = 444
+    testLen = 0
     train_in = data[0:trainLen]
     train_out = data[0 + 1 : trainLen + 1]
     val_in = data[trainLen : trainLen + valLen]
