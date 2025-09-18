@@ -8,7 +8,7 @@ parent_dir = os.path.dirname(current_dir)
 sys.path.insert(0, parent_dir)
 from NAS.error_metrics import nrmse, nrmse_sunspots, r_squared
 warnings.filterwarnings("ignore")
-from utils import getDataMGS, getDataLaser, getDataDDE, getDataLorenz, getDataSunspots, getDataWater, getDataWaterMultiStep, readSavedExperiment, printSavedResults
+from utils import getDataMGS, getDataLaser, getDataDDE, getDataLorenz, getDataSunspots, getDataWater, getDataWaterMultiStep, readSavedExperiment
 from NAS.utils import runModel
 from NAS.ESN_BO import ESN_BO
 import math
