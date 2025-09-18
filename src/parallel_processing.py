@@ -1,5 +1,4 @@
 import multiprocessing
-import multiprocessing.queues
 from multiprocessing import Pool
 import time
 import os

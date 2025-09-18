@@ -1,6 +1,0 @@
-numpy
-scipy
-matplotlib
-torch
-scikit-learn
-pandas

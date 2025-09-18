@@ -1,18 +1,17 @@
 import numpy as np
 import copy
-from NAS.parallel_processing import executeParallelBatch
-from NAS.utils import (
+from bayes_opt import BayesianOptimization
+import pickle
+import os
+import time
+from ..algorithms.types import EvalParams, ExperimentData
+from ..parallel_processing import executeParallelBatch
+from ..utils import (
     nodeParameterRanges,
     constructModel,
     runModel,
     trainModel,
 )
-from bayes_opt import BayesianOptimization
-from reservoirpy.observables import nrmse
-import pickle
-import os
-import time
-
 
 class ESN_BO:
     """
@@ -22,39 +21,22 @@ class ESN_BO:
 
     def __init__(
         self,
-        trainX,
-        trainY,
-        valX,
-        valY,
+        experimentData: ExperimentData,
+        evalParams: EvalParams,
         n_rand,
         iterations,
-        outputDim,
         seedModel,
-        numEvals=3,
         n_jobs=3,
-        errorMetrics=[nrmse],
-        defaultErrors=[np.inf],
-        minimizeFitness=True,
-        timeout=180,
         saveLocation=None,
-        isAutoRegressive=False,
     ):
-        self.trainX = trainX
-        self.trainY = trainY
-        self.valX = valX
-        self.valY = valY
+        self.experimentData = experimentData
+        self.evalParams = evalParams
         self.n_rand = n_rand
         self.iterations = iterations
-        self.outputDim = outputDim
+        self.outputDim = self.experimentData.trainY.shape[-1]
         self.seedModel = seedModel
-        self.numEvals = numEvals
         self.n_jobs = n_jobs
-        self.errorMetrics = errorMetrics
-        self.defaultErrors = defaultErrors
         self.saveLocation = saveLocation if saveLocation is not None else "temp"
-        self.isAutoRegressive = isAutoRegressive
-        self.minimizeFitness = minimizeFitness
-        self.timeout = timeout
 
         self.pbounds = {}
         self.isInt = {}
@@ -86,23 +68,23 @@ class ESN_BO:
         results = executeParallelBatch(
             (
                 self.evaluateArchitectureAutoRegressive
-                if self.isAutoRegressive
+                if self.evalParams.isAutoRegressive
                 else self.evaluateArchitecture
             ),
-            [(individual,) for _ in range(self.numEvals)],
-            self.numEvals,
-            self.timeout,
+            [(individual,) for _ in range(self.evalParams.numEvals)],
+            self.evalParams.numEvals,
+            self.evalParams.timeout,
         )
 
         valid_results = [res for res in results if res is not None]
         if not valid_results:
-            errors = self.defaultErrors
+            errors = self.evalParams.defaultErrors
             bestModel = None
         else:
             main_errors = [res[0][0] for res in valid_results]
             best_error_index = (
                 np.argmin(main_errors)
-                if self.minimizeFitness
+                if self.evalParams.minimizeFitness
                 else np.argmax(main_errors)
             )
             errors = valid_results[best_error_index][0]
@@ -113,12 +95,12 @@ class ESN_BO:
 
         all_main_errors = [e[0] for e in self.performances]
         best_of_all_time_main_error = (
-            min(all_main_errors) if self.minimizeFitness else max(all_main_errors)
+            min(all_main_errors) if self.evalParams.minimizeFitness else max(all_main_errors)
         )
         if (
-            self.minimizeFitness
+            self.evalParams.minimizeFitness
             and best_of_all_time_main_error >= errors[0]
-            or not self.minimizeFitness
+            or not self.evalParams.minimizeFitness
             and best_of_all_time_main_error <= errors[0]
         ):
             self.bestModel = bestModel
@@ -136,13 +118,13 @@ class ESN_BO:
 
         try:
             model = constructModel(individual)
-            model = trainModel(model, self.trainX, self.trainY)
+            model = trainModel(model, self.experimentData.trainX, self.experimentData.trainY)
             model_copy = copy.deepcopy(model)
-            preds = runModel(model, self.valX)
-            errors = [metric(self.valY, preds) for metric in self.errorMetrics]
+            preds = runModel(model, self.experimentData.valX)
+            errors = [metric(self.experimentData.valY, preds) for metric in self.evalParams.errorMetrics]
             return errors, model_copy
         except Exception as e:
-            errors = self.defaultErrors
+            errors = self.evalParams.defaultErrors
             return errors, None
 
     def evaluateArchitectureAutoRegressive(self, individual):
@@ -153,19 +135,19 @@ class ESN_BO:
         """
         try:
             model = constructModel(individual)
-            model = trainModel(model, self.trainX, self.trainY)
+            model = trainModel(model, self.experimentData.trainX, self.experimentData.trainY)
             model_copy = copy.deepcopy(model)
-            prevOutput = self.valX[0]
+            prevOutput = self.experimentData.valX[0]
             preds = []
-            for _ in range(len(self.valX)):
+            for _ in range(len(self.experimentData.valX)):
                 pred = runModel(model, prevOutput)
                 prevOutput = pred
                 preds.append(pred[0])
             preds = np.array(preds)
-            errors = [metric(self.valY, preds) for metric in self.errorMetrics]
+            errors = [metric(self.experimentData.valY, preds) for metric in self.evalParams.errorMetrics]
             return errors, model_copy
         except:
-            errors = self.defaultErrors
+            errors = self.evalParams.defaultErrors
             return errors, None
 
     def black_box(self, **params):
@@ -208,7 +190,7 @@ class ESN_BO:
         mainErrors = [e[0] for e in self.performances]
         bestErrors = self.performances[
             mainErrors.index(
-                min(mainErrors) if self.minimizeFitness else max(mainErrors)
+                min(mainErrors) if self.evalParams.minimizeFitness else max(mainErrors)
             )
         ]
 

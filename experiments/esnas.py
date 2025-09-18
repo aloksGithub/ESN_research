@@ -2,19 +2,17 @@ import reservoirpy as rpy
 import numpy as np
 import sys
 import os
-
+import warnings
+warnings.filterwarnings("ignore")
+rpy.verbosity(0)
 
 current_dir = os.path.abspath(os.path.dirname(__file__))
 parent_dir = os.path.dirname(current_dir)
 sys.path.insert(0, parent_dir)
-from NAS.ESN_NAS import EvalParams, ExperimentData, GAParams, ModelParams
-from NAS.utils import runModel
-from NAS.ESN_NAS2 import ESN_NAS2
-from NAS.error_metrics import nrmse, nrmse_sunspots, r_squared
-from utils import getDataMGS, getDataDDE, getDataLaser, getDataLorenz, getDataSunspots, getDataWater, printSavedResults
-import warnings
-warnings.filterwarnings("ignore")
-rpy.verbosity(0)
+from src.algorithms.ESN_GA_BO import EvalParams, ExperimentData, GAParams, ModelParams, ESNAS
+from src.utils import runModel
+from src.error_metrics import nrmse, nrmse_sunspots, r_squared
+from src.datasets import getDataMGS, getDataDDE, getDataLaser, getDataLorenz, getDataSunspots, getDataWater
 
 def runExperiment(dataset, dataLoader, errorMetrics, isAutoregressive, earlyStop=None, save_folder='results/esnas', num_nodes_range=(2, 4)):
     trainX, trainY, valX, valY, testX, testY = dataLoader()
@@ -44,7 +42,7 @@ def runExperiment(dataset, dataLoader, errorMetrics, isAutoregressive, earlyStop
     r2_squaredValues = []
     print(f'========================Starting GA for dataset {dataset}========================')
     for i in range(5):
-        ga = ESN_NAS2(
+        ga = ESNAS(
             experimentData,
             evalParams,
             gaParams,
@@ -74,16 +72,7 @@ def runExperiment(dataset, dataLoader, errorMetrics, isAutoregressive, earlyStop
     print("NRMSE: {} ({})".format(np.average(nrmseErrors), np.std(nrmseErrors)))
     print("R2: {} ({})".format(np.average(r2_squaredValues), np.std(r2_squaredValues)))
 
-def printAllSavedResults(save_folder='results/esnas'):
-    printSavedResults(save_folder, 'mgs')
-    printSavedResults(save_folder, 'lorenz')
-    printSavedResults(save_folder, 'dde')
-    printSavedResults(save_folder, 'laser')
-    printSavedResults(save_folder, 'sunspots', isAutoregressive=False)
-    printSavedResults(save_folder, 'water', isAutoregressive=False)
-
 if __name__ == "__main__":
-    # printAllSavedResults()
     runExperiment('lorenz', getDataLorenz, [nrmse, r_squared], True, None)
     runExperiment('mgs', getDataMGS, [nrmse, r_squared], True, None)
     runExperiment('dde', getDataDDE, [nrmse, r_squared], True, None)

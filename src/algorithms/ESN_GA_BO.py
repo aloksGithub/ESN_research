@@ -1,17 +1,19 @@
 from bayes_opt import BayesianOptimization
-from NAS.ESN_NAS import EvalParams, ExperimentData, GA_Base, GAParams, ModelParams
-from NAS.parallel_processing import executeParallelBatch
-from NAS.utils import (
-    evaluateArchitecture,
-    isValidArchitecture,
-    nodeParameterRanges,
-)
 from deap import creator
 import pickle
 import copy
 import time
 
-class ESN_NAS2(GA_Base):
+from ..algorithms.GA_Base import GA_Base
+from ..algorithms.types import EvalParams, ExperimentData, GAParams, ModelParams
+from ..parallel_processing import executeParallelBatch
+from ..utils import (
+    evaluateArchitecture,
+    isValidArchitecture,
+    nodeParameterRanges,
+)
+
+class ESNAS(GA_Base):
     """Genetic algorithm to obtain an optimized ESN architecture for a dataset"""
 
     def __init__(

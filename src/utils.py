@@ -1,21 +1,14 @@
-import reservoirpy as rpy
 from reservoirpy.nodes import Reservoir, IPReservoir, NVAR, RLS, Input
-from NAS.nodes.Ridge_parallel import Ridge
-from NAS.nodes.LMS_serializable import LMS
 from reservoirpy.observables import nrmse
 import numpy as np
 import random
-import warnings
-from NAS.memory_estimator import estimateMemory
 import networkx as nx
 import random
 import copy
 
-warnings.filterwarnings("ignore")
-
-rpy.verbosity(0)
-globalFitnesses = []
-
+from .nodes.Ridge_parallel import Ridge
+from .nodes.LMS_serializable import LMS
+from .memory_estimator import estimateMemory
 
 class VotingEnsemble:
     def __init__(self, models, threshold):

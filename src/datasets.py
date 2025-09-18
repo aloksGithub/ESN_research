@@ -1,56 +1,6 @@
 import pandas as pd
 import numpy as np
-import pickle
 import math
-from NAS.ESN_NAS import ESN_NAS
-from NAS.utils import runModel
-
-
-def readSavedExperiment(path):
-    file = open(path, "rb")
-    return pickle.load(file)
-
-
-def printSavedResults(directory, dataset, isAutoregressive=True):
-    nrmseErrors = []
-    r2_squaredValues = []
-    times = []
-    for i in range(5):
-        ga: ESN_NAS = readSavedExperiment("{}/{}/backup_{}.obj".format(directory, dataset, i))
-        try:
-            times.append(sum(ga.generationTimes))
-        except:
-            times.append(0)
-        best_model = ga.bestModel
-        if isAutoregressive:
-            runModel(best_model, ga.experimentData.trainX)
-            prevOutput = ga.experimentData.valX[0]
-            preds = []
-            for _ in range(len(ga.experimentData.valX)):
-                pred = runModel(best_model, prevOutput)
-                prevOutput = pred
-                preds.append(pred[0])
-            preds = np.array(preds)
-            nrmse_error = ga.evalParams.errorMetrics[0](ga.experimentData.valY, preds)
-            r2_error = ga.evalParams.errorMetrics[1](ga.experimentData.valY, preds)
-        else:
-            runModel(best_model, ga.experimentData.valX)
-            preds = runModel(best_model, ga.experimentData.testX)
-            nrmse_error = ga.evalParams.errorMetrics[0](ga.experimentData.testY, preds)
-            r2_error = ga.evalParams.errorMetrics[1](ga.experimentData.testY, preds)
-
-        nrmseErrors.append(nrmse_error)
-        r2_squaredValues.append(r2_error)
-    print("==============================================================")
-    print("{} Errors:".format(dataset))
-    print("NRMSE:", nrmseErrors)
-    print("R2:", r2_squaredValues)
-    print("Averaged errors:")
-    print("NRMSE: {} ({})".format(np.average(nrmseErrors), np.std(nrmseErrors)))
-    print("R2: {} ({})".format(np.average(r2_squaredValues), np.std(r2_squaredValues)))
-    print("Times:")
-    print(times)
-    print("Average time: {} ({})".format(np.average(times), np.std(times)))
 
 # https://www.sciencedirect.com/science/article/pii/S0925231222014291
 # Parameterizing echo state networks for multi-step time series prediction
