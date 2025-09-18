@@ -137,7 +137,7 @@ def getDataLorenz():
 
 
 def getDataSunspots():
-    sunspots = pd.read_csv("./datasets/Sunspots.csv")
+    sunspots = pd.read_csv("./data/Sunspots.csv")
     data = sunspots.loc[:, "Monthly Mean Total Sunspot Number"].to_numpy()
     data = np.expand_dims(data, axis=1)
 
@@ -158,7 +158,7 @@ def getDataWater():
 
 
 def getDataWaterMultiStep(n: int):
-    water = pd.read_csv("./datasets/Water.csv").to_numpy()
+    water = pd.read_csv("./data/Water.csv").to_numpy()
     firstCol = water[:, 0]
     lastRow = water[-1, 1:]
     data = np.expand_dims(np.concatenate((firstCol, lastRow)), axis=1)
