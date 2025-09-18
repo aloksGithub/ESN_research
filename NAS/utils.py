@@ -1,7 +1,7 @@
 import reservoirpy as rpy
 from reservoirpy.nodes import Reservoir, IPReservoir, NVAR, RLS, Input
-from NAS.Ridge_parallel import Ridge
-from NAS.LMS_serializable import LMS
+from NAS.nodes.Ridge_parallel import Ridge
+from NAS.nodes.LMS_serializable import LMS
 from reservoirpy.observables import nrmse
 import numpy as np
 import random
