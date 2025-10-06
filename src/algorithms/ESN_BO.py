@@ -7,10 +7,8 @@ import time
 from ..algorithms.types import EvalParams, ExperimentData
 from ..parallel_processing import executeParallelBatch
 from ..utils import (
+    evaluateArchitecture,
     nodeParameterRanges,
-    constructModel,
-    runModel,
-    trainModel,
 )
 
 class ESN_BO:
@@ -58,19 +56,35 @@ class ESN_BO:
         self.performances = []
         self.times = []
         self.bestModel = None
+        self.start_time = time.time()
+        self.end_time = time.time()
 
         # Make sure that save folder exists
         directory = os.path.dirname(self.saveLocation)
         os.makedirs(directory, exist_ok=True)
 
+    def evaluateArchitecture(self, individual):
+        """
+        Instantiate random models using given architecture, then train and evaluate them
+        on one step ahead prediction using errorMetrics on valX and valY.
+        """
+        _, errors, model = evaluateArchitecture(
+            individual,
+            self.experimentData.trainX,
+            self.experimentData.trainY,
+            self.experimentData.valX,
+            self.experimentData.valY,
+            1,
+            self.evalParams.errorMetrics,
+            self.evalParams.defaultErrors,
+            self.evalParams.isAutoRegressive,
+        )
+        return errors, model
+
     def evaluate(self, individual):
         start = time.time()
         results = executeParallelBatch(
-            (
-                self.evaluateArchitectureAutoRegressive
-                if self.evalParams.isAutoRegressive
-                else self.evaluateArchitecture
-            ),
+            self.evaluateArchitecture,
             [(individual,) for _ in range(self.evalParams.numEvals)],
             self.evalParams.numEvals,
             self.evalParams.timeout,
@@ -109,46 +123,6 @@ class ESN_BO:
         print(f"Time taken: {end - start}")
         self.times.append(end - start)
         return errors
-
-    def evaluateArchitecture(self, individual):
-        """
-        Instantiate a random model using given architecture, then train and evaluate it
-        on one step ahead prediction using errorMetrics on valX and valY.
-        """
-
-        try:
-            model = constructModel(individual)
-            model = trainModel(model, self.experimentData.trainX, self.experimentData.trainY)
-            model_copy = copy.deepcopy(model)
-            preds = runModel(model, self.experimentData.valX)
-            errors = [metric(self.experimentData.valY, preds) for metric in self.evalParams.errorMetrics]
-            return errors, model_copy
-        except Exception as e:
-            errors = self.evalParams.defaultErrors
-            return errors, None
-
-    def evaluateArchitectureAutoRegressive(self, individual):
-        """
-        Instantiate random models using given architecture, then train and evaluate them
-        using errorMetrics on valX and valY. Test prediction is done auto-regressively,
-        the output from the current timestep is used as input for next timestep
-        """
-        try:
-            model = constructModel(individual)
-            model = trainModel(model, self.experimentData.trainX, self.experimentData.trainY)
-            model_copy = copy.deepcopy(model)
-            prevOutput = self.experimentData.valX[0]
-            preds = []
-            for _ in range(len(self.experimentData.valX)):
-                pred = runModel(model, prevOutput)
-                prevOutput = pred
-                preds.append(pred[0])
-            preds = np.array(preds)
-            errors = [metric(self.experimentData.valY, preds) for metric in self.evalParams.errorMetrics]
-            return errors, model_copy
-        except:
-            errors = self.evalParams.defaultErrors
-            return errors, None
 
     def black_box(self, **params):
         modifiedArchitecture = copy.deepcopy(self.seedModel)
@@ -193,5 +167,6 @@ class ESN_BO:
                 min(mainErrors) if self.evalParams.minimizeFitness else max(mainErrors)
             )
         ]
+        self.end_time = time.time()
 
         return bestErrors, self.bestModel

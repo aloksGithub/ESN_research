@@ -7,7 +7,7 @@ def nrmse_sunspots(y_true, y_pred):
     variance = np.asarray(y_true).var()
     error = np.sqrt(mseError/variance)
     if math.isnan(error):
-        return np.inf
+        return 100000
     else:
         return error
 
