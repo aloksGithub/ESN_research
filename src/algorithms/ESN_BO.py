@@ -140,15 +140,9 @@ class ESN_BO:
             f=self.black_box,
             pbounds=self.pbounds,
             random_state=1,
-            allow_duplicate_points=False,
+            allow_duplicate_points=True,
         )
         # optimizer.probe(params=self.defaultParams)
-        optimizer.set_gp_params(
-            n_restarts_optimizer=2,
-            alpha=1e-3,
-            normalize_y=True,
-        )
-
         optimizer.maximize(
             init_points=self.n_rand,
             n_iter=self.iterations,
