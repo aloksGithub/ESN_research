@@ -5,14 +5,21 @@ import warnings
 current_dir = os.path.abspath(os.path.dirname(__file__))
 parent_dir = os.path.dirname(current_dir)
 sys.path.insert(0, parent_dir)
+from src.algorithms.ESN_BO import ESN_BO
 from src.algorithms.ESN_GA import ESN_GA
-from src.utils import trainModel, runModel
+from src.utils import evaluateArchitecture, trainModel, runModel
 from src.error_metrics import nrmse, r_squared
-from src.memory_estimator import measure_memory_usage, estimateMemory
-from src.datasets import getDataDDE, getDataLaser, getDataLorenz, getDataMGS, getDataSunspots, getDataWater
-from src.utils import readSavedExperiment
+from src.memory_estimator import measure_memory_usage
 import time
 import numpy as np
+import pickle
+import reservoirpy
+reservoirpy.verbosity(0)
+warnings.filterwarnings("ignore")
+
+def readSavedExperiment(path):
+    with open(path, "rb") as file:
+        return pickle.load(file)
 
 def findBestGaArchitecture(ga: ESN_GA):
     errors = [errors[0] for errors in ga.fitnesses]
@@ -45,47 +52,32 @@ def nrmse_sunspots(y_true, y_pred):
 
 if __name__ == "__main__":
     dataNames = ['dde', 'laser', 'lorenz', 'mgs', 'sunspots', 'water']
-    datasets = [getDataDDE, getDataLaser, getDataLorenz, getDataMGS, getDataSunspots, getDataWater]
-    esnas_save_locations = ['hybrid2', 'hybrid2', 'hybrid2', 'hybrid2', 'hybrid2_sunspots_tests', 'hybrid2_small_models']
-    for i, getDataset in enumerate(datasets):
-        trainX, trainY, valX, valY, testX, testY = getDataset()
-        print(len(trainX))
-        bos = [readSavedExperiment('./backup_bo2/{}/backup_{}.obj'.format(dataNames[i], j)) for j in range(5)]
-        maxMemory = 0
-        maxTime = 0
-        for bo in bos:
-            model = bo.bestModel
-            def func():
-                trainModel(model, trainX, trainY)
-                runModel(model, valX)
-            startTime = time.time()
-            try:
-                accurate = measure_memory_usage(func)
-                timeTaken = time.time() - startTime
-                if accurate>maxMemory:
-                    maxMemory = accurate
-                if timeTaken>maxTime:
-                    maxTime = timeTaken
-            except:
-                pass
-        print(f'BO_{dataNames[i]}: {maxMemory} MB       {maxTime}s')
-
-        gas = [readSavedExperiment(f'./{esnas_save_locations[i]}/{dataNames[i]}/backup_{j}.obj') for j in range(5)]
-        maxMemory = 0
-        maxTime = 0
+    for dataName in dataNames:
+        gas: list[ESN_GA] = [readSavedExperiment(f'./results/esnas/{dataName}/backup_{j}.obj') for j in range(5)]
+        memories = []
+        times = []
         for ga in gas:
             model = ga.bestModel
+            best_architecture, _ = findBestGaArchitecture(ga)
             def func():
-                trainModel(model, trainX, trainY)
-                runModel(model, valX)
+                evaluateArchitecture(
+                    best_architecture,
+                    ga.experimentData.trainX,
+                    ga.experimentData.trainY,
+                    ga.experimentData.valX,
+                    ga.experimentData.valY,
+                    1,
+                    ga.evalParams.errorMetrics,
+                    ga.evalParams.defaultErrors,
+                    ga.evalParams.isAutoRegressive
+                )
             startTime = time.time()
-            try:
-                accurate = measure_memory_usage(func)
-                timeTaken = time.time() - startTime
-                if accurate>maxMemory:
-                    maxMemory = accurate
-                if timeTaken>maxTime:
-                    maxTime = timeTaken
-            except:
-                pass
-        print(f'ESNAS_{dataNames[i]}: {maxMemory} MB       {maxTime}s')
+            accurate = measure_memory_usage(func)
+            timeTaken = time.time() - startTime
+            memories.append(accurate)
+            times.append(timeTaken)
+        memories = np.array(memories)
+        times = np.array(times)
+        print("==========================", dataName, "==========================")
+        print("Average memory: ", np.mean(memories), np.std(memories))
+        print("Average time: ", np.mean(times), np.std(times))

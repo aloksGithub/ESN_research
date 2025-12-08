@@ -1,4 +1,5 @@
 import reservoirpy as rpy
+rpy.verbosity(0)
 import numpy as np
 import sys
 import os
