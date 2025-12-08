@@ -72,9 +72,9 @@ def runExperiment(dataset, dataLoader, errorMetrics, isAutoregressive, earlyStop
 
 if __name__ == "__main__":
     runExperiment('lorenz', getDataLorenz, [nrmse, r_squared], True, None)
-    runExperiment('mgs', getDataMGS, [nrmse, r_squared], True, None)
+    # runExperiment('mgs', getDataMGS, [nrmse, r_squared], True, None)
     runExperiment('dde', getDataDDE, [nrmse, r_squared], True, None)
-    runExperiment('laser', getDataLaser, [nrmse, r_squared], True, None)
-    runExperiment('sunspots', getDataSunspots, [nrmse_sunspots, r_squared], False, None, num_nodes_range=(3, 5))
-    runExperiment('water', getDataWater, [nrmse, r_squared], False, None, num_nodes_range=(1, 2))
+    # runExperiment('laser', getDataLaser, [nrmse, r_squared], True, None)
+    # runExperiment('sunspots', getDataSunspots, [nrmse_sunspots, r_squared], False, None, num_nodes_range=(3, 5))
+    # runExperiment('water', getDataWater, [nrmse, r_squared], False, None, num_nodes_range=(1, 2))
 
