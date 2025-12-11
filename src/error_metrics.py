@@ -12,24 +12,28 @@ def nrmse_sunspots(y_true, y_pred):
     else:
         return error
 
-def nrmse(y_true, y_pred):
-    y_true = np.array(y_true)
-    y_pred = np.array(y_pred)
-    
-    diff = y_true - y_pred
-    mean_sq_error = np.mean(np.sum(diff**2, axis=1))
-    mean_norm = np.linalg.norm(np.mean(y_true, axis=0))
-        
-    rmse = np.sqrt(mean_sq_error)
-    
-    if mean_norm == 0:
-        return 100000
-        
-    error = rmse / mean_norm
-    return error
-    
 def r_squared(y_true, y_pred):
     try:
         return r2_score(y_true, y_pred, multioutput="variance_weighted")
     except:
         return 0
+
+def nrmse(y_true, y_pred):
+    y_true = np.array(y_true)
+    y_pred = np.array(y_pred)
+    
+    if y_true.ndim == 1:
+        y_true = y_true.reshape(-1, 1)
+        y_pred = y_pred.reshape(-1, 1)
+        
+    norm_diff = np.linalg.norm(y_true - y_pred, axis=1)
+    mean_sq_error = np.mean(norm_diff**2) 
+    rmse = np.sqrt(mean_sq_error)
+    
+    y_mean = np.mean(y_true, axis=0)
+    mean_norm = np.linalg.norm(y_mean)
+    
+    if mean_norm == 0:
+        return 100000
+        
+    return rmse / mean_norm
