@@ -128,7 +128,7 @@ def run_ga_gestures():
         # GA parameters matching ga.py (larger population and more generations)
         gaParams = GAParams(
             generations=40,
-            populationSize=20,
+            populationSize=100,
             crossoverProbability=0.7,
             mutationProbability=0.2,
             eliteSize=1,
@@ -149,7 +149,7 @@ def run_ga_gestures():
             evalParams,
             gaParams,
             modelParams,
-            n_jobs=4,
+            n_jobs=20,
             saveLocation=os.path.join(fold_save_loc, 'ga_backup.obj'),
         )
         
