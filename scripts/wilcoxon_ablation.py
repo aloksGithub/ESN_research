@@ -8,11 +8,8 @@ import pandas as pd
 from scipy import stats
 
 # Silence reservoirpy if imported indirectly
-try:
-    import reservoirpy as rpy  # type: ignore
-    rpy.verbosity(0)
-except Exception:
-    pass
+import reservoirpy as rpy  # type: ignore
+rpy.verbosity(0)
 
 current_dir = os.path.abspath(os.path.dirname(__file__))
 parent_dir = os.path.dirname(current_dir)
