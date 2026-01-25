@@ -8,7 +8,6 @@ import sklearn.metrics
 
 # Filter warnings and set reservoirpy verbosity
 warnings.filterwarnings("ignore")
-rpy.verbosity(0)
 
 # Add parent directory to sys.path to import from src and gesture_recognition
 current_dir = os.path.abspath(os.path.dirname(__file__))

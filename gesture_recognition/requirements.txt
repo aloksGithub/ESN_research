@@ -1,0 +1,13 @@
+numpy
+pycparser
+pygments
+pyparsing
+python-dateutil
+torch
+scikit-learn
+scipy
+reservoirpy
+bayesian-optimization
+ipykernel
+matplotlib
+Levenshtein

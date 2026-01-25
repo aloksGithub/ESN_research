@@ -1,13 +1,10 @@
-from reservoirpy.nodes import Reservoir, IPReservoir, NVAR, RLS, Input
+from reservoirpy.nodes import Reservoir, IPReservoir, NVAR, RLS, LMS, Ridge, Input
 from reservoirpy.observables import nrmse
 import numpy as np
 import random
 import networkx as nx
-import random
 import copy
 
-from .nodes.Ridge_parallel import Ridge
-from .nodes.LMS_serializable import LMS
 from .memory_estimator import estimateMemory
 
 class VotingEnsemble:
@@ -112,7 +109,7 @@ nodeParameterRanges = {
         "strides": {"lower": 1, "upper": 5, "intOnly": True},
     },
     "Ridge": {"ridge": {"lower": 0, "upper": 0.0001, "intOnly": False}},
-    "LMS": {"alpha": {"lower": 0, "upper": 1, "intOnly": False}},
+    "LMS": {"learning_rate": {"lower": 0, "upper": 1, "intOnly": False}},
     "RLS": {"alpha": {"lower": 0, "upper": 1, "intOnly": False}},
 }
 
@@ -420,10 +417,25 @@ def evaluateArchitecture(
         return individual, defaultErrors, None
 
 def constructModel(architecture):
-    nodes = [
-        nodeConstructors[nodeData["type"]](**nodeData["params"])
-        for nodeData in architecture["nodes"]
-    ]
+    nodes = []
+    node_type_counts = {}  # Track how many of each type for unique naming
+    
+    for nodeData in architecture["nodes"]:
+        node_type = nodeData["type"]
+        node_params = nodeData["params"].copy()
+        
+        # In reservoirpy v0.4.1+, Input node doesn't accept input_dim as constructor arg
+        # It's inferred during initialization from data
+        if node_type == "Input":
+            node_params.pop("input_dim", None)
+        
+        # Assign unique names to nodes (required in v0.4 for models with multiple trainable nodes)
+        if node_type not in node_type_counts:
+            node_type_counts[node_type] = 0
+        node_type_counts[node_type] += 1
+        node_params["name"] = f"{node_type}_{node_type_counts[node_type]}"
+        
+        nodes.append(nodeConstructors[node_type](**node_params))
 
     # Start with the first connection
     model = nodes[architecture["edges"][0][0]] >> nodes[architecture["edges"][0][1]]
@@ -435,6 +447,14 @@ def constructModel(architecture):
     return model
 
 
+def _get_node_type_name(node):
+    """Get a string identifier for a node's type."""
+    # In v0.4.1, node.name might be None, so use class name as fallback
+    if node.name is not None:
+        return node.name
+    return type(node).__name__
+
+
 def trainModel(model, trainX, trainY):
     if (
         isinstance(model, Ensemble)
@@ -443,25 +463,34 @@ def trainModel(model, trainX, trainY):
     ):
         model.train(trainX, trainY)
         return model
-    nodes = [node.name for node in model.nodes]
+    
+    node_names = [_get_node_type_name(node) for node in model.nodes]
     hasOnlineNode = False
     hasOfflineNode = False
-    for node in nodes:
-        if "LMS" in node or "RLS" in node:
+    for node_name in node_names:
+        if "LMS" in node_name or "RLS" in node_name:
             hasOnlineNode = True
-        if "Ridge" in node:
+        if "Ridge" in node_name:
             hasOfflineNode = True
+    
     notLastNodes = []
     for edge in model.edges:
-        if edge[0].name not in notLastNodes:
-            notLastNodes.append(edge[0].name)
-    output_nodes = list(set(nodes) - set(notLastNodes))
-    outputNode = output_nodes[0]
+        edge_name = _get_node_type_name(edge[0])
+        if edge_name not in notLastNodes:
+            notLastNodes.append(edge_name)
+    
+    output_nodes = list(set(node_names) - set(notLastNodes))
+    outputNode = output_nodes[0] if output_nodes else ""
     isOutputNodeOffline = "Ridge" in outputNode
+    
     if hasOfflineNode:
         model.fit(trainX, trainY, warmup=82)
     if hasOnlineNode:
-        model.train(trainX, trainY)
+        # NumPy backend uses train(), JAX backend uses partial_fit()
+        if hasattr(model, 'train'):
+            model.train(trainX, trainY)
+        else:
+            model.partial_fit(trainX, trainY)
     if isOutputNodeOffline:
         model.fit(trainX, trainY, warmup=82)
     return model
@@ -474,17 +503,24 @@ def runModel(model, x):
         or isinstance(model, VotingEnsemble)
     ):
         return model.run(x)
-    nodes = [node.name for node in model.nodes]
+    
+    node_names = [_get_node_type_name(node) for node in model.nodes]
     notLastNodes = []
     for edge in model.edges:
-        if edge[0].name not in notLastNodes:
-            notLastNodes.append(edge[0].name)
-    output_nodes = list(set(nodes) - set(notLastNodes))
+        edge_name = _get_node_type_name(edge[0])
+        if edge_name not in notLastNodes:
+            notLastNodes.append(edge_name)
+    
+    output_nodes = list(set(node_names) - set(notLastNodes))
     nodePreds = model.run(x)
-    if isinstance(nodePreds, np.ndarray):
-        return nodePreds
+    
+    # Check if nodePreds is an array (numpy or JAX) or a dict
+    # In v0.4.1 with JAX, model.run() may return a JAX array directly
+    if isinstance(nodePreds, dict):
+        return nodePreds[output_nodes[-1]] if output_nodes else list(nodePreds.values())[-1]
     else:
-        return nodePreds[output_nodes[-1]]
+        # It's an array (numpy or JAX), return it directly
+        return np.asarray(nodePreds)
 
 
 def smape(yTrue, preds):
