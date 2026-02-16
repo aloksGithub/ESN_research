@@ -1,10 +1,10 @@
 from deap import creator
-import pickle
+import dill
 import time
 
 from ..algorithms.GA_Base import GA_Base
 from ..algorithms.types import EvalParams, ExperimentData, GAParams, ModelParams
-from ..parallel_processing import executeParallelBatch
+from ..parallel_processing import executeParallelThreaded
 
 class ESN_GA(GA_Base):
     """Genetic algorithm to obtain an optimized ESN architecture for a dataset"""
@@ -33,12 +33,16 @@ class ESN_GA(GA_Base):
 
     def evaluateParallel(self, population):
         print("Evaluating population")
-        results = executeParallelBatch(
+        # Temporarily clear bestModel so self can be pickled for spawn
+        saved_model = self.bestModel
+        self.bestModel = None
+        results = executeParallelThreaded(
             (self.evaluateArchitecture),
             [(individual,) for individual in population],
             self.n_jobs,
             self.evalParams.timeout * self.evalParams.numEvals,
         )
+        self.bestModel = saved_model
         for i in range(len(results)):
             if results[i] is None:
                 results[i] = (population[i], self.evalParams.defaultErrors, None)
@@ -113,7 +117,7 @@ class ESN_GA(GA_Base):
         print("Time taken:", time.time() - startTime)
 
         file = open(self.saveLocation, "wb")
-        pickle.dump(self, file)
+        dill.dump(self, file)
 
     def run(self):
         startTime = time.time()
@@ -141,4 +145,4 @@ class ESN_GA(GA_Base):
                         break
 
         file = open(self.saveLocation, "rb")
-        return pickle.load(file)
+        return dill.load(file)

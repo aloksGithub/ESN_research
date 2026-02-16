@@ -1,13 +1,18 @@
+import os
 import reservoirpy as rpy
 import numpy as np
 import sys
-import os
 import warnings
 import traceback
 import sklearn.metrics
+import dill
+from deap import base, creator
+import jax
 
 # Filter warnings and set reservoirpy verbosity
 warnings.filterwarnings("ignore")
+rpy.set_seed(42)
+np.random.seed(42)
 
 # Add parent directory to sys.path to import from src and gesture_recognition
 current_dir = os.path.abspath(os.path.dirname(__file__))
@@ -16,9 +21,11 @@ sys.path.insert(0, root_dir)
 sys.path.insert(0, os.path.join(root_dir, 'gesture_recognition'))
 
 from src.algorithms.ESN_GA_BO import EvalParams, ExperimentData, GAParams, ModelParams, ESNAS
-from src.utils import runModel, trainModel
+from src.utils import constructModel, runModel, trainModel
 from gesture_recognition.Utils import createData, getData
 from gesture_recognition import Evaluation
+
+files = ['s', 'j', 'na', 'l', 'ni']
 
 def getSequenceData(loader):
     """Extracts individual sequences from the DataLoader instead of concatenating them."""
@@ -72,8 +79,74 @@ def gesture_acc_metric(y_true, y_pred):
     
     return np.mean(acc_scores)
 
+def print_saved_fold_results(idx):
+    """Evaluate a single saved fold using the jax.export artifact."""
+    save_folder = 'results/esnas_gestures/global1'
+
+    print(f"\n======================== Fold {idx+1}/5 ========================")
+    inputFiles = files[:idx] + files[idx+1:]
+    testFiles = files[idx:idx+1]
+    trainFiles = inputFiles[:idx%4] + inputFiles[idx%4+1:]
+
+    # Seed RNGs so test data is identical across runs
+    # (createData adds random noise and shuffles segments)
+    import random as _random
+    _random.seed(42 + idx)
+    np.random.seed(42 + idx)
+
+    # Load data
+    data_dir = os.path.join(root_dir, 'gesture_recognition', 'dataSets')
+
+    # Test data (List of sequences)
+    _, test_dataset, _, test_loader = createData(trainFiles, testFiles, dataDir=data_dir)
+    testX, testY = getSequenceData(test_loader)
+    testX, testY = testX[0], testY[0]
+
+    fold_save_loc = os.path.join(save_folder, f'fold_{idx}')
+
+    # Register deap creator types before loading (they're created dynamically)
+    if not hasattr(creator, "Fitness"):
+        creator.create("Fitness", base.Fitness, weights=(-1.0,))
+    if not hasattr(creator, "Individual"):
+        creator.create("Individual", dict, fitness=creator.Fitness)
+
+    # Load dill backup to get the save path, then load jax.export for inference
+    with open(os.path.join(fold_save_loc, 'esnas_backup.obj'), "rb") as f:
+        ga = dill.load(f)
+    export_path = os.path.splitext(ga.saveLocation)[0] + "_forward.jax"
+    predict = ESNAS.loadPredict(export_path)
+
+    preds = predict(testX)
+
+    threshold = np.ones((preds.shape[0], 1)) * 0.4
+    t_maxApp_prediction = Evaluation.calcMaxActivityPrediction(preds, testY, threshold, 10)
+    pred_MaxApp, targ_MaxApp = Evaluation.calcInputSegmentSeries(t_maxApp_prediction, testY, 0.5)
+
+    test_f1 = np.mean(sklearn.metrics.f1_score(targ_MaxApp, pred_MaxApp, average=None))
+    test_acc = np.mean(sklearn.metrics.accuracy_score(targ_MaxApp, pred_MaxApp))
+    print(f"F1: {test_f1:.4f}, Acc: {test_acc:.4f}")
+
+    return test_f1, test_acc
+
+
+def print_saved_results():
+    all_test_f1s = []
+    all_test_accs = []
+
+    for idx in range(5):
+        test_f1, test_acc = print_saved_fold_results(idx)
+        if test_f1 is not None:
+            all_test_f1s.append(test_f1)
+            all_test_accs.append(test_acc)
+
+    print("\n======================== Final Results Across Folds ========================")
+    if all_test_f1s:
+        print(f"Average Test F1: {np.mean(all_test_f1s):.4f} (+/- {np.std(all_test_f1s):.4f})")
+        print(f"Average Test Acc: {np.mean(all_test_accs):.4f} (+/- {np.std(all_test_accs):.4f})")
+    else:
+        print("No results to report.")
+
 def run_esnas_gestures():
-    files = ['s', 'j', 'na', 'l', 'ni']
     save_folder = 'results/esnas_gestures/global1'
     if not os.path.exists(save_folder):
         os.makedirs(save_folder)
@@ -115,18 +188,18 @@ def run_esnas_gestures():
         errorMetrics = [gesture_f1_metric, gesture_acc_metric]
         
         evalParams = EvalParams(
-            numEvals=3,
+            numEvals=1,
             errorMetrics=errorMetrics,
             defaultErrors=[1.0, 0.0],
-            timeout=60,
+            timeout=20,
             memoryLimit=756,
             minimizeFitness=True,
             isAutoRegressive=False,
         )
         
         gaParams = GAParams(
-            generations=20,
-            populationSize=40,
+            generations=2,
+            populationSize=8,
             crossoverProbability=0.7,
             mutationProbability=0.2,
             eliteSize=1,
@@ -147,40 +220,18 @@ def run_esnas_gestures():
             evalParams,
             gaParams,
             modelParams,
-            n_jobs=20,
+            n_jobs=4,
             saveLocation=os.path.join(fold_save_loc, 'esnas_backup.obj'),
             bo_init=0,
             bo_iter=5
         )
         
         ga.run()
-        
-        # Final evaluation: Following optimizer_global1's testModel logic
-        # 1. Re-train best model on combined train+validation data
-        # 2. Evaluate over 10 trials
-        best_model = ga.bestModel
-        if best_model is not None:
-            print("Re-training best model on combined train+validation data...")
-            combinedX = np.concatenate([trainX, valX])
-            combinedY = np.concatenate([trainY, valY])
-            
-            best_model = trainModel(best_model, combinedX, combinedY)
-            
-            preds = runModel(best_model, testX)
-            
-            # Accumulate per-sequence scores
-            for target, prediction in zip(testY, preds):
-                threshold = np.ones((prediction.shape[0], 1)) * 0.4
-                t_maxApp_prediction = Evaluation.calcMaxActivityPrediction(prediction, target, threshold, 10)
-                pred_MaxApp, targ_MaxApp = Evaluation.calcInputSegmentSeries(t_maxApp_prediction, target, 0.5)
-                
-                test_f1 = np.mean(sklearn.metrics.f1_score(targ_MaxApp, pred_MaxApp, average=None))
-                test_acc = np.mean(sklearn.metrics.accuracy_score(targ_MaxApp, pred_MaxApp))
-            
+
+        test_f1, test_acc = print_saved_fold_results(idx)
+        if test_f1 is not None:
             all_test_f1s.append(test_f1)
             all_test_accs.append(test_acc)
-        else:
-            print(f"Fold {idx+1} failed to find a valid model.")
 
     print("\n======================== Final Results Across Folds ========================")
     if all_test_f1s:
@@ -190,4 +241,4 @@ def run_esnas_gestures():
         print("No results to report.")
 
 if __name__ == "__main__":
-    run_esnas_gestures()
+    print_saved_results()

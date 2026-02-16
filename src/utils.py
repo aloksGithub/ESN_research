@@ -1,76 +1,12 @@
-from reservoirpy.nodes import Reservoir, IPReservoir, NVAR, RLS, LMS, Ridge, Input
+from reservoirpy.jax.nodes import Reservoir, NVAR, RLS, LMS, Ridge, Input
+from src.nodes.jax.ipreservoir import IPReservoir
 from reservoirpy.observables import nrmse
 import numpy as np
 import random
 import networkx as nx
 import copy
-
+import traceback
 from .memory_estimator import estimateMemory
-
-class VotingEnsemble:
-    def __init__(self, models, threshold):
-        self.models = models
-        self.threshold = threshold
-
-    def run(self, x):
-        preds = []
-        for dataPoint in x:
-            upVotes = 0
-            downVotes = 0
-            for model in self.models:
-                pred = runModel(model, dataPoint)[0][0]
-                if pred < -self.threshold:
-                    downVotes += 1
-                if pred > self.threshold:
-                    upVotes += 1
-            if upVotes >= 2 and downVotes <= 1:
-                preds.append(self.threshold * 1.1)
-            elif downVotes >= 2 and upVotes <= 1:
-                preds.append(-self.threshold * 1.1)
-        return np.expand_dims(np.array(preds), axis=1)
-
-
-class StackedEnsemble:
-    def __init__(self, models):
-        self.finalLayer = Reservoir(
-            600, sr=0.8, rc_connectivity=0.01, noise_in=1e-10
-        ) >> Ridge(output_dim=1, ridge=1e-5)
-        self.models = models
-
-    def train(self, trainX, trainY):
-        for model in self.models:
-            trainModel(model, trainX, trainY)
-        preds = []
-        for model in self.models:
-            preds.append(runModel(model, trainX))
-        preds = np.array(preds)
-        preds = preds.transpose(1, 0, 2).reshape(preds.shape[1], 3)
-        self.finalLayer.fit(np.concatenate([preds, trainX], axis=1), trainY, 100)
-
-    def run(self, x):
-        preds = []
-        for model in self.models:
-            preds.append(runModel(model, x))
-        preds = np.array(preds)
-        preds = preds.transpose(1, 0, 2).reshape(preds.shape[1], 3)
-        finalPreds = self.finalLayer.run(np.concatenate([preds, x], axis=1))
-        return finalPreds
-
-
-class Ensemble:
-    def __init__(self, models):
-        self.models = models
-
-    def train(self, trainX, trainY):
-        for model in self.models:
-            trainModel(model, trainX, trainY)
-
-    def run(self, x):
-        preds = []
-        for model in self.models:
-            preds.append(runModel(model, x))
-        return sum(arr for arr in preds) / len(preds)
-
 
 nodeConstructors = {
     "Input": Input,
@@ -78,8 +14,6 @@ nodeConstructors = {
     "IPReservoir": IPReservoir,
     "NVAR": NVAR,
     "Ridge": Ridge,
-    "LMS": LMS,
-    "RLS": RLS,
 }
 
 nodeParameterRanges = {
@@ -109,8 +43,6 @@ nodeParameterRanges = {
         "strides": {"lower": 1, "upper": 5, "intOnly": True},
     },
     "Ridge": {"ridge": {"lower": 0, "upper": 0.0001, "intOnly": False}},
-    "LMS": {"learning_rate": {"lower": 0, "upper": 1, "intOnly": False}},
-    "RLS": {"alpha": {"lower": 0, "upper": 1, "intOnly": False}},
 }
 
 
@@ -151,18 +83,18 @@ def isValidArchitecture(
     if memoryEstimate > memoryLimit:
         return False
     
-    try:
-        model = constructModel(architecture)
-        runModel(model, sampleInput[:1])
-        for node in model.nodes:
-            if "Ridge" in node.name and node.input_dim > 2200:
-                return False
-            if "RLS" in node.name and node.input_dim > 400:
-                return False
-            if "LMS" in node.name and node.input_dim > 3000:
-                return False
-    except Exception:
-        return False
+    # try:
+    #     model = constructModel(architecture)
+    #     runModel(model, sampleInput[:1])
+    #     for node in model.nodes:
+    #         if "Ridge" in node.name and node.input_dim > 2200:
+    #             return False
+    #         if "RLS" in node.name and node.input_dim > 400:
+    #             return False
+    #         if "LMS" in node.name and node.input_dim > 3000:
+    #             return False
+    # except Exception:
+    #     return False
     return True
 
 
@@ -212,8 +144,6 @@ def generateRandomArchitecture(
     for i in range(num_nodes - 1):
         available_node_types = list(nodeConstructors.keys())
         if i == 0:
-            available_node_types.remove("LMS")
-            available_node_types.remove("RLS")
             available_node_types.remove("Ridge")
         available_node_types.remove("Input")
         for node in nodes:
@@ -244,8 +174,6 @@ def generateRandomArchitecture(
     else:
         readouts = [
             {"type": "Ridge", "params": generateRandomNodeParams("Ridge", outputDim)},
-            {"type": "LMS", "params": generateRandomNodeParams("LMS", outputDim)},
-            {"type": "RLS", "params": generateRandomNodeParams("RLS", outputDim)},
         ]
     nodes.append(random.choice(readouts))
 
@@ -273,8 +201,6 @@ def generateRandomArchitectureOld(
     for i in range(num_nodes):
         available_node_types = list(nodeConstructors.keys())
         if i == 0:
-            available_node_types.remove("LMS")
-            available_node_types.remove("RLS")
             available_node_types.remove("Ridge")
         available_node_types.remove("Input")
         for node in nodes:
@@ -336,8 +262,6 @@ def generateRandomArchitectureOld(
     else:
         readouts = [
             {"type": "Ridge", "params": generateRandomNodeParams("Ridge", outputDim)},
-            {"type": "LMS", "params": generateRandomNodeParams("LMS", outputDim)},
-            {"type": "RLS", "params": generateRandomNodeParams("RLS", outputDim)},
         ]
     nodes.append(random.choice(readouts))
 
@@ -377,6 +301,10 @@ def evaluateArchitecture(
     object is returned *only if it can be pickled*; otherwise ``None`` is
     sent back.
     """
+    import os
+    import jax
+    jax.config.update("jax_enable_x64", True)
+    os.environ.setdefault("XLA_PYTHON_CLIENT_PREALLOCATE", "false")
 
     errors = []
     models = []
@@ -455,55 +383,12 @@ def _get_node_type_name(node):
     return type(node).__name__
 
 
-def trainModel(model, trainX, trainY):
-    if (
-        isinstance(model, Ensemble)
-        or isinstance(model, StackedEnsemble)
-        or isinstance(model, VotingEnsemble)
-    ):
-        model.train(trainX, trainY)
-        return model
-    
-    node_names = [_get_node_type_name(node) for node in model.nodes]
-    hasOnlineNode = False
-    hasOfflineNode = False
-    for node_name in node_names:
-        if "LMS" in node_name or "RLS" in node_name:
-            hasOnlineNode = True
-        if "Ridge" in node_name:
-            hasOfflineNode = True
-    
-    notLastNodes = []
-    for edge in model.edges:
-        edge_name = _get_node_type_name(edge[0])
-        if edge_name not in notLastNodes:
-            notLastNodes.append(edge_name)
-    
-    output_nodes = list(set(node_names) - set(notLastNodes))
-    outputNode = output_nodes[0] if output_nodes else ""
-    isOutputNodeOffline = "Ridge" in outputNode
-    
-    if hasOfflineNode:
-        model.fit(trainX, trainY, warmup=82)
-    if hasOnlineNode:
-        # NumPy backend uses train(), JAX backend uses partial_fit()
-        if hasattr(model, 'train'):
-            model.train(trainX, trainY)
-        else:
-            model.partial_fit(trainX, trainY)
-    if isOutputNodeOffline:
-        model.fit(trainX, trainY, warmup=82)
+def trainModel(model, trainX, trainY, warmup=100):
+    model.fit(trainX, trainY, warmup=warmup)
     return model
 
 
 def runModel(model, x):
-    if (
-        isinstance(model, Ensemble)
-        or isinstance(model, StackedEnsemble)
-        or isinstance(model, VotingEnsemble)
-    ):
-        return model.run(x)
-    
     node_names = [_get_node_type_name(node) for node in model.nodes]
     notLastNodes = []
     for edge in model.edges:

@@ -1,11 +1,11 @@
 import numpy as np
 import copy
 from bayes_opt import BayesianOptimization
-import pickle
+import dill
 import os
 import time
 from ..algorithms.types import EvalParams, ExperimentData
-from ..parallel_processing import executeParallelBatch
+from ..parallel_processing import executeParallelThreaded
 from ..utils import (
     evaluateArchitecture,
     nodeParameterRanges,
@@ -83,12 +83,16 @@ class ESN_BO:
 
     def evaluate(self, individual):
         start = time.time()
-        results = executeParallelBatch(
+        # Temporarily clear bestModel so self can be pickled for spawn
+        saved_model = self.bestModel
+        self.bestModel = None
+        results = executeParallelThreaded(
             self.evaluateArchitecture,
             [(individual,) for _ in range(self.evalParams.numEvals)],
             self.evalParams.numEvals,
             self.evalParams.timeout,
         )
+        self.bestModel = saved_model
 
         valid_results = [res for res in results if res is not None]
         if not valid_results:
@@ -158,7 +162,7 @@ class ESN_BO:
             bestArchitecture["nodes"][nodeIndex]["params"][paramName] = paramValue
 
         file = open(self.saveLocation, "wb")
-        pickle.dump(self, file)
+        dill.dump(self, file)
 
         mainErrors = [e[0] for e in self.performances]
         bestErrors = self.performances[

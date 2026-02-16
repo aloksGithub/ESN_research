@@ -14,7 +14,6 @@ from ..utils import (
     nodeParameterRanges,
     isValidArchitecture,
 )
-from ..parallel_processing import executeParallelBatch
 
 
 class GA_Base:
@@ -92,24 +91,14 @@ class GA_Base:
         generatedArchitectures = []
 
         while len(generatedArchitectures) < numIndividuals:
-            results = executeParallelBatch(
-                generateRandomArchitectureOld,
-                [
-                    (
-                        self.experimentData.trainY.shape[-1],
-                        self.experimentData.trainX,
-                        self.evalParams.memoryLimit,
-                        self.modelParams.num_nodes_range,
-                    )
-                    for _ in range(numIndividuals - len(generatedArchitectures))
-                ],
-                self.n_jobs,
-                10,     # Only a small timeout is needed to check architecture validity
-                log_level=0,
+            result = generateRandomArchitectureOld(
+                self.experimentData.trainY.shape[-1],
+                self.experimentData.trainX,
+                self.evalParams.memoryLimit,
+                self.modelParams.num_nodes_range,
             )
-            for result in results:
-                if result is not None:
-                    generatedArchitectures.append(result)
+            if result is not None:
+                generatedArchitectures.append(result)
 
         population = [
             creator.Individual(individual)
@@ -138,14 +127,8 @@ class GA_Base:
                 candidates.append(child1)
                 candidates.append(child2)
             
-            validities = executeParallelBatch(
-                self.checkModelValidity,
-                [(c,) for c in candidates[:self.n_jobs]],
-                self.n_jobs,
-                10,
-                0,
-            )
-            for validity in validities:
+            for c in candidates[:self.n_jobs]:
+                validity = self.checkModelValidity(c)
                 if validity is not None and validity[0]:
                     offspring.append(validity[1])
             candidates = []

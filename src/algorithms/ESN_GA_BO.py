@@ -1,12 +1,17 @@
 from bayes_opt import BayesianOptimization
 from deap import creator
-import pickle
+import dill
 import copy
 import time
+import os
+
+import jax
+import jax.numpy as jnp
+from jax import export
 
 from ..algorithms.GA_Base import GA_Base
 from ..algorithms.types import EvalParams, ExperimentData, GAParams, ModelParams
-from ..parallel_processing import executeParallelBatch
+from ..parallel_processing import executeParallelThreaded
 from ..utils import (
     evaluateArchitecture,
     isValidArchitecture,
@@ -139,12 +144,16 @@ class ESNAS(GA_Base):
     def evaluateParallel(self, population):
         print("Evaluating population")
         startTime = time.time()
-        results = executeParallelBatch(
+        # Temporarily clear bestModel so self can be pickled for spawn
+        saved_model = self.bestModel
+        self.bestModel = None
+        results = executeParallelThreaded(
             self.bo,
             [(individual,) for individual in population],
             self.n_jobs,
             self.evalParams.timeout * self.evalParams.numEvals * (self.bo_init + self.bo_iter),
         )
+        self.bestModel = saved_model
         
         for i in range(len(results)):
             if results[i] is None:
@@ -238,7 +247,50 @@ class ESNAS(GA_Base):
         print("Time taken:", time.time() - startTime)
 
         file = open(self.saveLocation, "wb")
-        pickle.dump(self, file)
+        dill.dump(self, file)
+        self.exportBestModel()
+
+    def exportBestModel(self):
+        """Export bestModel.run via jax.export for deterministic inference."""
+        if self.bestModel is None:
+            return
+
+        # Deep copy so that JAX tracing doesn't mutate self.bestModel's state,
+        # which would make it unpicklable with dill on subsequent generations.
+        model_copy = copy.deepcopy(self.bestModel)
+
+        @jax.jit
+        def forward(x_seq):
+            return model_copy.run(x_seq)
+
+        input_dim = self.experimentData.trainX.shape[-1]
+        T, = export.symbolic_shape("T")
+
+        try:
+            exported = export.export(forward)(
+                jax.ShapeDtypeStruct((T, input_dim), jnp.float32),
+            )
+            serialized = exported.serialize()
+
+            export_path = os.path.splitext(self.saveLocation)[0] + "_forward.jax"
+            with open(export_path, "wb") as f:
+                f.write(serialized)
+        except Exception as e:
+            print(f"Warning: jax.export of bestModel failed: {e}")
+
+    @staticmethod
+    def loadPredict(export_path):
+        """Load a jax.export artifact and return a predict(x_seq) callable."""
+        import numpy as np
+        with open(export_path, "rb") as f:
+            serialized = f.read()
+        rehydrated = export.deserialize(serialized)
+
+        def predict(x_seq):
+            x_seq = jnp.asarray(x_seq, dtype=jnp.float32)
+            return np.asarray(rehydrated.call(x_seq))
+
+        return predict
 
     def run(self):
         startTime = time.time()
@@ -259,4 +311,4 @@ class ESNAS(GA_Base):
             self.generationRun(gen)
 
         file = open(self.saveLocation, "rb")
-        return pickle.load(file)
+        return dill.load(file)
