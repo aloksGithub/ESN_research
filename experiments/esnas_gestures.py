@@ -188,7 +188,7 @@ def run_esnas_gestures():
         errorMetrics = [gesture_f1_metric, gesture_acc_metric]
         
         evalParams = EvalParams(
-            numEvals=1,
+            numEvals=3,
             errorMetrics=errorMetrics,
             defaultErrors=[1.0, 0.0],
             timeout=20,
@@ -198,8 +198,8 @@ def run_esnas_gestures():
         )
         
         gaParams = GAParams(
-            generations=2,
-            populationSize=8,
+            generations=10,
+            populationSize=20,
             crossoverProbability=0.7,
             mutationProbability=0.2,
             eliteSize=1,
@@ -207,7 +207,7 @@ def run_esnas_gestures():
         )
         
         modelParams = ModelParams(
-            num_nodes_range=(2, 4),
+            num_nodes_range=(1, 2),
         )
 
         fold_save_loc = os.path.join(save_folder, f'fold_{idx}')
@@ -241,4 +241,4 @@ def run_esnas_gestures():
         print("No results to report.")
 
 if __name__ == "__main__":
-    print_saved_results()
+    run_esnas_gestures()
