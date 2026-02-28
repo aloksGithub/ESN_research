@@ -248,35 +248,6 @@ class ESNAS(GA_Base):
 
         file = open(self.saveLocation, "wb")
         dill.dump(self, file)
-        self.exportBestModel()
-
-    def exportBestModel(self):
-        """Export bestModel.run via jax.export for deterministic inference."""
-        if self.bestModel is None:
-            return
-
-        # Deep copy so that JAX tracing doesn't mutate self.bestModel's state,
-        # which would make it unpicklable with dill on subsequent generations.
-        model_copy = copy.deepcopy(self.bestModel)
-
-        @jax.jit
-        def forward(x_seq):
-            return model_copy.run(x_seq)
-
-        input_dim = self.experimentData.trainX.shape[-1]
-        T, = export.symbolic_shape("T")
-
-        try:
-            exported = export.export(forward)(
-                jax.ShapeDtypeStruct((T, input_dim), jnp.float32),
-            )
-            serialized = exported.serialize()
-
-            export_path = os.path.splitext(self.saveLocation)[0] + "_forward.jax"
-            with open(export_path, "wb") as f:
-                f.write(serialized)
-        except Exception as e:
-            print(f"Warning: jax.export of bestModel failed: {e}")
 
     @staticmethod
     def loadPredict(export_path):
