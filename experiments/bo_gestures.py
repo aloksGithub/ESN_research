@@ -3,10 +3,8 @@ import reservoirpy as rpy
 import numpy as np
 import sys
 import warnings
-import traceback
 import sklearn.metrics
 import dill
-from deap import base, creator
 import jax
 import torch
 
@@ -15,8 +13,6 @@ warnings.filterwarnings("ignore")
 rpy.set_seed(0)
 np.random.seed(0)
 torch.manual_seed(0)
-import random as _random
-_random.seed(0)
 
 # Add parent directory to sys.path to import from src and gesture_recognition
 current_dir = os.path.abspath(os.path.dirname(__file__))
@@ -25,8 +21,10 @@ sys.path.insert(0, root_dir)
 sys.path.insert(0, os.path.join(root_dir, 'gesture_recognition'))
 data_dir = os.path.join(root_dir, 'gesture_recognition', 'dataSets')
 
-from src.algorithms.ESN_GA_BO import EvalParams, ExperimentData, GAParams, ModelParams, ESNAS
+from src.algorithms.types import EvalParams, ExperimentData
+from src.algorithms.ESN_BO import ESN_BO
 from src.utils import constructModel, runModel, trainModel
+from src.mat_gen_v03 import bernoulli as bernoulli_v03, normal as normal_v03, uniform as uniform_v03
 from gesture_recognition.Utils import createData, getData
 from gesture_recognition import Evaluation
 
@@ -106,42 +104,34 @@ def gesture_acc_metric(y_true, y_pred):
     return np.mean(acc_scores)
 
 def print_saved_fold_results(idx):
-    """Evaluate a single saved fold using the jax.export artifact."""
-    save_folder = 'results/esnas_gestures/global1'
+    """Evaluate a single saved fold using the dill backup."""
+    save_folder = 'results/bo_gestures/global1'
 
     print(f"\n======================== Fold {idx+1}/5 ========================")
     testFiles = files[idx:idx+1]
     inputFiles = files[:idx] + files[idx+1:]
     train_dataset, _, train_loader, _ = createData(inputFiles, testFiles, dataDir=data_dir)
     trainX, trainY = getData(train_loader)
-    import hashlib
-    print(f"trainX hash: {hashlib.md5(trainX.tobytes()).hexdigest()}")
-    print(f"trainY hash: {hashlib.md5(trainY.tobytes()).hexdigest()}")
 
     fold_save_loc = os.path.join(save_folder, f'fold_{idx}')
+    backup_path = os.path.join(fold_save_loc, 'bo_backup.obj')
 
-    # Register deap creator types before loading (they're created dynamically)
-    if not hasattr(creator, "Fitness"):
-        creator.create("Fitness", base.Fitness, weights=(-1.0,))
-    if not hasattr(creator, "Individual"):
-        creator.create("Individual", dict, fitness=creator.Fitness)
+    with open(backup_path, "rb") as f:
+        bo = dill.load(f)
 
-    # Load dill backup to get the save path, then load jax.export for inference
-    with open(os.path.join(fold_save_loc, 'esnas_backup.obj'), "rb") as f:
-        ga = dill.load(f)
-    
-    # model = trainModel(ga.bestModel, trainX, trainY)
+    model = trainModel(bo.bestModel, trainX, trainY)
 
-    f1, acc = testESN(ga.bestModel, testFiles)
-    print(f1, acc)
-    return f1, acc
+    test_f1, test_acc = testESN(model, testFiles)
+    print(test_f1, test_acc)
+    return test_f1, test_acc
 
 def print_saved_results():
     all_test_f1s = []
     all_test_accs = []
 
-    for idx in range(5):
+    for idx in [2]:
         test_f1, test_acc = print_saved_fold_results(idx)
+        print(test_f1, test_acc)
         if test_f1 is not None:
             all_test_f1s.append(test_f1)
             all_test_accs.append(test_acc)
@@ -153,37 +143,35 @@ def print_saved_results():
     else:
         print("No results to report.")
 
-def run_esnas_gestures():
-    save_folder = 'results/esnas_gestures/global1'
+def run_bo_gestures():
+    save_folder = 'results/bo_gestures/global1'
     if not os.path.exists(save_folder):
         os.makedirs(save_folder)
 
     all_test_f1s = []
     all_test_accs = []
 
-    for idx in [3, 4]:
+    for idx in [2]:
         print(f"\n======================== Fold {idx+1}/5 ========================")
         inputFiles = files[:idx] + files[idx+1:]
         testFiles = files[idx:idx+1]
         validationFiles = [inputFiles[idx%4]]
         trainFiles = inputFiles[:idx%4] + inputFiles[idx%4+1:]
-        
+
         print(f"Train subjects: {trainFiles}")
         print(f"Validation subject: {validationFiles}")
         print(f"Test subject: {testFiles}")
 
         # Load data
-        data_dir = os.path.join(root_dir, 'gesture_recognition', 'dataSets')
-        
         # Training data (Concatenated for fitting)
         train_dataset, _, train_loader, _ = createData(trainFiles, testFiles, dataDir=data_dir)
         trainX, trainY = getData(train_loader)
-        
+
         # Validation data (List of sequences for per-sequence averaging)
         _, val_dataset, _, val_loader = createData(trainFiles, validationFiles, dataDir=data_dir)
         valX, valY = getSequenceData(val_loader)
         valX, valY = valX[0], valY[0]
-        
+
         # Test data (List of sequences)
         _, test_dataset, _, test_loader = createData(trainFiles, testFiles, dataDir=data_dir)
         testX, testY = getSequenceData(test_loader)
@@ -193,47 +181,43 @@ def run_esnas_gestures():
 
         # Define error metrics following testESN behavior
         errorMetrics = [gesture_f1_metric, gesture_acc_metric]
-        
+
         evalParams = EvalParams(
             numEvals=3,
             errorMetrics=errorMetrics,
             defaultErrors=[1.0, 0.0],
-            timeout=20,
-            memoryLimit=756,
+            timeout=360,
+            memoryLimit=0,
             minimizeFitness=True,
             isAutoRegressive=False,
         )
-        
-        gaParams = GAParams(
-            generations=10,
-            populationSize=20,
-            crossoverProbability=0.7,
-            mutationProbability=0.2,
-            eliteSize=1,
-            stagnationReset=5,
-        )
-        
-        modelParams = ModelParams(
-            num_nodes_range=(1, 2),
-        )
+
+        # Set input/output dims to match gesture data
+        arch = {
+            'nodes': [
+                {'type': 'Input', 'params': {'input_dim': trainX.shape[1]}},
+                {'type': 'Reservoir', 'params': {'units': 1000, 'lr': 0.9, 'sr': 0.9, 'input_connectivity': 0.25, 'rc_connectivity': 0.25, 'Win': bernoulli_v03, 'W': normal_v03, 'bias': bernoulli_v03}},
+                {'type': 'Ridge', 'params': {'output_dim': trainY.shape[1], 'ridge': 8.0e-05}}
+            ],
+            'edges': [[0, 1], [1, 2]]
+        }
 
         fold_save_loc = os.path.join(save_folder, f'fold_{idx}')
         if not os.path.exists(fold_save_loc):
             os.makedirs(fold_save_loc)
 
-        # Run ESNAS for this fold
-        ga = ESNAS(
+        # Run BO for this fold
+        bo = ESN_BO(
             experimentData,
             evalParams,
-            gaParams,
-            modelParams,
-            n_jobs=4,
-            saveLocation=os.path.join(fold_save_loc, 'esnas_backup.obj'),
-            bo_init=0,
-            bo_iter=5
+            n_rand=15,
+            iterations=15,
+            seedModel=arch,
+            n_jobs=3,
+            saveLocation=os.path.join(fold_save_loc, 'bo_backup.obj'),
         )
-        
-        ga.run()
+
+        bo.run()
 
         test_f1, test_acc = print_saved_fold_results(idx)
         all_test_f1s.append(test_f1)
@@ -247,4 +231,4 @@ def run_esnas_gestures():
         print("No results to report.")
 
 if __name__ == "__main__":
-    print_saved_results()
+    run_bo_gestures()
