@@ -6,17 +6,20 @@ import math
 # Parameterizing echo state networks for multi-step time series prediction
 # Mackey glass dataset
 def getDataMGS():
-    data = np.load("./data/MG17.npy")
-    data = data.reshape((data.shape[0], 1))
-    data = data[:2801, :]
-    from scipy import stats
+    raw = np.load("./data/MG17.npy")
+    raw = raw.reshape((raw.shape[0], 1))
 
-    data = stats.zscore(data)
-    data.shape
+    # Compute normalization stats from the original 2801 window
+    orig_window = raw[:2801, :]
+    norm_mean = orig_window.mean()
+    norm_std = orig_window.std()
+
+    # Normalize the full raw data with the original window's stats
+    data = (raw - norm_mean) / norm_std
 
     trainLen = 2300
     valLen = 286
-    testLen = 0
+    testLen = 286
     train_in = data[0:trainLen]
     train_out = data[0 + 1 : trainLen + 1]
     val_in = data[trainLen : trainLen + valLen]
@@ -30,17 +33,21 @@ def getDataMGS():
 # Parameterizing echo state networks for multi-step time series prediction
 # Santafe laser dataset
 def getDataLaser():
-    sunspots = pd.read_csv("./data/santafelaser.csv")
-    data = np.array(sunspots)
-    data = data.reshape((data.shape[0], 1))
-    data = data[:2801, :]
-    from scipy import stats
+    raw = pd.read_csv("./data/santafelaser.csv")
+    raw = np.array(raw)
+    raw = raw.reshape((raw.shape[0], 1))
 
-    data = stats.zscore(data)
+    # Compute normalization stats from the original 2801 window
+    orig_window = raw[:2801, :]
+    norm_mean = orig_window.mean()
+    norm_std = orig_window.std()
+
+    # Normalize the full raw data with the original window's stats
+    data = (raw - norm_mean) / norm_std
 
     trainLen = 2300
     valLen = 100
-    testLen = 0
+    testLen = 100
     train_in = data[0:trainLen]
     train_out = data[0 + 1 : trainLen + 1]
     val_in = data[trainLen : trainLen + valLen]
@@ -55,16 +62,17 @@ def getDataLaser():
 # Neutral Normed DDE dataset
 def getDataDDE():
     data = np.load("./data/Neutral_normed_2801.npy")
+    ext = np.load("./data/Neutral_normed_extended.npy")
 
     trainLen = 2300
     valLen = 500
-    testLen = 0
+    testLen = 500
     train_in = data[0:trainLen]
     train_out = data[0 + 1 : trainLen + 1]
     val_in = data[trainLen : trainLen + valLen]
     val_out = data[trainLen + 1 : trainLen + valLen + 1]
-    test_in = data[trainLen + valLen : trainLen + valLen + testLen]
-    test_out = data[trainLen + valLen + 1 : trainLen + valLen + testLen + 1]
+    test_in = ext[trainLen + valLen : trainLen + valLen + testLen]
+    test_out = ext[trainLen + valLen + 1 : trainLen + valLen + testLen + 1]
     return train_in, train_out, val_in, val_out, test_in, test_out
 
 
@@ -73,16 +81,17 @@ def getDataDDE():
 # Lorenz dataset
 def getDataLorenz():
     data = np.load("./data/Lorenz_normed_2801.npy")
+    ext = np.load("./data/Lorenz_normed_extended.npy")
 
     trainLen = 2300
     valLen = 444
-    testLen = 0
+    testLen = 444
     train_in = data[0:trainLen]
     train_out = data[0 + 1 : trainLen + 1]
     val_in = data[trainLen : trainLen + valLen]
     val_out = data[trainLen + 1 : trainLen + valLen + 1]
-    test_in = data[trainLen + valLen : trainLen + valLen + testLen]
-    test_out = data[trainLen + valLen + 1 : trainLen + valLen + testLen + 1]
+    test_in = ext[trainLen + valLen : trainLen + valLen + testLen]
+    test_out = ext[trainLen + valLen + 1 : trainLen + valLen + testLen + 1]
     return train_in, train_out, val_in, val_out, test_in, test_out
 
 

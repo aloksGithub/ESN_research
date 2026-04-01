@@ -11,12 +11,27 @@ sys.path.insert(0, parent_dir)
 from src.utils import runModel
 from src.algorithms.ESN_BO import ESN_BO
 from src.algorithms.ESN_GA import ESN_GA
+from src.datasets import getDataDDE, getDataLaser, getDataLorenz, getDataMGS
+
+# Load fresh test data from the updated dataset functions
+DATASET_LOADERS = {
+    'mgs': getDataMGS,
+    'lorenz': getDataLorenz,
+    'dde': getDataDDE,
+    'laser': getDataLaser,
+}
 
 def readSavedExperiment(path):
     file = open(path, "rb")
     return pickle.load(file)
 
 def printSavedResults(directory, dataset, isAutoregressive=True, isGA=True):
+    # Load fresh test data for autoregressive datasets
+    testX = None
+    testY = None
+    if isAutoregressive and dataset in DATASET_LOADERS:
+        _, _, _, _, testX, testY = DATASET_LOADERS[dataset]()
+
     nrmseErrors = []
     r2_squaredValues = []
     times = []
@@ -33,15 +48,16 @@ def printSavedResults(directory, dataset, isAutoregressive=True, isGA=True):
         best_model = ga.bestModel
         if isAutoregressive:
             runModel(best_model, ga.experimentData.trainX)
-            prevOutput = ga.experimentData.valX[0]
+            runModel(best_model, ga.experimentData.valX)
+            prevOutput = testX[0]
             preds = []
-            for _ in range(len(ga.experimentData.valX)):
+            for _ in range(len(testX)):
                 pred = runModel(best_model, prevOutput)
                 prevOutput = pred
                 preds.append(pred[0])
             preds = np.array(preds)
-            nrmse_error = ga.evalParams.errorMetrics[0](ga.experimentData.valY, preds)
-            r2_error = ga.evalParams.errorMetrics[1](ga.experimentData.valY, preds)
+            nrmse_error = ga.evalParams.errorMetrics[0](testY, preds)
+            r2_error = ga.evalParams.errorMetrics[1](testY, preds)
         else:
             runModel(best_model, ga.experimentData.valX)
             preds = runModel(best_model, ga.experimentData.testX)

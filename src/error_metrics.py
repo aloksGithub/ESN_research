@@ -1,7 +1,13 @@
 import math
 import numpy as np
-from reservoirpy.observables import (mse)
 from sklearn.metrics import r2_score
+
+
+def mse(y_true, y_pred):
+    """Mean squared error."""
+    y_true = np.asarray(y_true)
+    y_pred = np.asarray(y_pred)
+    return np.mean((y_true - y_pred) ** 2)
 
 def nrmse_sunspots(y_true, y_pred):
     mseError = mse(y_true, y_pred)
