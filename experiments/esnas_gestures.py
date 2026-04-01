@@ -162,12 +162,12 @@ def run_esnas_gestures():
         best_model = ga.bestModel
         if best_model is not None:
             print("Re-training best model on combined train+validation data...")
-            combinedX = np.concatenate([trainX, np.concatenate(valX)])
-            combinedY = np.concatenate([trainY, np.concatenate(valY)])
+            combinedX = np.concatenate([trainX, valX])
+            combinedY = np.concatenate([trainY, valY])
             
             best_model = trainModel(best_model, combinedX, combinedY)
             
-            preds = [runModel(best_model, seq) for seq in testX]
+            preds = runModel(best_model, testX)
             
             # Accumulate per-sequence scores
             for target, prediction in zip(testY, preds):
