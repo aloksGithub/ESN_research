@@ -51,10 +51,9 @@ def prepare_data(data_loader):
 
 
 def run_experiment(dataset_name, data_loader, num_repeats=5,
-                   max_layers=4, neurons_per_layer=40, neurons_add=40,
+                   max_layers=3, neurons_per_layer=1000, neurons_add=50,
                    washout=100, save_dir='results/ge_desn',
-                   nrmse_func=None,
-                   min_improvement=0.01, patience=1):
+                   nrmse_func=None, autoregressive=False):
     """Run GE-DESN on one dataset for num_repeats trials."""
     if nrmse_func is None:
         nrmse_func = nrmse
@@ -79,7 +78,7 @@ def run_experiment(dataset_name, data_loader, num_repeats=5,
     pram = {
         'input_dim': input_dim,
         'output_dim': output_dim,
-        'leaky_rate': 0.92,
+        'leaky_rate': 0.7,
         'max_layers': max_layers,
         'neurons_per_layer': [neurons_per_layer] * 16,
         'neurons_add': neurons_add,
@@ -87,15 +86,13 @@ def run_experiment(dataset_name, data_loader, num_repeats=5,
 
     oram = {
         'spare_rate': 1.0,
-        'ampWi': 1.2853033,
-        'ampWp': 0.53432484,
-        'ampWr': 0.8,
-        'reg_fac': 1e-10,
+        'ampWi': 0.5,
+        'ampWp': 0.5,
+        'ampWr': 0.99,
+        'reg_fac': 1e-6,
         'similarity_method': 0,
         'Q2': 0,
     }
-
-    print(f"  Early stopping: min_improvement={min_improvement}, patience={patience}")
 
     dataset_dir = os.path.join(save_dir, dataset_name)
     os.makedirs(dataset_dir, exist_ok=True)
@@ -109,8 +106,7 @@ def run_experiment(dataset_name, data_loader, num_repeats=5,
         start = time.time()
         result = run_ge_desn(
             U_init, U_train, Y_train, test_in, test_out,
-            pram, oram,
-            min_improvement=min_improvement, patience=patience,
+            pram, oram, autoregressive=autoregressive,
         )
         elapsed = time.time() - start
         total_elapsed += elapsed
@@ -135,8 +131,6 @@ def run_experiment(dataset_name, data_loader, num_repeats=5,
             'dataset': dataset_name,
             'pram': pram,
             'oram': oram,
-            'min_improvement': min_improvement,
-            'patience': patience,
             'washout': washout,
             'nrmse': nrmse_val,
             'r2': r2_val,
@@ -173,11 +167,14 @@ if __name__ == '__main__':
         'sunspots': nrmse_sunspots,
     }
 
+    AUTOREGRESSIVE = {'mgs', 'laser', 'dde', 'lorenz'}
+
     all_results = {}
     for name, loader in DATASETS.items():
         nrmse_fn = NRMSE_OVERRIDES.get(name)
         nrmses, r2s = run_experiment(name, loader, num_repeats=5,
-                                     nrmse_func=nrmse_fn)
+                                     nrmse_func=nrmse_fn,
+                                     autoregressive=name in AUTOREGRESSIVE)
         all_results[name] = {'nrmse': nrmses, 'r2': r2s}
 
     # Final summary table
