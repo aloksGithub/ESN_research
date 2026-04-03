@@ -157,6 +157,26 @@ class EchoStateNetwork:
         Y_test = self.Wout @ X_test
         return Y_test, X_test
 
+    def Validate_test_data_autoregressive(self, first_input, n_steps):
+        """Autoregressive forward pass: feed own predictions back as input.
+
+        Args:
+            first_input: Initial input, shape (input_dim, 1)
+            n_steps: Number of timesteps to predict
+
+        Returns:
+            Y_pred: Predicted outputs, shape (output_dim, n_steps)
+        """
+        alaph = self.galaph
+        current_input = first_input.copy()
+        Y_pred = np.zeros((self.Y_dim, n_steps))
+        for i in range(n_steps):
+            x = self.UspanX(current_input, alaph)
+            y = self.Wout @ x
+            Y_pred[:, i:i + 1] = y
+            current_input = y[:self.U_dim, :]
+        return Y_pred
+
     # ------------------------------------------------------------------ #
     #  Neuron merging & pruning (evolution phase)                          #
     # ------------------------------------------------------------------ #
@@ -263,8 +283,7 @@ class EchoStateNetwork:
 
 
 def run_ge_desn(U_init, U_train, Y_train, U_test, Y_test,
-                pram, oram,
-                min_improvement=0.01, patience=1):
+                pram, oram, autoregressive=False):
     """Run a single GE-DESN grow-evolve trial and return the result.
 
     This implements the CCN_evaluateMergeHE logic from the original code:
@@ -279,11 +298,8 @@ def run_ge_desn(U_init, U_train, Y_train, U_test, Y_test,
         Y_test: shape (output_dim, test_len)
         pram: structural parameters dict
         oram: weight/regularization parameters dict
-        min_improvement: minimum relative NRMSE improvement to justify adding
-            a layer. E.g. 0.01 means the new layer must reduce NRMSE by at
-            least 1% relative to the previous layer's NRMSE.
-        patience: number of consecutive layers without sufficient improvement
-            before stopping layer growth.
+        autoregressive: If True, feed predictions back as input during testing.
+            If False (default), use teacher-forced evaluation.
 
     Returns:
         Dict containing:
@@ -309,12 +325,11 @@ def run_ge_desn(U_init, U_train, Y_train, U_test, Y_test,
                   neurons_to_remove=neurons_add,
                   similarity_method=similarity_method, Q2=Q2)
 
-    nrmse_val, ms_val = _evaluate_after_evolution(esn)
+    nrmse_val, ms_val = _evaluate_after_evolution(esn, autoregressive)
     nrmse_per_layer.append(nrmse_val)
     ms_per_layer.append(ms_val)
 
-    # --- Subsequent layers with early stopping ---
-    stagnant_layers = 0
+    # --- Subsequent layers ---
     for i in range(1, max_layers):
         X_num_prior = sum(esn.X_dim)
         esn.Inilize_Stack_a_reservoir(neurons_add + target_sizes[i])
@@ -323,34 +338,23 @@ def run_ge_desn(U_init, U_train, Y_train, U_test, Y_test,
                       similarity_method=similarity_method, Q2=Q2,
                       protect_below=X_num_prior)
 
-        nrmse_val, ms_val = _evaluate_after_evolution(esn)
+        nrmse_val, ms_val = _evaluate_after_evolution(esn, autoregressive)
         nrmse_per_layer.append(nrmse_val)
         ms_per_layer.append(ms_val)
-
-        # Check for sufficient improvement
-        prev_nrmse = nrmse_per_layer[-2]
-        if prev_nrmse == 0:
-            relative_improvement = 0.0
-        else:
-            relative_improvement = (prev_nrmse - nrmse_val) / prev_nrmse
-
-        if relative_improvement < min_improvement:
-            stagnant_layers += 1
-            print(f"  Layer {i}: NRMSE {prev_nrmse:.6f} -> {nrmse_val:.6f} "
-                  f"(improvement {relative_improvement:.4f} < {min_improvement}), "
-                  f"stagnant {stagnant_layers}/{patience}")
-            if stagnant_layers >= patience:
-                print(f"  Early stop: no improvement for {patience} "
-                      f"consecutive layer(s), stopping at {i + 1} layers")
-                break
-        else:
-            stagnant_layers = 0
 
     # Final prediction
     esn.Init_reservior(esn.U_init)
     esn.Train_reservoir(esn.U_train, esn.Y_train)
     esn.Reinit_reservoir()
-    Y_pred, _ = esn.Validate_test_data_constant(esn.U_test)
+    if autoregressive:
+        # Drive reservoir through training data to reach correct state,
+        # then predict autoregressively on the test set
+        for i in range(esn.U_train.shape[1]):
+            esn.UspanX(esn.U_train[:, i:i + 1], esn.galaph)
+        Y_pred = esn.Validate_test_data_autoregressive(
+            esn.U_test[:, 0:1], esn.U_test.shape[1])
+    else:
+        Y_pred, _ = esn.Validate_test_data_constant(esn.U_test)
 
     return {
         'Y_pred': Y_pred,
@@ -394,12 +398,18 @@ def _evolve_layer(esn, layer_idx, target_size, neurons_to_remove,
             esn.CCN_Merge_Top(0, mergei, mergej, Q2)
 
 
-def _evaluate_after_evolution(esn):
+def _evaluate_after_evolution(esn, autoregressive=False):
     """Train and evaluate the ESN after an evolution step. Returns (nrmse, last_max_similarity)."""
     esn.Init_reservior(esn.U_init)
     X_train = esn.Train_reservoir(esn.U_train, esn.Y_train)
     esn.Reinit_reservoir()
-    Yout, _ = esn.Validate_test_data_constant(esn.U_test)
+    if autoregressive:
+        for i in range(esn.U_train.shape[1]):
+            esn.UspanX(esn.U_train[:, i:i + 1], esn.galaph)
+        Yout = esn.Validate_test_data_autoregressive(
+            esn.U_test[:, 0:1], esn.U_test.shape[1])
+    else:
+        Yout, _ = esn.Validate_test_data_constant(esn.U_test)
 
     err = (Yout - esn.Y_test) ** 2
     Ynorm = np.mean(esn.Y_test) * np.ones(Yout.shape)
