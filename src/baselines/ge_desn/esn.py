@@ -23,13 +23,16 @@ class EchoStateNetwork:
         U_init: Input data for washout, shape (input_dim, init_len)
         U_train: Input data for training, shape (input_dim, train_len)
         Y_train: Target data for training, shape (output_dim, train_len)
+        U_val: Input data for validation, shape (input_dim, val_len)
+        Y_val: Target data for validation, shape (output_dim, val_len)
         U_test: Input data for testing, shape (input_dim, test_len)
         Y_test: Target data for testing, shape (output_dim, test_len)
         pram: Dict of structural parameters
         oram: Dict of weight-scaling / regularization parameters
     """
 
-    def __init__(self, U_init, U_train, Y_train, U_test, Y_test, pram, oram):
+    def __init__(self, U_init, U_train, Y_train, U_val, Y_val,
+                 U_test, Y_test, pram, oram):
         self.U_dim = pram['input_dim']
         self.Y_dim = pram['output_dim']
         self.galaph = pram['leaky_rate']
@@ -49,6 +52,8 @@ class EchoStateNetwork:
         self.U_init = U_init
         self.U_train = U_train
         self.Y_train = Y_train
+        self.U_val = U_val
+        self.Y_val = Y_val
         self.U_test = U_test
         self.Y_test = Y_test
         self.TrainProcessLen = U_train.shape[1]
@@ -282,7 +287,7 @@ class EchoStateNetwork:
         return flat.reshape(x, y)
 
 
-def run_ge_desn(U_init, U_train, Y_train, U_test, Y_test,
+def run_ge_desn(U_init, U_train, Y_train, U_val, Y_val, U_test, Y_test,
                 pram, oram, autoregressive=False):
     """Run a single GE-DESN grow-evolve trial and return the result.
 
@@ -294,6 +299,8 @@ def run_ge_desn(U_init, U_train, Y_train, U_test, Y_test,
         U_init: shape (input_dim, init_len)
         U_train: shape (input_dim, train_len)
         Y_train: shape (output_dim, train_len)
+        U_val: shape (input_dim, val_len)
+        Y_val: shape (output_dim, val_len)
         U_test: shape (input_dim, test_len)
         Y_test: shape (output_dim, test_len)
         pram: structural parameters dict
@@ -304,7 +311,7 @@ def run_ge_desn(U_init, U_train, Y_train, U_test, Y_test,
     Returns:
         Dict containing:
           'Y_pred': predicted output, shape (output_dim, test_len)
-          'nrmse_per_layer': list of NRMSE after each layer's evolution
+          'nrmse_per_layer': list of NRMSE after each layer's evolution (on val)
           'max_similarity_per_layer': list of final MS after each layer
           'esn': the trained EchoStateNetwork instance
     """
@@ -314,7 +321,8 @@ def run_ge_desn(U_init, U_train, Y_train, U_test, Y_test,
     similarity_method = oram.get('similarity_method', 0)
     Q2 = oram.get('Q2', 0)
 
-    esn = EchoStateNetwork(U_init, U_train, Y_train, U_test, Y_test, pram, oram)
+    esn = EchoStateNetwork(U_init, U_train, Y_train, U_val, Y_val,
+                           U_test, Y_test, pram, oram)
 
     nrmse_per_layer = []
     ms_per_layer = []
@@ -399,7 +407,7 @@ def _evolve_layer(esn, layer_idx, target_size, neurons_to_remove,
 
 
 def _evaluate_after_evolution(esn, autoregressive=False):
-    """Train and evaluate the ESN after an evolution step. Returns (nrmse, last_max_similarity)."""
+    """Train and evaluate the ESN on validation data after an evolution step. Returns (nrmse, last_max_similarity)."""
     esn.Init_reservior(esn.U_init)
     X_train = esn.Train_reservoir(esn.U_train, esn.Y_train)
     esn.Reinit_reservoir()
@@ -407,12 +415,12 @@ def _evaluate_after_evolution(esn, autoregressive=False):
         for i in range(esn.U_train.shape[1]):
             esn.UspanX(esn.U_train[:, i:i + 1], esn.galaph)
         Yout = esn.Validate_test_data_autoregressive(
-            esn.U_test[:, 0:1], esn.U_test.shape[1])
+            esn.U_val[:, 0:1], esn.U_val.shape[1])
     else:
-        Yout, _ = esn.Validate_test_data_constant(esn.U_test)
+        Yout, _ = esn.Validate_test_data_constant(esn.U_val)
 
-    err = (Yout - esn.Y_test) ** 2
-    Ynorm = np.mean(esn.Y_test) * np.ones(Yout.shape)
+    err = (Yout - esn.Y_val) ** 2
+    Ynorm = np.mean(esn.Y_val) * np.ones(Yout.shape)
     nerr = (Yout - Ynorm) ** 2
 
     denom = np.sum(nerr)

@@ -43,6 +43,11 @@ NEXTSTEP_DATASETS = {'sunspots', 'water'}
 # Experiment runner
 # ---------------------------------------------------------------------------
 
+def _mse(y_true, y_pred):
+    """MSE for use as AR validation objective in BO (smoother than NRMSE)."""
+    return float(np.mean((np.asarray(y_true) - np.asarray(y_pred)) ** 2))
+
+
 def run_experiment(dataset_name, data_loader, num_repeats=5,
                    n_init=20, n_iter=800, bo_patience=30,
                    epochs=200, patience=20,
@@ -86,6 +91,8 @@ def run_experiment(dataset_name, data_loader, num_repeats=5,
             n_init=n_init, n_iter=n_iter, bo_patience=bo_patience,
             epochs=epochs, patience=patience,
             device=device, seed=rep,
+            autoregressive=is_autoregressive,
+            val_error_func=_mse if is_autoregressive else None,
         )
 
         print(f"  Best params: {best_params}")
@@ -93,8 +100,11 @@ def run_experiment(dataset_name, data_loader, num_repeats=5,
 
         # Evaluate best model directly on test set
         if is_autoregressive:
+            # Warm up hidden state with train+val before AR prediction on test
+            warmup_data = np.concatenate([train_in, val_in], axis=0)
             y_pred = predict_lstm_autoregressive(
                 best_model, test_in[0], num_steps=len(test_out), device=device,
+                warmup_data=warmup_data,
             )
         else:
             y_pred = predict_lstm(best_model, test_in, device=device)

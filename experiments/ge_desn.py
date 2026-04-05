@@ -33,21 +33,18 @@ def prepare_data(data_loader):
     """
     train_in, train_out, val_in, val_out, test_in, test_out = data_loader()
 
-    # Combine train + val for the training set, test stays separate
-    # GE-DESN uses its own washout from the beginning of the training data
-    combined_in = np.concatenate([train_in, val_in], axis=0)
-    combined_out = np.concatenate([train_out, val_out], axis=0)
-
-    input_dim = combined_in.shape[1]
-    output_dim = combined_out.shape[1]
+    input_dim = train_in.shape[1]
+    output_dim = train_out.shape[1]
 
     # Transpose to (features, timesteps)
-    all_in = combined_in.T    # (input_dim, train+val_len)
-    all_out = combined_out.T  # (output_dim, train+val_len)
+    tr_in = train_in.T
+    tr_out = train_out.T
+    v_in = val_in.T
+    v_out = val_out.T
     t_in = test_in.T
     t_out = test_out.T
 
-    return all_in, all_out, t_in, t_out, input_dim, output_dim
+    return tr_in, tr_out, v_in, v_out, t_in, t_out, input_dim, output_dim
 
 
 def run_experiment(dataset_name, data_loader, num_repeats=5,
@@ -61,16 +58,16 @@ def run_experiment(dataset_name, data_loader, num_repeats=5,
     print(f"  Dataset: {dataset_name}")
     print(f"{'=' * 60}")
 
-    all_in, all_out, test_in, test_out, input_dim, output_dim = prepare_data(data_loader)
-    total_train_len = all_in.shape[1]
+    train_in, train_out, val_in, val_out, test_in, test_out, input_dim, output_dim = prepare_data(data_loader)
 
     # Split off washout from training data
-    U_init = all_in[:, :washout]
-    U_train = all_in[:, washout:]
-    Y_train = all_out[:, washout:]
+    U_init = train_in[:, :washout]
+    U_train = train_in[:, washout:]
+    Y_train = train_out[:, washout:]
 
     print(f"  Input dim: {input_dim}, Output dim: {output_dim}")
-    print(f"  Washout: {washout}, Train: {U_train.shape[1]}, Test: {test_in.shape[1]}")
+    print(f"  Washout: {washout}, Train: {U_train.shape[1]}, "
+          f"Val: {val_in.shape[1]}, Test: {test_in.shape[1]}")
     print(f"  Layers: {max_layers}, Neurons/layer: {neurons_per_layer}, "
           f"Extra neurons: {neurons_add}")
     print(f"  Repeats: {num_repeats}")
@@ -105,7 +102,8 @@ def run_experiment(dataset_name, data_loader, num_repeats=5,
     for rep in range(num_repeats):
         start = time.time()
         result = run_ge_desn(
-            U_init, U_train, Y_train, test_in, test_out,
+            U_init, U_train, Y_train, val_in, val_out,
+            test_in, test_out,
             pram, oram, autoregressive=autoregressive,
         )
         elapsed = time.time() - start

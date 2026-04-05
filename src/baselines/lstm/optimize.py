@@ -13,14 +13,15 @@ with how EESNAS returns its best model from the search.
 import copy
 import numpy as np
 from bayes_opt import BayesianOptimization
-from .model import LSTMForecaster, train_lstm
+from .model import LSTMForecaster, train_lstm, predict_lstm_autoregressive
 
 
 def optimize_lstm(train_in, train_out, val_in, val_out,
                   input_dim, output_dim,
                   n_init=20, n_iter=800, bo_patience=30,
                   epochs=200, patience=20,
-                  device='cpu', seed=None, verbose=2):
+                  device='cpu', seed=None, verbose=2,
+                  autoregressive=False, val_error_func=None):
     """Run Bayesian Optimization to find the best LSTM model.
 
     Uses the same bayes_opt library as the rest of the EESNAS codebase.
@@ -46,11 +47,16 @@ def optimize_lstm(train_in, train_out, val_in, val_out,
         device: 'cpu' or 'cuda'.
         seed: Random seed.
         verbose: Verbosity level for bayes_opt (0=silent, 2=all).
+        autoregressive: If True, evaluate validation using autoregressive
+            prediction (warm up on train data, then AR predict on val).
+        val_error_func: Error function for AR validation (e.g. nrmse).
+            Required when autoregressive=True. Should return a scalar
+            where lower is better.
 
     Returns:
         best_model: The best trained LSTMForecaster instance.
         best_params: Dict of best hyperparameters found.
-        best_val_loss: Best validation MSE achieved.
+        best_val_loss: Best validation loss achieved.
     """
     best_model_state = [None]  # mutable container for closure
     best_model_config = [None]
@@ -83,6 +89,14 @@ def optimize_lstm(train_in, train_out, val_in, val_out,
             epochs=epochs, patience=patience, device=device,
         )
 
+        # For AR datasets, re-evaluate using autoregressive prediction
+        if autoregressive and val_error_func is not None:
+            y_pred = predict_lstm_autoregressive(
+                model, val_in[0], num_steps=len(val_out),
+                device=device, warmup_data=train_in,
+            )
+            val_loss = val_error_func(val_out, y_pred)
+
         # Track the best model weights
         if val_loss < best_val[0]:
             best_val[0] = val_loss
@@ -96,12 +110,12 @@ def optimize_lstm(train_in, train_out, val_in, val_out,
         return -val_loss  # BO maximizes, so negate
 
     pbounds = {
-        'hidden_size': (16, 256),
+        'hidden_size': (16, 512),
         'num_layers': (1, 3),
         'dropout': (0.0, 0.5),
         'log_lr': (-4, -2),             # 1e-4 to 1e-2
         'log_weight_decay': (-6, -2),   # 1e-6 to 1e-2
-        'seq_len': (10, 100),
+        'seq_len': (10, 200),
     }
 
     random_state = seed if seed is not None else 1

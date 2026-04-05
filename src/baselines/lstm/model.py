@@ -159,7 +159,8 @@ def predict_lstm(model, test_in, device='cpu'):
     return pred.squeeze(0).cpu().numpy()
 
 
-def predict_lstm_autoregressive(model, initial_input, num_steps, device='cpu'):
+def predict_lstm_autoregressive(model, initial_input, num_steps, device='cpu',
+                                warmup_data=None):
     """Autoregressive multi-step prediction.
 
     Feeds the model's own output back as the next input for num_steps.
@@ -169,15 +170,25 @@ def predict_lstm_autoregressive(model, initial_input, num_steps, device='cpu'):
         initial_input: First input, shape (input_dim,).
         num_steps: Number of steps to predict.
         device: 'cpu' or 'cuda'.
+        warmup_data: Optional array of shape (num_samples, input_dim) to
+            drive through the model first (teacher-forced) to warm up the
+            hidden state before autoregressive prediction.
 
     Returns:
         predictions: numpy array of shape (num_steps, output_dim).
     """
     model.eval()
     model = model.to(device)
+    hidden = None
+
+    # Warm up hidden state by teacher-forcing through warmup data
+    if warmup_data is not None:
+        x = torch.tensor(warmup_data, dtype=torch.float32).unsqueeze(0).to(device)
+        with torch.no_grad():
+            _, hidden = model(x, hidden)
+
     predictions = []
     current = torch.tensor(initial_input, dtype=torch.float32).reshape(1, 1, -1).to(device)
-    hidden = None
 
     with torch.no_grad():
         for _ in range(num_steps):
