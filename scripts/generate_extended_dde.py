@@ -75,8 +75,7 @@ if __name__ == "__main__":
     print(f"Original shape: {original.shape}")
 
     # Generate enough data: 2801 original + 1 skipped + buffer for test set
-    # Generate 4500 steps to have plenty of room (skip 1 -> 4499 usable)
-    n_total_steps = 4500
+    n_total_steps = 10000
     raw = generate(n_total_steps, dt=0.1)
     print(f"Raw generated shape: {raw.shape}")
 

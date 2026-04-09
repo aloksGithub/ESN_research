@@ -32,9 +32,8 @@ if __name__ == "__main__":
     y0 = [1.0, 1.0, 0.0]
 
     # Generate enough data: need 2801*10 = 28010 fine steps for original,
-    # plus extra for test set. Generate 45000 fine steps -> 4500 subsampled.
     dt_fine = 0.001
-    n_fine = 45000
+    n_fine = 100000
     t_eval = np.arange(0, n_fine * dt_fine, dt_fine)
     sol = odeint(lorenz, y0, t_eval)
 
