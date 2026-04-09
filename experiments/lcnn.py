@@ -133,6 +133,11 @@ def run_experiment(dataset_name, data_loader, num_repeats=5,
 if __name__ == '__main__':
     DATASETS = {
         'mgs': getDataMGS,
+        'laser': getDataLaser,
+        'dde': getDataDDE,
+        'lorenz': getDataLorenz,
+        'sunspots': getDataSunspots,
+        'water': getDataWater,
     }
 
     NRMSE_OVERRIDES = {
