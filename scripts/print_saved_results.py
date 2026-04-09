@@ -30,7 +30,7 @@ def printSavedResults(directory, dataset, isAutoregressive=True, isGA=True):
     testX = None
     testY = None
     if isAutoregressive and dataset in DATASET_LOADERS:
-        _, _, _, _, testX, testY = DATASET_LOADERS[dataset]()
+        _, _, valX, _, testX, testY = DATASET_LOADERS[dataset]()
 
     nrmseErrors = []
     r2_squaredValues = []
@@ -47,25 +47,29 @@ def printSavedResults(directory, dataset, isAutoregressive=True, isGA=True):
             times.append(0)
         best_model = ga.bestModel
         if isAutoregressive:
-            runModel(best_model, ga.experimentData.trainX)
-            runModel(best_model, ga.experimentData.valX)
-            prevOutput = testX[0]
-            preds = []
-            for _ in range(len(testX)):
-                pred = runModel(best_model, prevOutput)
-                prevOutput = pred
-                preds.append(pred[0])
-            preds = np.array(preds)
-            nrmse_error = ga.evalParams.errorMetrics[0](testY, preds)
-            r2_error = ga.evalParams.errorMetrics[1](testY, preds)
+            for i in range(len(testX)):
+                prev_x = valX if i==0 else testX[i-1]
+                current_x = testX[i]
+                runModel(best_model, prev_x)
+                prevOutput = current_x[0]
+                preds = []
+                for _ in range(len(current_x)):
+                    pred = runModel(best_model, prevOutput)
+                    prevOutput = pred
+                    preds.append(pred[0])
+                preds = np.array(preds)
+                nrmse_error = ga.evalParams.errorMetrics[0](testY[i], preds)
+                r2_error = ga.evalParams.errorMetrics[1](testY[i], preds)
+                nrmseErrors.append(nrmse_error)
+                r2_squaredValues.append(r2_error)
+
         else:
             runModel(best_model, ga.experimentData.valX)
             preds = runModel(best_model, ga.experimentData.testX)
             nrmse_error = ga.evalParams.errorMetrics[0](ga.experimentData.testY, preds)
             r2_error = ga.evalParams.errorMetrics[1](ga.experimentData.testY, preds)
-
-        nrmseErrors.append(nrmse_error)
-        r2_squaredValues.append(r2_error)
+            nrmseErrors.append(nrmse_error)
+            r2_squaredValues.append(r2_error)
     print("==============================================================")
     print("{} Errors:".format(dataset))
     print("NRMSE:", nrmseErrors)

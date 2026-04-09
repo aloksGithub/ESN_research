@@ -2,6 +2,8 @@ import pandas as pd
 import numpy as np
 import math
 
+NUM_TEST = 5
+
 # https://www.sciencedirect.com/science/article/pii/S0925231222014291
 # Parameterizing echo state networks for multi-step time series prediction
 # Mackey glass dataset
@@ -24,8 +26,11 @@ def getDataMGS():
     train_out = data[0 + 1 : trainLen + 1]
     val_in = data[trainLen : trainLen + valLen]
     val_out = data[trainLen + 1 : trainLen + valLen + 1]
-    test_in = data[trainLen + valLen : trainLen + valLen + testLen]
-    test_out = data[trainLen + valLen + 1 : trainLen + valLen + testLen + 1]
+    test_in = []
+    test_out = []
+    for i in range(NUM_TEST):
+        test_in.append(data[trainLen + valLen + (i*testLen) : trainLen + valLen + testLen + (i*testLen)])
+        test_out.append(data[trainLen + valLen + 1 + (i*testLen) : trainLen + valLen + testLen + 1 + (i*testLen)])
     return train_in, train_out, val_in, val_out, test_in, test_out
 
 
@@ -52,8 +57,11 @@ def getDataLaser():
     train_out = data[0 + 1 : trainLen + 1]
     val_in = data[trainLen : trainLen + valLen]
     val_out = data[trainLen + 1 : trainLen + valLen + 1]
-    test_in = data[trainLen + valLen : trainLen + valLen + testLen]
-    test_out = data[trainLen + valLen + 1 : trainLen + valLen + testLen + 1]
+    test_in = []
+    test_out = []
+    for i in range(NUM_TEST):
+        test_in.append(data[trainLen + valLen + (i*testLen) : trainLen + valLen + testLen + (i*testLen)])
+        test_out.append(data[trainLen + valLen + 1 + (i*testLen) : trainLen + valLen + testLen + 1 + (i*testLen)])
     return train_in, train_out, val_in, val_out, test_in, test_out
 
 
@@ -71,8 +79,11 @@ def getDataDDE():
     train_out = data[0 + 1 : trainLen + 1]
     val_in = data[trainLen : trainLen + valLen]
     val_out = data[trainLen + 1 : trainLen + valLen + 1]
-    test_in = ext[trainLen + valLen : trainLen + valLen + testLen]
-    test_out = ext[trainLen + valLen + 1 : trainLen + valLen + testLen + 1]
+    test_in = []
+    test_out = []
+    for i in range(NUM_TEST):
+        test_in.append(ext[trainLen + valLen + (i*testLen) : trainLen + valLen + testLen + (i*testLen)])
+        test_out.append(ext[trainLen + valLen + 1 + (i*testLen) : trainLen + valLen + testLen + 1 + (i*testLen)])
     return train_in, train_out, val_in, val_out, test_in, test_out
 
 
@@ -90,8 +101,11 @@ def getDataLorenz():
     train_out = data[0 + 1 : trainLen + 1]
     val_in = data[trainLen : trainLen + valLen]
     val_out = data[trainLen + 1 : trainLen + valLen + 1]
-    test_in = ext[trainLen + valLen : trainLen + valLen + testLen]
-    test_out = ext[trainLen + valLen + 1 : trainLen + valLen + testLen + 1]
+    test_in = []
+    test_out = []
+    for i in range(NUM_TEST):
+        test_in.append(ext[trainLen + valLen + (i*testLen) : trainLen + valLen + testLen + (i*testLen)])
+        test_out.append(ext[trainLen + valLen + 1 + (i*testLen) : trainLen + valLen + testLen + 1 + (i*testLen)])
     return train_in, train_out, val_in, val_out, test_in, test_out
 
 
