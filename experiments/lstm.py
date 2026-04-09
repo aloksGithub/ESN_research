@@ -12,6 +12,7 @@ import os
 import pickle
 import sys
 import time
+import torch
 
 # Add project root to path so we can import src modules
 root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -49,7 +50,7 @@ def _mse(y_true, y_pred):
 
 
 def run_experiment(dataset_name, data_loader, num_repeats=5,
-                   n_init=20, n_iter=800, bo_patience=30,
+                   n_init=30, n_iter=800, bo_patience=50,
                    epochs=200, patience=20,
                    save_dir='results/lstm', nrmse_func=None, device='cpu'):
     """Run LSTM BO search + evaluation on one dataset.
@@ -70,7 +71,11 @@ def run_experiment(dataset_name, data_loader, num_repeats=5,
     is_autoregressive = dataset_name in AUTOREGRESSIVE_DATASETS
 
     print(f"  Input dim: {input_dim}, Output dim: {output_dim}")
-    print(f"  Train: {len(train_in)}, Val: {len(val_in)}, Test: {len(test_in)}")
+    if is_autoregressive:
+        test_len_str = f"{len(test_in)}x{len(test_in[0])}"
+    else:
+        test_len_str = str(len(test_in))
+    print(f"  Train: {len(train_in)}, Val: {len(val_in)}, Test: {test_len_str}")
     print(f"  Mode: {'autoregressive' if is_autoregressive else 'next-step'}")
     print(f"  BO: {n_init} init + up to {n_iter} iter (patience={bo_patience}), "
           f"Repeats: {num_repeats}")
@@ -99,23 +104,52 @@ def run_experiment(dataset_name, data_loader, num_repeats=5,
         print(f"  Best val MSE: {best_val_loss:.6f}")
 
         # Evaluate best model directly on test set
+        rep_nrmse = []
+        rep_r2 = []
         if is_autoregressive:
-            # Warm up hidden state with train+val before AR prediction on test
-            warmup_data = np.concatenate([train_in, val_in], axis=0)
-            y_pred = predict_lstm_autoregressive(
-                best_model, test_in[0], num_steps=len(test_out), device=device,
-                warmup_data=warmup_data,
-            )
+            best_model.eval()
+            best_model = best_model.to(device)
+            hidden = None
+
+            # Teacher-force through training data
+            x = torch.tensor(train_in, dtype=torch.float32).unsqueeze(0).to(device)
+            with torch.no_grad():
+                _, hidden = best_model(x, hidden)
+
+            for i in range(len(test_in)):
+                # Teacher-force through previous segment (val or prior test set)
+                prev_data = val_in if i == 0 else test_in[i - 1]
+                x = torch.tensor(prev_data, dtype=torch.float32).unsqueeze(0).to(device)
+                with torch.no_grad():
+                    _, hidden = best_model(x, hidden)
+
+                # Autoregressive prediction on current test set
+                preds = []
+                current = torch.tensor(test_in[i][0], dtype=torch.float32).reshape(1, 1, -1).to(device)
+                ar_hidden = hidden
+                with torch.no_grad():
+                    for _ in range(len(test_in[i])):
+                        out, ar_hidden = best_model(current, ar_hidden)
+                        pred = out[:, -1, :]
+                        preds.append(pred.cpu().numpy().flatten())
+                        current = pred.unsqueeze(1)
+                hidden = ar_hidden
+
+                y_pred = np.array(preds)
+                rep_nrmse.append(nrmse_func(test_out[i], y_pred))
+                rep_r2.append(r_squared(test_out[i], y_pred))
         else:
             y_pred = predict_lstm(best_model, test_in, device=device)
+            rep_nrmse.append(nrmse_func(test_out, y_pred))
+            rep_r2.append(r_squared(test_out, y_pred))
 
-        nrmse_val = nrmse_func(test_out, y_pred)
-        r2_val = r_squared(test_out, y_pred)
-        nrmse_scores.append(nrmse_val)
-        r2_scores.append(r2_val)
+        nrmse_scores.extend(rep_nrmse)
+        r2_scores.extend(rep_r2)
 
         elapsed = time.time() - start
-        print(f"  NRMSE: {nrmse_val:.6f}, R2: {r2_val:.6f} ({elapsed:.1f}s)")
+        print(f"  Repeat {rep + 1}: ({elapsed:.1f}s)")
+        for j, (n, r) in enumerate(zip(rep_nrmse, rep_r2)):
+            print(f"    Test {j+1}: NRMSE={n:.6f}, R2={r:.6f}")
 
         # Save this repeat's result to its own pickle
         repeat_data = {
@@ -135,8 +169,8 @@ def run_experiment(dataset_name, data_loader, num_repeats=5,
             'model_state_dict': best_model.state_dict(),
             'params': best_params,
             'val_loss': best_val_loss,
-            'nrmse': nrmse_val,
-            'r2': r2_val,
+            'nrmse': rep_nrmse,
+            'r2': rep_r2,
             'elapsed': elapsed,
         }
         with open(os.path.join(dataset_dir, f'repeat_{rep}.pkl'), 'wb') as f:

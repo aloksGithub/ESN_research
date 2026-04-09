@@ -78,7 +78,8 @@ def _make_sequences(inputs, outputs, seq_len):
 
 def train_lstm(model, train_in, train_out, val_in, val_out,
                seq_len=50, lr=1e-3, weight_decay=0.0,
-               epochs=200, patience=20, device='cpu'):
+               epochs=200, patience=20, device='cpu',
+               input_noise=0.0):
     """Train the LSTM model with early stopping on validation loss.
 
     Args:
@@ -93,6 +94,9 @@ def train_lstm(model, train_in, train_out, val_in, val_out,
         epochs: Maximum training epochs.
         patience: Early stopping patience.
         device: 'cpu' or 'cuda'.
+        input_noise: Std of Gaussian noise added to training inputs each
+            epoch. Simulates the perturbed inputs seen during autoregressive
+            rollout, improving robustness to error compounding.
 
     Returns:
         best_val_loss: Best validation MSE achieved.
@@ -111,19 +115,40 @@ def train_lstm(model, train_in, train_out, val_in, val_out,
     best_state = None
     wait = 0
 
+    n_train_chunks = X_train.shape[0]
+    n_val_chunks = X_val.shape[0]
+
     for epoch in range(epochs):
+        # --- Training with TBPTT (sequential hidden state carry-over) ---
         model.train()
         optimizer.zero_grad()
-        pred, _ = model(X_train)
-        loss = criterion(pred, Y_train)
-        loss.backward()
+        hidden = None
+        total_loss = 0.0
+        for i in range(n_train_chunks):
+            chunk = X_train[i:i+1]
+            if input_noise > 0:
+                chunk = chunk + torch.randn_like(chunk) * input_noise
+            pred, hidden = model(chunk, hidden)
+            total_loss = total_loss + criterion(pred, Y_train[i:i+1])
+            hidden = model.detach_hidden(hidden)
+        total_loss = total_loss / n_train_chunks
+        total_loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
         optimizer.step()
 
+        # --- Validation with sequential hidden state carry-over ---
         model.eval()
         with torch.no_grad():
-            val_pred, _ = model(X_val)
-            val_loss = criterion(val_pred, Y_val).item()
+            hidden = None
+            # Warm up on training data
+            for i in range(n_train_chunks):
+                _, hidden = model(X_train[i:i+1], hidden)
+            # Evaluate on validation chunks
+            val_loss = 0.0
+            for i in range(n_val_chunks):
+                val_pred, hidden = model(X_val[i:i+1], hidden)
+                val_loss += criterion(val_pred, Y_val[i:i+1]).item()
+            val_loss /= n_val_chunks
 
         if val_loss < best_val_loss:
             best_val_loss = val_loss

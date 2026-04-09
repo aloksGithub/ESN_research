@@ -39,8 +39,12 @@ def run_experiment(dataset_name, data_loader, num_repeats=5,
     train_in, train_out, val_in, val_out, test_in, test_out = data_loader()
 
     print(f"  Input dim: {train_in.shape[1]}, Output dim: {train_out.shape[1]}")
+    if autoregressive:
+        test_len_str = f"{len(test_in)}x{len(test_in[0])}"
+    else:
+        test_len_str = str(len(test_in))
     print(f"  Washout: {washout}, Train: {len(train_in)}, "
-          f"Val: {len(val_in)}, Test: {len(test_in)}")
+          f"Val: {len(val_in)}, Test: {test_len_str}")
     print(f"  Autoregressive: {autoregressive}")
     print(f"  CMA-ES: popsize={popsize}, max_evals={max_evals}")
     print(f"  Repeats: {num_repeats}")
@@ -74,24 +78,31 @@ def run_experiment(dataset_name, data_loader, num_repeats=5,
         best_model.state_ = np.zeros_like(best_model.state_)
         best_model.last_output_ = None
         best_model.run(train_in, train_out, washout=0, teacher_forcing=True)
+        rep_nrmse = []
+        rep_r2 = []
         if autoregressive:
-            # Continue teacher-forcing through val to bring state up to test
-            best_model.run(val_in, val_out, washout=0, teacher_forcing=True)
-            preds = best_model.predict_autoregressive(test_in[0], steps=len(test_out))
+            for i in range(len(test_in)):
+                prev_in = val_in if i == 0 else test_in[i - 1]
+                prev_out = val_out if i == 0 else test_out[i - 1]
+                best_model.run(prev_in, prev_out, washout=0, teacher_forcing=True)
+                preds = best_model.predict_autoregressive(test_in[i][0], steps=len(test_in[i]))
+                rep_nrmse.append(nrmse_func(test_out[i], preds))
+                rep_r2.append(r_squared(test_out[i], preds))
         else:
             best_model.run(val_in, val_out, washout=0, teacher_forcing=True)
             preds = best_model.predict(test_in)
+            rep_nrmse.append(nrmse_func(test_out, preds))
+            rep_r2.append(r_squared(test_out, preds))
+
+        nrmse_scores.extend(rep_nrmse)
+        r2_scores.extend(rep_r2)
 
         elapsed = time.time() - start
         total_elapsed += elapsed
 
-        nrmse_val = nrmse_func(test_out, preds)
-        r2_val = r_squared(test_out, preds)
-
-        nrmse_scores.append(nrmse_val)
-        r2_scores.append(r2_val)
-
-        print(f"  Repeat {rep + 1}: NRMSE={nrmse_val:.6f}, R²={r2_val:.6f} ({elapsed:.1f}s)")
+        print(f"  Repeat {rep + 1}: ({elapsed:.1f}s)")
+        for j, (n, r) in enumerate(zip(rep_nrmse, rep_r2)):
+            print(f"    Test {j+1}: NRMSE={n:.6f}, R²={r:.6f}")
         print(f"  Best params: {best_params}")
 
         # Save checkpoint
@@ -99,8 +110,8 @@ def run_experiment(dataset_name, data_loader, num_repeats=5,
             'dataset': dataset_name,
             'params': best_params,
             'washout': washout,
-            'nrmse': nrmse_val,
-            'r2': r2_val,
+            'nrmse': rep_nrmse,
+            'r2': rep_r2,
             'val_error': best_val_error,
             'elapsed': elapsed,
         }
@@ -122,11 +133,6 @@ def run_experiment(dataset_name, data_loader, num_repeats=5,
 if __name__ == '__main__':
     DATASETS = {
         'mgs': getDataMGS,
-        'laser': getDataLaser,
-        'dde': getDataDDE,
-        'lorenz': getDataLorenz,
-        'sunspots': getDataSunspots,
-        'water': getDataWater,
     }
 
     NRMSE_OVERRIDES = {

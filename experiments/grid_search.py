@@ -13,13 +13,16 @@ import numpy as np
 import pickle
 import sys
 import os
+import torch
 
 current_dir = os.path.abspath(os.path.dirname(__file__))
 root_dir = os.path.dirname(current_dir)
 sys.path.insert(0, root_dir)
 sys.path.insert(0, os.path.join(root_dir, "src", "baselines", "grid_search"))
 
-from reproduce_results import network
+from reproduce_results import pooling, WinPooling
+import ESN_Torch as ESN
+from scipy.stats import uniform
 from src.datasets import getDataMGS, getDataDDE, getDataLaser, getDataLorenz
 from src.error_metrics import nrmse, r_squared
 
@@ -53,6 +56,69 @@ DATASETS = {
 }
 
 
+def build_and_train_reservoir(params, dim, train_in, train_out, maskW):
+    """Build the reservoir, train it, and return the trained reservoir object."""
+    initLen = int(params[8])
+    n_reservoir = int(params[0])
+    leak_rate = params[1]
+    spectral_radius = params[2]
+    input_scaling = params[6]
+    proba_non_zero_connec_W = params[3]
+    regularization_coef = params[5]
+    N = n_reservoir
+    seed = params[9]
+
+    np.random.seed(int(seed))
+    W = np.asarray(uniform.rvs(size=(8192*2, 8192*2)))
+    W = pooling(W, int(8192*2/N))
+    Win = np.asarray(uniform.rvs(size=(8192*2, dim+1)))
+    Win = WinPooling(Win, int(8192*2/N))
+    maskWuse = np.asarray(uniform.rvs(size=(N, N)))
+    maskWuse = pooling(maskW, int(8192*2/N))
+
+    idx = np.flatnonzero(maskWuse)
+    Nso = np.count_nonzero(maskWuse != 0) - int(round(proba_non_zero_connec_W * maskWuse.size))
+    if Nso > 0:
+        np.put(maskWuse, np.random.choice(idx, size=Nso, replace=False), 0)
+    W[maskWuse == 0] = 0
+    negMask = np.asarray(uniform.rvs(size=(8192*2, 8192*2)))
+    negMask = pooling(negMask, int(8192*2/N))
+    W[negMask > .5] *= -1
+    neginMask = np.asarray(uniform.rvs(size=(8192*2, dim+1)))
+    neginMask = WinPooling(neginMask, int(8192*2/N))
+    Win[neginMask > .5] *= -1
+    original_spectral_radius = np.max(np.abs(np.linalg.eigvals(W)))
+
+    Win = Win * input_scaling
+    if original_spectral_radius != 0:
+        W = W * (spectral_radius / original_spectral_radius)
+
+    reservoir = ESN.ESN(lr=leak_rate, W=W, Win=Win, input_bias=True,
+                        ridge=regularization_coef, Wfb=None, fbfunc=None)
+    if reservoir == 0:
+        return None
+
+    reservoir.train(inputs=[train_in], teachers=[train_out],
+                    wash_nr_time_step=initLen, verbose=False)
+    return reservoir
+
+
+def warmup_reservoir(reservoir, data):
+    """Teacher-forced run through data to update the reservoir's internal state."""
+    x = reservoir.x
+    di = reservoir.dim_inp
+    for t in range(data.shape[0]):
+        if reservoir.in_bias:
+            u_t = np.concatenate(([1.0], data[t]))
+        else:
+            u_t = data[t]
+        u_t = torch.from_numpy(u_t.astype(reservoir.typefloat)).reshape(di, 1)
+        x = (1 - reservoir.lr) * x + reservoir.lr * torch.tanh(
+            torch.matmul(reservoir.Win, u_t) + torch.matmul(reservoir.W, x)
+        )
+    reservoir.x = x
+
+
 def run_dataset(dataset_name, seedSet):
     config = DATASETS[dataset_name]
     loader = config["loader"]
@@ -64,6 +130,7 @@ def run_dataset(dataset_name, seedSet):
     print(f"{'='*60}")
 
     train_in, train_out, val_in, val_out, test_in, test_out = loader()
+    num_test = len(test_in)
 
     # Combine train + val for final training (matches ESNAS final evaluation protocol)
     combined_in = np.concatenate([train_in, val_in], axis=0)
@@ -78,18 +145,37 @@ def run_dataset(dataset_name, seedSet):
         params = list(base_params)
         params[9] = int(seed)
         try:
-            preds = network(params, dim, combined_in, combined_out, test_in, maskW)
+            reservoir = build_and_train_reservoir(params, dim, combined_in, combined_out, maskW)
         except Exception as e:
             print(f"  Seed {i}: FAILED ({e})")
-            preds = None
+            reservoir = None
 
-        if preds is not None:
-            nrmse_val = nrmse(test_out, preds)
-            r2_val = r_squared(test_out, preds)
-            result = {"nrmse": nrmse_val, "r2": r2_val}
-            print(f"  Seed {i}: NRMSE={nrmse_val:.6f}, R2={r2_val:.6f}")
+        if reservoir is not None:
+            nrmse_per_set = []
+            r2_per_set = []
+            for j in range(num_test):
+                # Warm up: show val data before first test set, previous test set otherwise
+                prev_data = val_in if j == 0 else test_in[j - 1]
+                warmup_reservoir(reservoir, prev_data)
+
+                # Autoregressive prediction on current test set
+                output_pred, _ = reservoir.run(inputs=[test_in[j]], reset_state=False)
+                preds = output_pred[0]
+
+                nrmse_per_set.append(nrmse(test_out[j], preds))
+                r2_per_set.append(r_squared(test_out[j], preds))
+
+            avg_nrmse = float(np.mean(nrmse_per_set))
+            avg_r2 = float(np.mean(r2_per_set))
+            result = {
+                "nrmse": avg_nrmse,
+                "r2": avg_r2,
+                "nrmse_per_set": nrmse_per_set,
+                "r2_per_set": r2_per_set,
+            }
+            print(f"  Seed {i}: NRMSE={avg_nrmse:.6f}, R2={avg_r2:.6f}")
         else:
-            result = {"nrmse": np.inf, "r2": -np.inf}
+            result = {"nrmse": np.inf, "r2": -np.inf, "nrmse_per_set": [], "r2_per_set": []}
             print(f"  Seed {i}: FAILED")
         results.append(result)
 
@@ -105,6 +191,7 @@ def run_dataset(dataset_name, seedSet):
         "dataset": dataset_name,
         "num_seeds": len(seedSet),
         "num_valid": int(valid.sum()),
+        "num_test_sets": num_test,
         "per_seed_results": results,
         "nrmse_median": float(np.median(nrmse_valid)) if len(nrmse_valid) > 0 else None,
         "nrmse_mean": float(np.mean(nrmse_valid)) if len(nrmse_valid) > 0 else None,
@@ -137,7 +224,7 @@ if __name__ == "__main__":
 
     all_stats = {}
     for name in names_to_run:
-        stats = run_dataset(name, seedSet)
+        stats = run_dataset(name, seedSet[:10])
         all_stats[name] = stats
 
         # Save per-dataset results

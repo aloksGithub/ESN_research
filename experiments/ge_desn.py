@@ -41,8 +41,12 @@ def prepare_data(data_loader):
     tr_out = train_out.T
     v_in = val_in.T
     v_out = val_out.T
-    t_in = test_in.T
-    t_out = test_out.T
+    if isinstance(test_in, list):
+        t_in = [t.T for t in test_in]
+        t_out = [t.T for t in test_out]
+    else:
+        t_in = test_in.T
+        t_out = test_out.T
 
     return tr_in, tr_out, v_in, v_out, t_in, t_out, input_dim, output_dim
 
@@ -66,8 +70,12 @@ def run_experiment(dataset_name, data_loader, num_repeats=5,
     Y_train = train_out[:, washout:]
 
     print(f"  Input dim: {input_dim}, Output dim: {output_dim}")
+    if autoregressive:
+        test_len_str = f"{len(test_in)}x{test_in[0].shape[1]}"
+    else:
+        test_len_str = str(test_in.shape[1])
     print(f"  Washout: {washout}, Train: {U_train.shape[1]}, "
-          f"Val: {val_in.shape[1]}, Test: {test_in.shape[1]}")
+          f"Val: {val_in.shape[1]}, Test: {test_len_str}")
     print(f"  Layers: {max_layers}, Neurons/layer: {neurons_per_layer}, "
           f"Extra neurons: {neurons_add}")
     print(f"  Repeats: {num_repeats}")
@@ -96,30 +104,49 @@ def run_experiment(dataset_name, data_loader, num_repeats=5,
 
     nrmse_scores = []
     r2_scores = []
-    y_true_T = test_out.T
     total_elapsed = 0.0
 
     for rep in range(num_repeats):
         start = time.time()
+        # Pass first test set (or single test set) to run_ge_desn
+        t_in_arg = test_in[0] if autoregressive else test_in
+        t_out_arg = test_out[0] if autoregressive else test_out
         result = run_ge_desn(
             U_init, U_train, Y_train, val_in, val_out,
-            test_in, test_out,
+            t_in_arg, t_out_arg,
             pram, oram, autoregressive=autoregressive,
         )
         elapsed = time.time() - start
         total_elapsed += elapsed
 
-        Y_pred = result['Y_pred']
-        y_pred_T = Y_pred.T
+        rep_nrmse = []
+        rep_r2 = []
+        if autoregressive:
+            esn = result['esn']
+            esn.Init_reservior(esn.U_init)
+            esn.Train_reservoir(esn.U_train, esn.Y_train)
+            esn.Reinit_reservoir()
+            for j in range(esn.U_train.shape[1]):
+                esn.UspanX(esn.U_train[:, j:j + 1], esn.galaph)
+            for i in range(len(test_in)):
+                prev_data = val_in if i == 0 else test_in[i - 1]
+                esn.Validate_test_data_constant(prev_data)
+                Y_pred = esn.Validate_test_data_autoregressive(
+                    test_in[i][:, 0:1], test_in[i].shape[1])
+                rep_nrmse.append(nrmse_func(test_out[i].T, Y_pred.T))
+                rep_r2.append(r_squared(test_out[i].T, Y_pred.T))
+        else:
+            Y_pred = result['Y_pred']
+            y_true_T = test_out.T
+            rep_nrmse.append(nrmse_func(y_true_T, Y_pred.T))
+            rep_r2.append(r_squared(y_true_T, Y_pred.T))
 
-        nrmse_val = nrmse_func(y_true_T, y_pred_T)
-        r2_val = r_squared(y_true_T, y_pred_T)
-
-        nrmse_scores.append(nrmse_val)
-        r2_scores.append(r2_val)
+        nrmse_scores.extend(rep_nrmse)
+        r2_scores.extend(rep_r2)
 
         print(f"\n  --- Repeat {rep + 1}/{num_repeats} ({elapsed:.1f}s) ---")
-        print(f"  NRMSE: {nrmse_val:.6f}, R²: {r2_val:.6f}")
+        for j, (n, r) in enumerate(zip(rep_nrmse, rep_r2)):
+            print(f"    Test {j+1}: NRMSE={n:.6f}, R²={r:.6f}")
         for i, (nl, ms) in enumerate(zip(result['nrmse_per_layer'],
                                           result['max_similarity_per_layer'])):
             print(f"    Layer {i}: NRMSE={nl:.6f}, MaxSimilarity={ms:.6f}")
@@ -130,8 +157,8 @@ def run_experiment(dataset_name, data_loader, num_repeats=5,
             'pram': pram,
             'oram': oram,
             'washout': washout,
-            'nrmse': nrmse_val,
-            'r2': r2_val,
+            'nrmse': rep_nrmse,
+            'r2': rep_r2,
             'elapsed': elapsed,
             'result': result,
         }

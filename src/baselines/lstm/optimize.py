@@ -63,7 +63,7 @@ def optimize_lstm(train_in, train_out, val_in, val_out,
     best_val = [float('inf')]
 
     def black_box(hidden_size, num_layers, dropout, log_lr,
-                  log_weight_decay, seq_len):
+                  log_weight_decay, seq_len, input_noise):
         hidden_size = int(round(hidden_size))
         num_layers = int(round(num_layers))
         seq_len = int(round(seq_len / 10.0)) * 10  # snap to multiples of 10
@@ -87,6 +87,7 @@ def optimize_lstm(train_in, train_out, val_in, val_out,
             model, train_in, train_out, val_in, val_out,
             seq_len=seq_len, lr=lr, weight_decay=weight_decay,
             epochs=epochs, patience=patience, device=device,
+            input_noise=input_noise,
         )
 
         # For AR datasets, re-evaluate using autoregressive prediction
@@ -116,6 +117,7 @@ def optimize_lstm(train_in, train_out, val_in, val_out,
         'log_lr': (-4, -2),             # 1e-4 to 1e-2
         'log_weight_decay': (-6, -2),   # 1e-6 to 1e-2
         'seq_len': (10, 200),
+        'input_noise': (0.0, 0.1),
     }
 
     random_state = seed if seed is not None else 1
@@ -162,6 +164,7 @@ def optimize_lstm(train_in, train_out, val_in, val_out,
         'lr': 10 ** raw['log_lr'],
         'weight_decay': 10 ** raw['log_weight_decay'],
         'seq_len': max(int(round(raw['seq_len'] / 10.0)) * 10, 10),
+        'input_noise': raw['input_noise'],
     }
 
     # Reconstruct the best model with its saved weights

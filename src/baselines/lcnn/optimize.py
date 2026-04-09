@@ -19,7 +19,7 @@ KERNEL_OPTIONS = [3, 5, 7]
 def _params_from_vector(x):
     """Decode a CMA-ES solution vector into LCNN hyperparameters.
 
-    The vector x has 10 continuous dimensions, mapped as follows:
+    The vector x has 11 continuous dimensions, mapped as follows:
       0: state_height  (clamped to [3, 30], rounded to int)
       1: state_width   (clamped to [3, 30], rounded to int)
       2: kernel_idx    (index into KERNEL_OPTIONS, same for H and W)
@@ -30,6 +30,7 @@ def _params_from_vector(x):
       7: log10(ridge)
       8: noise         (clamped to [0.0, 0.1])
       9: spectral_radius (clamped to [0.1, 1.5])
+     10: noise_augment  (clamped to [0.0, 0.1])
     """
     state_height = int(np.clip(round(x[0]), 3, 30))
     state_width = int(np.clip(round(x[1]), 3, 30))
@@ -48,6 +49,7 @@ def _params_from_vector(x):
     ridge = 10 ** np.clip(x[7], -6, -1)
     noise = np.clip(x[8], 0.0, 0.05)
     spectral_radius = np.clip(x[9], 0.1, 1.5)
+    noise_augment = np.clip(x[10], 0.0, 0.1)
 
     return {
         'state_height': state_height,
@@ -66,6 +68,7 @@ def _params_from_vector(x):
         'noise': noise,
         'ridge': ridge,
         'spectral_radius': spectral_radius,
+        'noise_augment': noise_augment,
     }
 
 
@@ -73,8 +76,10 @@ def _evaluate(params, train_in, train_out, val_in, val_out,
               washout, autoregressive, val_error_func, seed):
     """Train an LCNN with given params and return (error, model)."""
     try:
+        noise_augment = params.pop('noise_augment', 0.0)
         model = LCNN(**params, seed=seed)
-        model.fit(train_in, train_out, washout=washout)
+        model.fit(train_in, train_out, washout=washout,
+                  noise_augment=noise_augment)
 
         if autoregressive:
             preds = model.predict_autoregressive(val_in[0], steps=len(val_out))
@@ -95,8 +100,8 @@ def _evaluate(params, train_in, train_out, val_in, val_out,
 def optimize_lcnn(train_in, train_out, val_in, val_out,
                   washout=100, autoregressive=False,
                   val_error_func=None,
-                  popsize=20, max_evals=300,
-                  n_restarts=1, seed=None, verbose=True):
+                  popsize=20, max_evals=600,
+                  n_restarts=3, seed=None, verbose=True):
     """Run CMA-ES to find the best LCNN hyperparameters.
 
     Args:
@@ -135,6 +140,7 @@ def optimize_lcnn(train_in, train_out, val_in, val_out,
         -4,    # log10(ridge)
         0.0,   # noise
         0.9,   # spectral_radius
+        0.02,  # noise_augment
     ]
     sigma0 = 1.5
 
