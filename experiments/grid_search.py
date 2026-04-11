@@ -129,7 +129,7 @@ def run_dataset(dataset_name, seedSet):
     print(f"Dataset: {dataset_name} (dim={dim})")
     print(f"{'='*60}")
 
-    train_in, train_out, val_in, val_out, test_in, test_out = loader()
+    train_in, train_out, val_in, val_out, test_in, test_out, warmup_in, _ = loader()
     num_test = len(test_in)
 
     # Combine train + val for final training (matches ESNAS final evaluation protocol)
@@ -155,8 +155,7 @@ def run_dataset(dataset_name, seedSet):
             r2_per_set = []
             for j in range(num_test):
                 # Warm up: show val data before first test set, previous test set otherwise
-                prev_data = val_in if j == 0 else test_in[j - 1]
-                warmup_reservoir(reservoir, prev_data)
+                warmup_reservoir(reservoir, warmup_in[j])
 
                 # Autoregressive prediction on current test set
                 output_pred, _ = reservoir.run(inputs=[test_in[j]], reset_state=False)

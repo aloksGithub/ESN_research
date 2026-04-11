@@ -18,6 +18,7 @@ root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, root_dir)
 
 from src.baselines.ge_desn.esn import run_ge_desn
+from src.baselines.ge_desn.optimize import optimize_oram
 from src.datasets import (
     getDataMGS, getDataLaser, getDataDDE, getDataLorenz, getDataSunspots,
     getDataWater
@@ -31,7 +32,7 @@ def prepare_data(data_loader):
     Framework datasets return arrays of shape (num_samples, num_features).
     GE-DESN expects shape (num_features, num_samples) — columns are timesteps.
     """
-    train_in, train_out, val_in, val_out, test_in, test_out = data_loader()
+    train_in, train_out, val_in, val_out, test_in, test_out, warmup_in, warmup_out = data_loader()
 
     input_dim = train_in.shape[1]
     output_dim = train_out.shape[1]
@@ -44,25 +45,37 @@ def prepare_data(data_loader):
     if isinstance(test_in, list):
         t_in = [t.T for t in test_in]
         t_out = [t.T for t in test_out]
+        w_in = [w.T for w in warmup_in]
     else:
         t_in = test_in.T
         t_out = test_out.T
+        w_in = None
 
-    return tr_in, tr_out, v_in, v_out, t_in, t_out, input_dim, output_dim
+    return tr_in, tr_out, v_in, v_out, t_in, t_out, w_in, input_dim, output_dim
 
 
 def run_experiment(dataset_name, data_loader, num_repeats=5,
-                   max_layers=3, neurons_per_layer=1000, neurons_add=50,
+                   max_layers=8, neurons_per_layer=40, neurons_add=40,
                    washout=100, save_dir='results/ge_desn',
-                   nrmse_func=None, autoregressive=False):
-    """Run GE-DESN on one dataset for num_repeats trials."""
+                   nrmse_func=None, autoregressive=False,
+                   optimize=True, opt_maxiter=20, opt_popsize=15,
+                   opt_seed=None):
+    """Run GE-DESN on one dataset for num_repeats trials.
+
+    Args:
+        optimize: If True, run differential-evolution optimizer on the
+            validation set to tune oram parameters before the main trials.
+        opt_maxiter: Max iterations for the optimizer.
+        opt_popsize: Population size multiplier for differential evolution.
+        opt_seed: Random seed for optimizer reproducibility.
+    """
     if nrmse_func is None:
         nrmse_func = nrmse
     print(f"\n{'=' * 60}")
     print(f"  Dataset: {dataset_name}")
     print(f"{'=' * 60}")
 
-    train_in, train_out, val_in, val_out, test_in, test_out, input_dim, output_dim = prepare_data(data_loader)
+    train_in, train_out, val_in, val_out, test_in, test_out, warmup_in, input_dim, output_dim = prepare_data(data_loader)
 
     # Split off washout from training data
     U_init = train_in[:, :washout]
@@ -78,7 +91,7 @@ def run_experiment(dataset_name, data_loader, num_repeats=5,
           f"Val: {val_in.shape[1]}, Test: {test_len_str}")
     print(f"  Layers: {max_layers}, Neurons/layer: {neurons_per_layer}, "
           f"Extra neurons: {neurons_add}")
-    print(f"  Repeats: {num_repeats}")
+    print(f"  Repeats: {num_repeats}, Optimize: {optimize}")
 
     pram = {
         'input_dim': input_dim,
@@ -108,13 +121,27 @@ def run_experiment(dataset_name, data_loader, num_repeats=5,
 
     for rep in range(num_repeats):
         start = time.time()
+
+        # Re-optimize per repeat so each trial gets its own tuned params
+        rep_pram = pram.copy()
+        rep_oram = oram.copy()
+        if optimize:
+            print(f"\n  --- Optimizing repeat {rep + 1}/{num_repeats} ---")
+            opt_oram, opt_leaky = optimize_oram(
+                U_init, U_train, Y_train, val_in, val_out,
+                rep_pram, rep_oram, autoregressive=autoregressive,
+                repeats=3, maxiter=opt_maxiter, popsize=opt_popsize,
+                seed=opt_seed)
+            rep_oram.update(opt_oram)
+            rep_pram['leaky_rate'] = opt_leaky
+
         # Pass first test set (or single test set) to run_ge_desn
         t_in_arg = test_in[0] if autoregressive else test_in
         t_out_arg = test_out[0] if autoregressive else test_out
         result = run_ge_desn(
             U_init, U_train, Y_train, val_in, val_out,
             t_in_arg, t_out_arg,
-            pram, oram, autoregressive=autoregressive,
+            rep_pram, rep_oram, autoregressive=autoregressive,
         )
         elapsed = time.time() - start
         total_elapsed += elapsed
@@ -129,8 +156,7 @@ def run_experiment(dataset_name, data_loader, num_repeats=5,
             for j in range(esn.U_train.shape[1]):
                 esn.UspanX(esn.U_train[:, j:j + 1], esn.galaph)
             for i in range(len(test_in)):
-                prev_data = val_in if i == 0 else test_in[i - 1]
-                esn.Validate_test_data_constant(prev_data)
+                esn.Validate_test_data_constant(warmup_in[i])
                 Y_pred = esn.Validate_test_data_autoregressive(
                     test_in[i][:, 0:1], test_in[i].shape[1])
                 rep_nrmse.append(nrmse_func(test_out[i].T, Y_pred.T))
@@ -154,8 +180,8 @@ def run_experiment(dataset_name, data_loader, num_repeats=5,
         # Save this repeat's result to its own pickle
         repeat_data = {
             'dataset': dataset_name,
-            'pram': pram,
-            'oram': oram,
+            'pram': rep_pram,
+            'oram': rep_oram,
             'washout': washout,
             'nrmse': rep_nrmse,
             'r2': rep_r2,
@@ -179,6 +205,23 @@ def run_experiment(dataset_name, data_loader, num_repeats=5,
 
 
 if __name__ == '__main__':
+    import argparse
+
+    parser = argparse.ArgumentParser(description='GE-DESN baseline experiment')
+    parser.add_argument('--no-optimize', action='store_true',
+                        help='Skip hyperparameter optimization (optimization '
+                             'is on by default, tuning ampWi, ampWp, ampWr, '
+                             'leaky_rate, reg_fac on the validation set)')
+    parser.add_argument('--opt-maxiter', type=int, default=20,
+                        help='Max iterations for optimizer (default: 20)')
+    parser.add_argument('--opt-popsize', type=int, default=15,
+                        help='Population size multiplier (default: 15)')
+    parser.add_argument('--opt-seed', type=int, default=None,
+                        help='Random seed for optimizer')
+    parser.add_argument('--datasets', nargs='+', default=None,
+                        help='Specific datasets to run (default: all)')
+    args = parser.parse_args()
+
     DATASETS = {
         'mgs': getDataMGS,
         'laser': getDataLaser,
@@ -194,12 +237,22 @@ if __name__ == '__main__':
 
     AUTOREGRESSIVE = {'mgs', 'laser', 'dde', 'lorenz'}
 
+    if args.datasets:
+        datasets_to_run = {k: v for k, v in DATASETS.items()
+                           if k in args.datasets}
+    else:
+        datasets_to_run = DATASETS
+
     all_results = {}
-    for name, loader in DATASETS.items():
+    for name, loader in datasets_to_run.items():
         nrmse_fn = NRMSE_OVERRIDES.get(name)
         nrmses, r2s = run_experiment(name, loader, num_repeats=5,
                                      nrmse_func=nrmse_fn,
-                                     autoregressive=name in AUTOREGRESSIVE)
+                                     autoregressive=name in AUTOREGRESSIVE,
+                                     optimize=not args.no_optimize,
+                                     opt_maxiter=args.opt_maxiter,
+                                     opt_popsize=args.opt_popsize,
+                                     opt_seed=args.opt_seed)
         all_results[name] = {'nrmse': nrmses, 'r2': r2s}
 
     # Final summary table

@@ -36,7 +36,7 @@ def run_experiment(dataset_name, data_loader, num_repeats=5,
     print(f"  Dataset: {dataset_name}")
     print(f"{'=' * 60}")
 
-    train_in, train_out, val_in, val_out, test_in, test_out = data_loader()
+    train_in, train_out, val_in, val_out, test_in, test_out, warmup_in, warmup_out = data_loader()
 
     print(f"  Input dim: {train_in.shape[1]}, Output dim: {train_out.shape[1]}")
     if autoregressive:
@@ -82,9 +82,7 @@ def run_experiment(dataset_name, data_loader, num_repeats=5,
         rep_r2 = []
         if autoregressive:
             for i in range(len(test_in)):
-                prev_in = val_in if i == 0 else test_in[i - 1]
-                prev_out = val_out if i == 0 else test_out[i - 1]
-                best_model.run(prev_in, prev_out, washout=0, teacher_forcing=True)
+                best_model.run(warmup_in[i], warmup_out[i], washout=0, teacher_forcing=True)
                 preds = best_model.predict_autoregressive(test_in[i][0], steps=len(test_in[i]))
                 rep_nrmse.append(nrmse_func(test_out[i], preds))
                 rep_r2.append(r_squared(test_out[i], preds))

@@ -65,7 +65,7 @@ def run_experiment(dataset_name, data_loader, num_repeats=5,
     print(f"  Dataset: {dataset_name}")
     print(f"{'=' * 60}")
 
-    train_in, train_out, val_in, val_out, test_in, test_out = data_loader()
+    train_in, train_out, val_in, val_out, test_in, test_out, warmup_in, _ = data_loader()
     input_dim = train_in.shape[1]
     output_dim = train_out.shape[1]
     is_autoregressive = dataset_name in AUTOREGRESSIVE_DATASETS
@@ -117,9 +117,8 @@ def run_experiment(dataset_name, data_loader, num_repeats=5,
                 _, hidden = best_model(x, hidden)
 
             for i in range(len(test_in)):
-                # Teacher-force through previous segment (val or prior test set)
-                prev_data = val_in if i == 0 else test_in[i - 1]
-                x = torch.tensor(prev_data, dtype=torch.float32).unsqueeze(0).to(device)
+                # Teacher-force through warmup segment for this test set
+                x = torch.tensor(warmup_in[i], dtype=torch.float32).unsqueeze(0).to(device)
                 with torch.no_grad():
                     _, hidden = best_model(x, hidden)
 

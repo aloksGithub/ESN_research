@@ -29,8 +29,9 @@ def printSavedResults(directory, dataset, isAutoregressive=True, isGA=True):
     # Load fresh test data for autoregressive datasets
     testX = None
     testY = None
+    warmupX = None
     if isAutoregressive and dataset in DATASET_LOADERS:
-        _, _, valX, _, testX, testY = DATASET_LOADERS[dataset]()
+        _, _, _, _, testX, testY, warmupX, _ = DATASET_LOADERS[dataset]()
 
     nrmseErrors = []
     r2_squaredValues = []
@@ -48,9 +49,8 @@ def printSavedResults(directory, dataset, isAutoregressive=True, isGA=True):
         best_model = ga.bestModel
         if isAutoregressive:
             for i in range(len(testX)):
-                prev_x = valX if i==0 else testX[i-1]
                 current_x = testX[i]
-                runModel(best_model, prev_x)
+                runModel(best_model, warmupX[i])
                 prevOutput = current_x[0]
                 preds = []
                 for _ in range(len(current_x)):
