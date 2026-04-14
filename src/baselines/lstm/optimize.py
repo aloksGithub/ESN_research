@@ -110,13 +110,14 @@ def optimize_lstm(train_in, train_out, val_in, val_out,
 
         return -val_loss  # BO maximizes, so negate
 
+    seq_len_max = max(10, (len(val_in) // 10) * 10)
     pbounds = {
         'hidden_size': (16, 512),
         'num_layers': (1, 3),
         'dropout': (0.0, 0.5),
         'log_lr': (-4, -2),             # 1e-4 to 1e-2
         'log_weight_decay': (-6, -2),   # 1e-6 to 1e-2
-        'seq_len': (10, 200),
+        'seq_len': (10, seq_len_max),
         'input_noise': (0.0, 0.1),
     }
 

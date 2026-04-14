@@ -106,6 +106,7 @@ def train_lstm(model, train_in, train_out, val_in, val_out,
                                  weight_decay=weight_decay)
     criterion = nn.MSELoss()
 
+    seq_len = min(seq_len, len(train_in), len(val_in))
     X_train, Y_train = _make_sequences(train_in, train_out, seq_len)
     X_val, Y_val = _make_sequences(val_in, val_out, seq_len)
     X_train, Y_train = X_train.to(device), Y_train.to(device)
