@@ -65,7 +65,12 @@ def run_experiment(dataset_name, data_loader, num_repeats=5,
     print(f"  Dataset: {dataset_name}")
     print(f"{'=' * 60}")
 
-    train_in, train_out, val_in, val_out, test_in, test_out, warmup_in, _ = data_loader()
+    result = data_loader()
+    if len(result) == 8:
+        train_in, train_out, val_in, val_out, test_in, test_out, warmup_in, _ = result
+    else:
+        train_in, train_out, val_in, val_out, test_in, test_out = result
+        warmup_in = None
     input_dim = train_in.shape[1]
     output_dim = train_out.shape[1]
     is_autoregressive = dataset_name in AUTOREGRESSIVE_DATASETS
