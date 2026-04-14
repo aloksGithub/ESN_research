@@ -100,6 +100,10 @@ def run_experiment(dataset_name, data_loader, num_repeats=5,
             verbose=True,
         )
 
+        # Save model BEFORE eval so reloaded rng state matches training-time eval
+        with open(os.path.join(dataset_dir, f'repeat_{rep}_model.pkl'), 'wb') as f:
+            pickle.dump(best_model, f)
+
         rep_nrmse, rep_r2 = _evaluate_lcnn_on_test(
             best_model, val_in, val_out,
             test_in, test_out, warmup_in, warmup_out,
@@ -115,10 +119,6 @@ def run_experiment(dataset_name, data_loader, num_repeats=5,
         for j, (n, r) in enumerate(zip(rep_nrmse, rep_r2)):
             print(f"    Test {j+1}: NRMSE={n:.6f}, R²={r:.6f}")
         print(f"  Best params: {best_params}")
-
-        # Save model separately for later reload/eval
-        with open(os.path.join(dataset_dir, f'repeat_{rep}_model.pkl'), 'wb') as f:
-            pickle.dump(best_model, f)
 
         repeat_data = {
             'dataset': dataset_name,

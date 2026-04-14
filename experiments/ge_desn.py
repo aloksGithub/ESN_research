@@ -177,6 +177,10 @@ def run_experiment(dataset_name, data_loader, num_repeats=5,
         total_elapsed += elapsed
 
         esn = result['esn']
+        # Save ESN BEFORE eval so reloaded state matches training-time eval
+        with open(os.path.join(dataset_dir, f'repeat_{rep}_model.pkl'), 'wb') as f:
+            pickle.dump(esn, f)
+
         rep_nrmse, rep_r2 = _evaluate_gedesn_on_test(
             esn, val_in, test_in, test_out, warmup_in, autoregressive, nrmse_func)
 
@@ -189,10 +193,6 @@ def run_experiment(dataset_name, data_loader, num_repeats=5,
         for i, (nl, ms) in enumerate(zip(result['nrmse_per_layer'],
                                           result['max_similarity_per_layer'])):
             print(f"    Layer {i}: NRMSE={nl:.6f}, MaxSimilarity={ms:.6f}")
-
-        # Save trained ESN separately so it can be reloaded for test eval
-        with open(os.path.join(dataset_dir, f'repeat_{rep}_model.pkl'), 'wb') as f:
-            pickle.dump(result['esn'], f)
 
         result_no_esn = {k: v for k, v in result.items() if k != 'esn'}
         repeat_data = {
