@@ -18,10 +18,12 @@ import torch
 root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, root_dir)
 
+from experiments._seed import set_global_seed
 from src.baselines.lstm import (
     predict_lstm, predict_lstm_autoregressive,
     optimize_lstm,
 )
+from src.baselines.lstm.model import LSTMForecaster
 from src.datasets import (
     getDataMGS, getDataLaser, getDataDDE, getDataLorenz, getDataSunspots,
     getDataWater
@@ -49,9 +51,47 @@ def _mse(y_true, y_pred):
     return float(np.mean((np.asarray(y_true) - np.asarray(y_pred)) ** 2))
 
 
+def _evaluate_lstm_on_test(model, val_in, test_in, test_out, warmup_in,
+                           is_autoregressive, nrmse_func, device):
+    """Run trained LSTM on test data and return (nrmses, r2s)."""
+    rep_nrmse = []
+    rep_r2 = []
+    model.eval()
+    model = model.to(device)
+    if is_autoregressive:
+        for i in range(len(test_in)):
+            x = torch.tensor(warmup_in[i], dtype=torch.float32).unsqueeze(0).to(device)
+            with torch.no_grad():
+                _, hidden = model(x, None)
+
+            preds = []
+            current = torch.tensor(test_in[i][0], dtype=torch.float32).reshape(1, 1, -1).to(device)
+            with torch.no_grad():
+                for _ in range(len(test_in[i])):
+                    out, hidden = model(current, hidden)
+                    pred = out[:, -1, :]
+                    preds.append(pred.cpu().numpy().flatten())
+                    current = pred.unsqueeze(1)
+
+            y_pred = np.array(preds)
+            rep_nrmse.append(nrmse_func(test_out[i], y_pred))
+            rep_r2.append(r_squared(test_out[i], y_pred))
+    else:
+        # Warm hidden state through val, then next-step predict on test
+        x_val = torch.tensor(val_in, dtype=torch.float32).unsqueeze(0).to(device)
+        x_test = torch.tensor(test_in, dtype=torch.float32).unsqueeze(0).to(device)
+        with torch.no_grad():
+            _, hidden = model(x_val, None)
+            pred, _ = model(x_test, hidden)
+        y_pred = pred.squeeze(0).cpu().numpy()
+        rep_nrmse.append(nrmse_func(test_out, y_pred))
+        rep_r2.append(r_squared(test_out, y_pred))
+    return rep_nrmse, rep_r2
+
+
 def run_experiment(dataset_name, data_loader, num_repeats=5,
                    n_init=30, n_iter=800, bo_patience=50,
-                   epochs=200, patience=20,
+                   epochs=200, patience=20, base_seed=0,
                    save_dir='results/lstm', nrmse_func=None, device='cpu'):
     """Run LSTM BO search + evaluation on one dataset.
 
@@ -92,15 +132,17 @@ def run_experiment(dataset_name, data_loader, num_repeats=5,
     os.makedirs(dataset_dir, exist_ok=True)
 
     for rep in range(num_repeats):
+        seed = base_seed + rep
+        set_global_seed(seed)
         start = time.time()
-        print(f"\n  --- Run {rep + 1}/{num_repeats} ---")
+        print(f"\n  --- Run {rep + 1}/{num_repeats} (seed={seed}) ---")
 
         best_model, best_params, best_val_loss = optimize_lstm(
             train_in, train_out, val_in, val_out,
             input_dim, output_dim,
             n_init=n_init, n_iter=n_iter, bo_patience=bo_patience,
             epochs=epochs, patience=patience,
-            device=device, seed=rep,
+            device=device, seed=seed,
             autoregressive=is_autoregressive,
             val_error_func=_mse if is_autoregressive else None,
         )
@@ -108,44 +150,9 @@ def run_experiment(dataset_name, data_loader, num_repeats=5,
         print(f"  Best params: {best_params}")
         print(f"  Best val MSE: {best_val_loss:.6f}")
 
-        # Evaluate best model directly on test set
-        rep_nrmse = []
-        rep_r2 = []
-        if is_autoregressive:
-            best_model.eval()
-            best_model = best_model.to(device)
-            hidden = None
-
-            # Teacher-force through training data
-            x = torch.tensor(train_in, dtype=torch.float32).unsqueeze(0).to(device)
-            with torch.no_grad():
-                _, hidden = best_model(x, hidden)
-
-            for i in range(len(test_in)):
-                # Teacher-force through warmup segment for this test set
-                x = torch.tensor(warmup_in[i], dtype=torch.float32).unsqueeze(0).to(device)
-                with torch.no_grad():
-                    _, hidden = best_model(x, hidden)
-
-                # Autoregressive prediction on current test set
-                preds = []
-                current = torch.tensor(test_in[i][0], dtype=torch.float32).reshape(1, 1, -1).to(device)
-                ar_hidden = hidden
-                with torch.no_grad():
-                    for _ in range(len(test_in[i])):
-                        out, ar_hidden = best_model(current, ar_hidden)
-                        pred = out[:, -1, :]
-                        preds.append(pred.cpu().numpy().flatten())
-                        current = pred.unsqueeze(1)
-                hidden = ar_hidden
-
-                y_pred = np.array(preds)
-                rep_nrmse.append(nrmse_func(test_out[i], y_pred))
-                rep_r2.append(r_squared(test_out[i], y_pred))
-        else:
-            y_pred = predict_lstm(best_model, test_in, device=device)
-            rep_nrmse.append(nrmse_func(test_out, y_pred))
-            rep_r2.append(r_squared(test_out, y_pred))
+        rep_nrmse, rep_r2 = _evaluate_lstm_on_test(
+            best_model, val_in, test_in, test_out, warmup_in,
+            is_autoregressive, nrmse_func, device)
 
         nrmse_scores.extend(rep_nrmse)
         r2_scores.extend(rep_r2)
@@ -155,9 +162,20 @@ def run_experiment(dataset_name, data_loader, num_repeats=5,
         for j, (n, r) in enumerate(zip(rep_nrmse, rep_r2)):
             print(f"    Test {j+1}: NRMSE={n:.6f}, R2={r:.6f}")
 
-        # Save this repeat's result to its own pickle
+        # Save model separately so it can be reloaded for test eval
+        model_path = os.path.join(dataset_dir, f'repeat_{rep}_model.pt')
+        torch.save({
+            'state_dict': best_model.state_dict(),
+            'input_dim': input_dim,
+            'output_dim': output_dim,
+            'hidden_size': int(best_params['hidden_size']),
+            'num_layers': int(best_params['num_layers']),
+            'dropout': float(best_params.get('dropout', 0.0)),
+        }, model_path)
+
         repeat_data = {
             'dataset': dataset_name,
+            'seed': seed,
             'input_dim': input_dim,
             'output_dim': output_dim,
             'is_autoregressive': is_autoregressive,
@@ -170,7 +188,12 @@ def run_experiment(dataset_name, data_loader, num_repeats=5,
                 'epochs': epochs,
                 'patience': patience,
             },
-            'model_state_dict': best_model.state_dict(),
+            'data': {
+                'train_in': train_in, 'train_out': train_out,
+                'val_in': val_in, 'val_out': val_out,
+                'test_in': test_in, 'test_out': test_out,
+                'warmup_in': warmup_in,
+            },
             'params': best_params,
             'val_loss': best_val_loss,
             'nrmse': rep_nrmse,
@@ -191,8 +214,52 @@ def run_experiment(dataset_name, data_loader, num_repeats=5,
     return nrmse_scores, r2_scores
 
 
+def evaluate_saved(dataset_name, data_loader, save_dir='results/lstm',
+                   nrmse_func=None, device='cpu'):
+    """Load each saved repeat model and re-evaluate on freshly loaded test data."""
+    if nrmse_func is None:
+        nrmse_func = nrmse
+    is_autoregressive = dataset_name in AUTOREGRESSIVE_DATASETS
+
+    result = data_loader()
+    if len(result) == 8:
+        _, _, val_in, _, test_in, test_out, warmup_in, _ = result
+    else:
+        _, _, val_in, _, test_in, test_out = result
+        warmup_in = None
+
+    dataset_dir = os.path.join(save_dir, dataset_name)
+    rep = 0
+    all_nrmse, all_r2 = [], []
+    while True:
+        model_path = os.path.join(dataset_dir, f'repeat_{rep}_model.pt')
+        if not os.path.exists(model_path):
+            break
+        ckpt = torch.load(model_path, map_location=device, weights_only=False)
+        model = LSTMForecaster(
+            input_dim=ckpt['input_dim'], output_dim=ckpt['output_dim'],
+            hidden_size=ckpt['hidden_size'], num_layers=ckpt['num_layers'],
+            dropout=ckpt['dropout'],
+        ).to(device)
+        model.load_state_dict(ckpt['state_dict'])
+
+        rep_nrmse, rep_r2 = _evaluate_lstm_on_test(
+            model, val_in, test_in, test_out, warmup_in,
+            is_autoregressive, nrmse_func, device)
+        print(f"  Repeat {rep}: NRMSE={np.mean(rep_nrmse):.6f}, R2={np.mean(rep_r2):.6f}")
+        all_nrmse.extend(rep_nrmse)
+        all_r2.extend(rep_r2)
+        rep += 1
+    return all_nrmse, all_r2
+
+
 if __name__ == '__main__':
-    import torch
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--eval-only', action='store_true',
+                        help='Skip training; load saved models and evaluate only')
+    args = parser.parse_args()
+
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print(f"Using device: {device}")
 
@@ -212,10 +279,14 @@ if __name__ == '__main__':
     all_results = {}
     for name, loader in DATASETS.items():
         nrmse_fn = NRMSE_OVERRIDES.get(name)
-        nrmses, r2s = run_experiment(
-            name, loader, num_repeats=5,
-            nrmse_func=nrmse_fn, device=device,
-        )
+        if args.eval_only:
+            nrmses, r2s = evaluate_saved(
+                name, loader, nrmse_func=nrmse_fn, device=device)
+        else:
+            nrmses, r2s = run_experiment(
+                name, loader, num_repeats=5,
+                nrmse_func=nrmse_fn, device=device,
+            )
         all_results[name] = {'nrmse': nrmses, 'r2': r2s}
 
     # Final summary table

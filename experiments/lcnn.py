@@ -16,6 +16,7 @@ import time
 root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, root_dir)
 
+from experiments._seed import set_global_seed
 from src.baselines.lcnn.optimize import optimize_lcnn
 from src.baselines.lcnn.lcnn import LCNN
 from src.datasets import (
@@ -25,8 +26,29 @@ from src.datasets import (
 from src.error_metrics import nrmse, nrmse_sunspots, r_squared
 
 
+def _evaluate_lcnn_on_test(model, val_in, val_out,
+                           test_in, test_out, warmup_in, warmup_out,
+                           autoregressive, nrmse_func):
+    """Run trained LCNN on test data and return (nrmses, r2s)."""
+    model.state_ = np.zeros_like(model.state_)
+    model.last_output_ = None
+    rep_nrmse, rep_r2 = [], []
+    if autoregressive:
+        for i in range(len(test_in)):
+            model.run(warmup_in[i], warmup_out[i], washout=0, teacher_forcing=True)
+            preds = model.predict_autoregressive(test_in[i][0], steps=len(test_in[i]))
+            rep_nrmse.append(nrmse_func(test_out[i], preds))
+            rep_r2.append(r_squared(test_out[i], preds))
+    else:
+        model.run(val_in, val_out, washout=0, teacher_forcing=True)
+        preds = model.predict(test_in)
+        rep_nrmse.append(nrmse_func(test_out, preds))
+        rep_r2.append(r_squared(test_out, preds))
+    return rep_nrmse, rep_r2
+
+
 def run_experiment(dataset_name, data_loader, num_repeats=5,
-                   washout=100, save_dir='results/lcnn',
+                   washout=100, base_seed=0, save_dir='results/lcnn',
                    nrmse_func=None, autoregressive=False,
                    popsize=20, max_evals=300):
     """Run LCNN optimization + evaluation on one dataset."""
@@ -62,10 +84,11 @@ def run_experiment(dataset_name, data_loader, num_repeats=5,
     total_elapsed = 0.0
 
     for rep in range(num_repeats):
-        print(f"\n  --- Repeat {rep + 1}/{num_repeats} ---")
+        seed = base_seed + rep
+        set_global_seed(seed)
+        print(f"\n  --- Repeat {rep + 1}/{num_repeats} (seed={seed}) ---")
         start = time.time()
 
-        # Optimize on validation set
         best_model, best_params, best_val_error = optimize_lcnn(
             train_in, train_out, val_in, val_out,
             washout=washout,
@@ -73,29 +96,18 @@ def run_experiment(dataset_name, data_loader, num_repeats=5,
             val_error_func=nrmse_func,
             popsize=popsize,
             max_evals=max_evals,
-            seed=rep * 1000,
+            seed=seed,
             verbose=True,
         )
 
-        # Evaluate on test set
-        # Re-run train+val with teacher forcing to build up reservoir state,
-        # then predict on test.
-        best_model.state_ = np.zeros_like(best_model.state_)
-        best_model.last_output_ = None
-        best_model.run(train_in, train_out, washout=0, teacher_forcing=True)
-        rep_nrmse = []
-        rep_r2 = []
-        if autoregressive:
-            for i in range(len(test_in)):
-                best_model.run(warmup_in[i], warmup_out[i], washout=0, teacher_forcing=True)
-                preds = best_model.predict_autoregressive(test_in[i][0], steps=len(test_in[i]))
-                rep_nrmse.append(nrmse_func(test_out[i], preds))
-                rep_r2.append(r_squared(test_out[i], preds))
-        else:
-            best_model.run(val_in, val_out, washout=0, teacher_forcing=True)
-            preds = best_model.predict(test_in)
-            rep_nrmse.append(nrmse_func(test_out, preds))
-            rep_r2.append(r_squared(test_out, preds))
+        # Save model BEFORE eval so reloaded rng state matches training-time eval
+        with open(os.path.join(dataset_dir, f'repeat_{rep}_model.pkl'), 'wb') as f:
+            pickle.dump(best_model, f)
+
+        rep_nrmse, rep_r2 = _evaluate_lcnn_on_test(
+            best_model, val_in, val_out,
+            test_in, test_out, warmup_in, warmup_out,
+            autoregressive, nrmse_func)
 
         nrmse_scores.extend(rep_nrmse)
         r2_scores.extend(rep_r2)
@@ -108,11 +120,18 @@ def run_experiment(dataset_name, data_loader, num_repeats=5,
             print(f"    Test {j+1}: NRMSE={n:.6f}, R²={r:.6f}")
         print(f"  Best params: {best_params}")
 
-        # Save checkpoint
         repeat_data = {
             'dataset': dataset_name,
+            'seed': seed,
             'params': best_params,
             'washout': washout,
+            'autoregressive': autoregressive,
+            'data': {
+                'train_in': train_in, 'train_out': train_out,
+                'val_in': val_in, 'val_out': val_out,
+                'test_in': test_in, 'test_out': test_out,
+                'warmup_in': warmup_in, 'warmup_out': warmup_out,
+            },
             'nrmse': rep_nrmse,
             'r2': rep_r2,
             'val_error': best_val_error,
@@ -133,7 +152,46 @@ def run_experiment(dataset_name, data_loader, num_repeats=5,
     return nrmse_scores, r2_scores
 
 
+def evaluate_saved(dataset_name, data_loader, save_dir='results/lcnn',
+                   nrmse_func=None, autoregressive=False):
+    """Load each saved repeat model and re-evaluate on freshly loaded test data."""
+    if nrmse_func is None:
+        nrmse_func = nrmse
+
+    result = data_loader()
+    if len(result) == 8:
+        train_in, train_out, val_in, val_out, test_in, test_out, warmup_in, warmup_out = result
+    else:
+        train_in, train_out, val_in, val_out, test_in, test_out = result
+        warmup_in = warmup_out = None
+
+    dataset_dir = os.path.join(save_dir, dataset_name)
+    rep = 0
+    all_nrmse, all_r2 = [], []
+    while True:
+        model_path = os.path.join(dataset_dir, f'repeat_{rep}_model.pkl')
+        if not os.path.exists(model_path):
+            break
+        with open(model_path, 'rb') as f:
+            model = pickle.load(f)
+        rep_nrmse, rep_r2 = _evaluate_lcnn_on_test(
+            model, val_in, val_out,
+            test_in, test_out, warmup_in, warmup_out,
+            autoregressive, nrmse_func)
+        print(f"  Repeat {rep}: NRMSE={np.mean(rep_nrmse):.6f}, R2={np.mean(rep_r2):.6f}")
+        all_nrmse.extend(rep_nrmse)
+        all_r2.extend(rep_r2)
+        rep += 1
+    return all_nrmse, all_r2
+
+
 if __name__ == '__main__':
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--eval-only', action='store_true',
+                        help='Skip training; load saved models and evaluate only')
+    args = parser.parse_args()
+
     DATASETS = {
         'mgs': getDataMGS,
         'laser': getDataLaser,
@@ -152,11 +210,16 @@ if __name__ == '__main__':
     all_results = {}
     for name, loader in DATASETS.items():
         nrmse_fn = NRMSE_OVERRIDES.get(name)
-        nrmses, r2s = run_experiment(
-            name, loader, num_repeats=5,
-            nrmse_func=nrmse_fn,
-            autoregressive=name in AUTOREGRESSIVE,
-        )
+        if args.eval_only:
+            nrmses, r2s = evaluate_saved(
+                name, loader, nrmse_func=nrmse_fn,
+                autoregressive=name in AUTOREGRESSIVE)
+        else:
+            nrmses, r2s = run_experiment(
+                name, loader, num_repeats=5,
+                nrmse_func=nrmse_fn,
+                autoregressive=name in AUTOREGRESSIVE,
+            )
         all_results[name] = {'nrmse': nrmses, 'r2': r2s}
 
     # Final summary table
