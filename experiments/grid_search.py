@@ -223,7 +223,7 @@ if __name__ == "__main__":
 
     all_stats = {}
     for name in names_to_run:
-        stats = run_dataset(name, seedSet[:10])
+        stats = run_dataset(name, seedSet)
         all_stats[name] = stats
 
         # Save per-dataset results
