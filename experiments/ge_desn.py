@@ -65,11 +65,15 @@ def _evaluate_gedesn_on_test(esn, val_in, test_in, test_out, warmup_in,
     """Run trained GE-DESN on test data and return (nrmses, r2s)."""
     rep_nrmse, rep_r2 = [], []
     if autoregressive:
-        esn.Init_reservior(esn.U_init)
-        esn.Train_reservoir(esn.U_train, esn.Y_train)
-        esn.Reinit_reservoir()
-        for j in range(esn.U_train.shape[1]):
-            esn.UspanX(esn.U_train[:, j:j + 1], esn.galaph)
+        if hasattr(esn, 'PreTestX'):
+            for i in range(esn.Stack):
+                esn.GroupX[i] = esn.PreTestX[i].copy()
+        else:
+            esn.Init_reservior(esn.U_init)
+            esn.Train_reservoir(esn.U_train, esn.Y_train)
+            esn.Reinit_reservoir()
+            for j in range(esn.U_train.shape[1]):
+                esn.UspanX(esn.U_train[:, j:j + 1], esn.galaph)
         for i in range(len(test_in)):
             esn.Validate_test_data_constant(warmup_in[i])
             Y_pred = esn.Validate_test_data_autoregressive(
@@ -85,10 +89,10 @@ def _evaluate_gedesn_on_test(esn, val_in, test_in, test_out, warmup_in,
 
 
 def run_experiment(dataset_name, data_loader, num_repeats=5,
-                   max_layers=8, neurons_per_layer=40, neurons_add=40,
+                   max_layers=3, neurons_per_layer=40, neurons_add=40,
                    washout=100, base_seed=0, save_dir='results/ge_desn',
                    nrmse_func=None, autoregressive=False,
-                   optimize=True, opt_maxiter=20, opt_popsize=15):
+                   optimize=True, opt_maxiter=5, opt_popsize=5):
     """Run GE-DESN on one dataset for num_repeats trials.
 
     Args:
