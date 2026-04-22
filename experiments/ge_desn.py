@@ -89,10 +89,10 @@ def _evaluate_gedesn_on_test(esn, val_in, test_in, test_out, warmup_in,
 
 
 def run_experiment(dataset_name, data_loader, num_repeats=5,
-                   max_layers=3, neurons_per_layer=40, neurons_add=40,
+                   max_layers=8, neurons_per_layer=40, neurons_add=40,
                    washout=100, base_seed=0, save_dir='results/ge_desn',
                    nrmse_func=None, autoregressive=False,
-                   optimize=True, opt_maxiter=5, opt_popsize=5):
+                   optimize=True, opt_maxiter=20, opt_popsize=15):
     """Run GE-DESN on one dataset for num_repeats trials.
 
     Args:
