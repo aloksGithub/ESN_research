@@ -359,6 +359,10 @@ def run_ge_desn(U_init, U_train, Y_train, U_val, Y_val, U_test, Y_test,
         # then predict autoregressively on the test set
         for i in range(esn.U_train.shape[1]):
             esn.UspanX(esn.U_train[:, i:i + 1], esn.galaph)
+        # Snapshot pre-test reservoir state so eval can restore it without
+        # re-running training (whose Wout re-solve is BLAS-nondeterministic
+        # across processes and gets amplified by the AR rollout).
+        esn.PreTestX = [esn.GroupX[i].copy() for i in range(esn.Stack)]
         Y_pred = esn.Validate_test_data_autoregressive(
             esn.U_test[:, 0:1], esn.U_test.shape[1])
     else:
