@@ -205,6 +205,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--eval-only', action='store_true',
                         help='Skip training; load saved models and evaluate only')
+    parser.add_argument('--datasets', nargs='+', default=None,
+                        help='Specific datasets to run (default: all)')
     args = parser.parse_args()
 
     # Order: laser and mgs first (hardest / most diagnostic), then the rest.
@@ -223,8 +225,14 @@ if __name__ == '__main__':
 
     AUTOREGRESSIVE = {'mgs', 'laser', 'dde', 'lorenz'}
 
+    if args.datasets:
+        datasets_to_run = {k: v for k, v in DATASETS.items()
+                           if k in args.datasets}
+    else:
+        datasets_to_run = DATASETS
+
     all_results = {}
-    for name, loader in DATASETS.items():
+    for name, loader in datasets_to_run.items():
         nrmse_fn = NRMSE_OVERRIDES.get(name)
         if args.eval_only:
             nrmses, r2s = evaluate_saved(
