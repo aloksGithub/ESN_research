@@ -29,9 +29,24 @@ from src.error_metrics import nrmse, nrmse_sunspots, r_squared
 def _evaluate_lcnn_on_test(model, val_in, val_out,
                            test_in, test_out, warmup_in, warmup_out,
                            autoregressive, nrmse_func):
-    """Run trained LCNN on test data and return (nrmses, r2s)."""
-    model.state_ = np.zeros_like(model.state_)
-    model.last_output_ = None
+    """Run trained LCNN on test data and return (nrmses, r2s).
+
+    Starts from the post-train state snapshot so the reservoir is in the
+    same warm attractor that CMA-ES saw during validation, rather than
+    cold-starting from zero (which used 2300 teacher-forced steps during
+    training but only a short warmup at test time — the mismatch crushed
+    MGS/laser performance).
+    """
+    if not hasattr(model, 'post_train_state_'):
+        raise AttributeError(
+            "Model missing post_train_state_ — retrain with the current "
+            "fit() to snapshot it, or re-run the experiment."
+        )
+    model.state_ = model.post_train_state_.copy()
+    model.last_output_ = (
+        None if model.post_train_last_output_ is None
+        else model.post_train_last_output_.copy()
+    )
     rep_nrmse, rep_r2 = [], []
     if autoregressive:
         for i in range(len(test_in)):
@@ -192,9 +207,10 @@ if __name__ == '__main__':
                         help='Skip training; load saved models and evaluate only')
     args = parser.parse_args()
 
+    # Order: laser and mgs first (hardest / most diagnostic), then the rest.
     DATASETS = {
-        'mgs': getDataMGS,
         'laser': getDataLaser,
+        'mgs': getDataMGS,
         'dde': getDataDDE,
         'lorenz': getDataLorenz,
         'sunspots': getDataSunspots,
@@ -219,6 +235,7 @@ if __name__ == '__main__':
                 name, loader, num_repeats=5,
                 nrmse_func=nrmse_fn,
                 autoregressive=name in AUTOREGRESSIVE,
+                max_evals=1000,
             )
         all_results[name] = {'nrmse': nrmses, 'r2': r2s}
 

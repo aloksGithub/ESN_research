@@ -19,17 +19,21 @@ KERNEL_OPTIONS = [3, 5, 7]
 def _params_from_vector(x):
     """Decode a CMA-ES solution vector into LCNN hyperparameters.
 
+    Bounds are chosen from standard ESN/LCNN tuning guidelines so CMA-ES
+    cannot land in pathological regions (e.g. echo-state-property violations
+    at SR > 1 or input starvation at sigma_in << 1).
+
     The vector x has 11 continuous dimensions, mapped as follows:
       0: state_height  (clamped to [3, 30], rounded to int)
       1: state_width   (clamped to [3, 30], rounded to int)
       2: kernel_idx    (index into KERNEL_OPTIONS, same for H and W)
-      3: log10(sigma_res)  -> sigma_res
-      4: sigma_in
+      3: log10(sigma_res)  -> sigma_res, clamped to [~0.316, ~3.16]
+      4: sigma_in, clamped to [0.3, 2.5]
       5: leakage       (clamped to [0.01, 1.0])
-      6: sparsity      (clamped to [0.0, 0.95])
+      6: sparsity      (clamped to [0.0, 0.9])
       7: log10(ridge)
-      8: noise         (clamped to [0.0, 0.1])
-      9: spectral_radius (clamped to [0.1, 1.5])
+      8: noise         (clamped to [0.0, 0.05])
+      9: spectral_radius (clamped to [0.1, 1.1])
      10: noise_augment  (clamped to [0.0, 0.1])
     """
     state_height = int(np.clip(round(x[0]), 3, 30))
@@ -42,13 +46,17 @@ def _params_from_vector(x):
         kernel_size -= 1
     kernel_size = max(kernel_size, 3)
 
-    sigma_res = 10 ** np.clip(x[3], -1.5, 0.5)
-    sigma_in = np.clip(x[4], 0.1, 3.0)
+    # sigma_res floor of 10^-0.5 (~0.316) avoids near-degenerate random
+    # reservoirs being amplified pathologically by the spectral-radius
+    # rescaling step.
+    sigma_res = 10 ** np.clip(x[3], -0.5, 0.5)
+    sigma_in = np.clip(x[4], 0.3, 2.5)
     leakage = np.clip(x[5], 0.01, 1.0)
     sparsity = np.clip(x[6], 0.0, 0.9)
     ridge = 10 ** np.clip(x[7], -6, -1)
     noise = np.clip(x[8], 0.0, 0.05)
-    spectral_radius = np.clip(x[9], 0.1, 1.5)
+    # SR cap of 1.1 keeps the reservoir within/near the echo state regime.
+    spectral_radius = np.clip(x[9], 0.1, 1.1)
     noise_augment = np.clip(x[10], 0.0, 0.1)
 
     return {

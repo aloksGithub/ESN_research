@@ -353,6 +353,12 @@ class LCNN:
         states, _ = self.run(train_in, train_out, washout=washout, teacher_forcing=True)
         targets = train_out[washout:]
         self.train(states, targets, noise_augment=noise_augment)
+        # Snapshot post-train state so test-time eval can start from the same
+        # warm attractor that validation AR inherits, instead of zeroing.
+        self.post_train_state_ = self.state_.copy()
+        self.post_train_last_output_ = (
+            None if self.last_output_ is None else self.last_output_.copy()
+        )
         return self
 
     def predict(self, inputs, teacher_forcing=False):
