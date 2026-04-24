@@ -269,8 +269,8 @@ if __name__ == '__main__':
                              'leaky_rate, reg_fac on the validation set)')
     parser.add_argument('--opt-maxiter', type=int, default=40,
                         help='Max iterations for optimizer (default: 40)')
-    parser.add_argument('--opt-popsize', type=int, default=25,
-                        help='Population size multiplier (default: 25)')
+    parser.add_argument('--opt-popsize', type=int, default=15,
+                        help='Population size multiplier (default: 15)')
     parser.add_argument('--base-seed', type=int, default=0,
                         help='Base seed (rep seed = base_seed + rep)')
     parser.add_argument('--eval-only', action='store_true',
