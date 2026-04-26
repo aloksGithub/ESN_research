@@ -65,7 +65,7 @@ def _evaluate_lcnn_on_test(model, val_in, val_out,
 def run_experiment(dataset_name, data_loader, num_repeats=5,
                    washout=100, base_seed=0, save_dir='results/lcnn',
                    nrmse_func=None, autoregressive=False,
-                   popsize=20, max_evals=300):
+                   popsize=20, max_evals=5000):
     """Run LCNN optimization + evaluation on one dataset."""
     if nrmse_func is None:
         nrmse_func = nrmse
@@ -104,7 +104,7 @@ def run_experiment(dataset_name, data_loader, num_repeats=5,
         print(f"\n  --- Repeat {rep + 1}/{num_repeats} (seed={seed}) ---")
         start = time.time()
 
-        best_model, best_params, best_val_error = optimize_lcnn(
+        best_model, best_params, best_val_error, optim_log = optimize_lcnn(
             train_in, train_out, val_in, val_out,
             washout=washout,
             autoregressive=autoregressive,
@@ -151,6 +151,7 @@ def run_experiment(dataset_name, data_loader, num_repeats=5,
             'r2': rep_r2,
             'val_error': best_val_error,
             'elapsed': elapsed,
+            'optim_log': optim_log,
         }
         with open(os.path.join(dataset_dir, f'repeat_{rep}.pkl'), 'wb') as f:
             pickle.dump(repeat_data, f)
@@ -243,7 +244,6 @@ if __name__ == '__main__':
                 name, loader, num_repeats=5,
                 nrmse_func=nrmse_fn,
                 autoregressive=name in AUTOREGRESSIVE,
-                max_evals=1000,
             )
         all_results[name] = {'nrmse': nrmses, 'r2': r2s}
 

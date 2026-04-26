@@ -9,6 +9,7 @@ The key insight from the original code is that optimization uses a *simple*
 (non-growing) ESN for speed — the oram parameters control reservoir dynamics
 and are somewhat independent of the evolution process.
 """
+import time
 import numpy as np
 from scipy.optimize import differential_evolution
 
@@ -63,7 +64,8 @@ def _build_and_evaluate(U_init, U_train, Y_train, U_val, Y_val, pram, oram,
 
 def optimize_oram(U_init, U_train, Y_train, U_val, Y_val, pram,
                   base_oram, autoregressive=False, repeats=3,
-                  maxiter=20, popsize=15, seed=None, verbose=True):
+                  maxiter=200, popsize=15, gen_patience=20, rtol=1e-4,
+                  seed=None, verbose=True):
     """Optimize oram parameters using differential evolution.
 
     Tunes: ampWi, ampWp (ampWc), ampWr, leaky_rate, reg_fac.
@@ -75,13 +77,19 @@ def optimize_oram(U_init, U_train, Y_train, U_val, Y_val, pram,
         base_oram: starting oram dict (used for fixed values like spare_rate)
         autoregressive: whether to use autoregressive evaluation
         repeats: number of random restarts per evaluation (reduces variance)
-        maxiter: max iterations for the optimizer
+        maxiter: max generations for the optimizer (safety cap; the
+            patience callback normally terminates first)
         popsize: population size multiplier for differential evolution
+        gen_patience: stop if best score has not improved by `rtol` for
+            this many consecutive DE generations
+        rtol: relative-improvement threshold for the patience gate
         seed: random seed for reproducibility
         verbose: print progress
 
     Returns:
-        optimized oram dict, optimized leaky_rate
+        optimized oram dict, optimized leaky_rate, optim_log dict
+        (full trajectory of every eval's params + val_loss, generation
+        numbers, stop reason, etc.)
     """
     # Parameter bounds — informed by the author's PSO ranges and defaults
     # (ampWi, ampWp, ampWr, leaky_rate, log10_reg_fac)
@@ -95,6 +103,8 @@ def optimize_oram(U_init, U_train, Y_train, U_val, Y_val, pram,
 
     best_score = [np.inf]
     eval_count = [0]
+    gen_counter = [0]
+    trajectory = []
 
     def objective(x):
         oram = base_oram.copy()
@@ -105,28 +115,78 @@ def optimize_oram(U_init, U_train, Y_train, U_val, Y_val, pram,
         trial_pram['leaky_rate'] = x[3]
         oram['reg_fac'] = 10 ** x[4]
 
+        eval_start = time.time()
         score = _build_and_evaluate(
             U_init, U_train, Y_train, U_val, Y_val,
             trial_pram, oram, autoregressive, repeats)
+        eval_elapsed = time.time() - eval_start
 
         eval_count[0] += 1
-        if score < best_score[0]:
+        is_best = score < best_score[0]
+        if is_best:
             best_score[0] = score
             if verbose:
                 print(f"    [eval {eval_count[0]:>4d}] NRMSE={score:.6f}  "
                       f"ampWi={x[0]:.4f} ampWp={x[1]:.4f} ampWr={x[2]:.4f} "
                       f"leak={x[3]:.4f} reg={10**x[4]:.2e}")
+
+        trajectory.append({
+            'gen': gen_counter[0],
+            'eval_idx': eval_count[0],
+            'params': {
+                'ampWi': float(x[0]),
+                'ampWp': float(x[1]),
+                'ampWr': float(x[2]),
+                'leaky_rate': float(x[3]),
+                'reg_fac': float(10 ** x[4]),
+            },
+            'val_loss': float(score),
+            'is_best_so_far': bool(is_best),
+            'elapsed_s': eval_elapsed,
+        })
         return score
 
     if verbose:
         print("  Optimizing oram parameters (differential evolution)...")
+
+    # Generation-level patience tracking. DE's callback fires after each
+    # generation; returning True halts the optimizer.
+    gen_best = [np.inf]
+    gens_without_improvement = [0]
+    stop_reason = ['unknown']
+
+    def _patience_callback(xk, convergence):
+        gen_counter[0] += 1
+        current_best = best_score[0]
+        improvement_threshold = gen_best[0] * (1 - rtol)
+        if current_best < improvement_threshold:
+            gen_best[0] = current_best
+            gens_without_improvement[0] = 0
+        else:
+            gens_without_improvement[0] += 1
+        if gens_without_improvement[0] >= gen_patience:
+            if verbose:
+                print(f"  DE early stop: {gen_patience} generations without "
+                      f"relative improvement > {rtol}")
+            stop_reason[0] = 'patience'
+            return True
+        return False
 
     result = differential_evolution(
         objective, bounds,
         maxiter=maxiter, popsize=popsize,
         seed=seed, tol=1e-4,
         mutation=(0.5, 1.0), recombination=0.7,
+        callback=_patience_callback,
     )
+
+    if stop_reason[0] == 'unknown':
+        # DE finished without our callback returning True. It either hit
+        # maxiter or converged via its internal `tol`.
+        if result.nit >= maxiter:
+            stop_reason[0] = 'maxiter'
+        else:
+            stop_reason[0] = 'tol'
 
     opt_oram = base_oram.copy()
     opt_oram['ampWi'] = result.x[0]
@@ -144,4 +204,31 @@ def optimize_oram(U_init, U_train, Y_train, U_val, Y_val, pram,
               f"leaky_rate={opt_leaky:.4f}, "
               f"reg_fac={opt_oram['reg_fac']:.2e}")
 
-    return opt_oram, opt_leaky
+    # Best-so-far trace
+    best_val_trace = []
+    running_best = float('inf')
+    for e in trajectory:
+        if e['val_loss'] < running_best:
+            running_best = e['val_loss']
+        best_val_trace.append(running_best)
+
+    optim_log = {
+        'optimizer': 'differential_evolution',
+        'evals_total': eval_count[0],
+        'gens_total': gen_counter[0],
+        'maxiter': maxiter,
+        'popsize': popsize,
+        'gen_patience': gen_patience,
+        'rtol': rtol,
+        'stop_reason': stop_reason[0],
+        'scipy_nfev': int(result.nfev),
+        'scipy_nit': int(result.nit),
+        'scipy_message': str(result.message),
+        'scipy_success': bool(result.success),
+        'best_val_trace': best_val_trace,
+        'evals': trajectory,
+        'bounds': bounds,
+        'eval_repeats': repeats,
+    }
+
+    return opt_oram, opt_leaky, optim_log

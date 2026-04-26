@@ -90,13 +90,21 @@ def _evaluate_lstm_on_test(model, val_in, test_in, test_out, warmup_in,
 
 
 def run_experiment(dataset_name, data_loader, num_repeats=5,
-                   n_init=30, n_iter=800, bo_patience=50,
+                   n_init=30, n_iter=2000, bo_patience=100,
                    epochs=200, patience=20, base_seed=0,
-                   save_dir='results/lstm', nrmse_func=None, device='cpu'):
+                   save_dir='results/lstm', nrmse_func=None, device='cpu',
+                   val_noise_sigma=0.0):
     """Run LSTM BO search + evaluation on one dataset.
 
     Each repeat runs an independent full BO search and takes the best
     model directly for test evaluation — matching EESNAS methodology.
+
+    Args:
+        val_noise_sigma: Std of Gaussian noise injected into warmup data
+            during AR val scoring. >0 enables noise-robust val (see
+            optimize_lstm). Use ~0.05 for memorization-prone datasets
+            (laser/mgs). Keep 0 for chaotic systems (lorenz) where
+            warmup noise amplifies and penalizes good models.
     """
     if nrmse_func is None:
         nrmse_func = nrmse
@@ -137,7 +145,7 @@ def run_experiment(dataset_name, data_loader, num_repeats=5,
         start = time.time()
         print(f"\n  --- Run {rep + 1}/{num_repeats} (seed={seed}) ---")
 
-        best_model, best_params, best_val_loss = optimize_lstm(
+        best_model, best_params, best_val_loss, optim_log = optimize_lstm(
             train_in, train_out, val_in, val_out,
             input_dim, output_dim,
             n_init=n_init, n_iter=n_iter, bo_patience=bo_patience,
@@ -145,6 +153,7 @@ def run_experiment(dataset_name, data_loader, num_repeats=5,
             device=device, seed=seed,
             autoregressive=is_autoregressive,
             val_error_func=_mse if is_autoregressive else None,
+            val_noise_sigma=val_noise_sigma,
         )
 
         print(f"  Best params: {best_params}")
@@ -199,6 +208,7 @@ def run_experiment(dataset_name, data_loader, num_repeats=5,
             'nrmse': rep_nrmse,
             'r2': rep_r2,
             'elapsed': elapsed,
+            'optim_log': optim_log,
         }
         with open(os.path.join(dataset_dir, f'repeat_{rep}.pkl'), 'wb') as f:
             pickle.dump(repeat_data, f)
@@ -258,16 +268,20 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--eval-only', action='store_true',
                         help='Skip training; load saved models and evaluate only')
+    parser.add_argument('--datasets', nargs='+', default=None,
+                        help='Specific datasets to run (default: all)')
     args = parser.parse_args()
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print(f"Using device: {device}")
 
+    # Order: laser and mgs first (most diagnostic / currently worst), then
+    # lorenz, then the well-behaved ones.
     DATASETS = {
-        'mgs': getDataMGS,
         'laser': getDataLaser,
-        'dde': getDataDDE,
+        'mgs': getDataMGS,
         'lorenz': getDataLorenz,
+        'dde': getDataDDE,
         'sunspots': getDataSunspots,
         'water': getDataWater,
     }
@@ -276,8 +290,30 @@ if __name__ == '__main__':
         'sunspots': nrmse_sunspots,
     }
 
+    # Noise-robust val sigma per dataset. Laser/mgs are prone to
+    # memorization (val is a natural continuation of train), so noise on
+    # the warmup breaks overfit configs. Lorenz is chaotic — warmup noise
+    # amplifies through 2300 steps and wrongly penalizes good models.
+    VAL_NOISE_SIGMA = {
+        'laser': 0.05,
+        'mgs': 0.05,
+    }
+
+    # n_init bumped for lorenz: 4/5 prior BO seeds missed the good basin,
+    # more diverse random init improves the odds of hitting it.
+    N_INIT = {
+        'lorenz': 60,
+    }
+    DEFAULT_N_INIT = 30
+
+    if args.datasets:
+        datasets_to_run = {k: v for k, v in DATASETS.items()
+                           if k in args.datasets}
+    else:
+        datasets_to_run = DATASETS
+
     all_results = {}
-    for name, loader in DATASETS.items():
+    for name, loader in datasets_to_run.items():
         nrmse_fn = NRMSE_OVERRIDES.get(name)
         if args.eval_only:
             nrmses, r2s = evaluate_saved(
@@ -286,6 +322,8 @@ if __name__ == '__main__':
             nrmses, r2s = run_experiment(
                 name, loader, num_repeats=5,
                 nrmse_func=nrmse_fn, device=device,
+                val_noise_sigma=VAL_NOISE_SIGMA.get(name, 0.0),
+                n_init=N_INIT.get(name, DEFAULT_N_INIT),
             )
         all_results[name] = {'nrmse': nrmses, 'r2': r2s}
 
