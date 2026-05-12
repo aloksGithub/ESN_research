@@ -9,6 +9,7 @@ Evaluates seeds on the proper test split (not validation) and reports
 median, mean, and best NRMSE/R2 scores.
 """
 
+import argparse
 import numpy as np
 import pickle
 import sys
@@ -200,26 +201,50 @@ def run_dataset(dataset_name, seedSet):
         "r2_best": float(np.max(r2_valid)) if len(r2_valid) > 0 else None,
     }
 
-    print(f"\n--- {dataset_name} Results ({stats['num_valid']}/{len(seedSet)} valid seeds) ---")
-    print(f"  NRMSE  - Median: {stats['nrmse_median']:.6f}, Mean: {stats['nrmse_mean']:.6f}, Best: {stats['nrmse_best']:.6f}")
-    print(f"  R2     - Median: {stats['r2_median']:.6f}, Mean: {stats['r2_mean']:.6f}, Best: {stats['r2_best']:.6f}")
+    print_summary(stats)
 
     return stats
 
 
+def print_summary(stats):
+    name = stats["dataset"]
+    print(f"\n--- {name} Results ({stats['num_valid']}/{stats['num_seeds']} valid seeds) ---")
+    print(f"  NRMSE  - Median: {stats['nrmse_median']:.6f}, Mean: {stats['nrmse_mean']:.6f}, Best: {stats['nrmse_best']:.6f}")
+    print(f"  R2     - Median: {stats['r2_median']:.6f}, Mean: {stats['r2_mean']:.6f}, Best: {stats['r2_best']:.6f}")
+
+
 if __name__ == "__main__":
+    dataset_names = ["dde", "lorenz", "mgs", "laser"]
+
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("dataset_idx", nargs="?", type=int, default=None,
+                        help=f"Dataset index: {dict(enumerate(dataset_names))}. If omitted, runs all.")
+    parser.add_argument("--eval-only", action="store_true",
+                        help="Skip training; load saved per-dataset pickles and print summary stats.")
+    args = parser.parse_args()
+
     save_dir = os.path.join(root_dir, "results", "grid_search")
-    os.makedirs(save_dir, exist_ok=True)
 
-    seedSet = np.genfromtxt(SEEDS_PATH)
-
-    if len(sys.argv) > 1:
-        # Run specific dataset by index: 0=dde, 1=lorenz, 2=mgs, 3=laser
-        dataset_names = ["dde", "lorenz", "mgs", "laser"]
-        idx = int(sys.argv[1])
-        names_to_run = [dataset_names[idx]]
+    if args.dataset_idx is not None:
+        names_to_run = [dataset_names[args.dataset_idx]]
     else:
-        names_to_run = ["dde", "lorenz", "mgs", "laser"]
+        names_to_run = list(dataset_names)
+
+    if args.eval_only:
+        all_stats = {}
+        for name in names_to_run:
+            results_path = os.path.join(save_dir, f"{name}_results.pkl")
+            if not os.path.exists(results_path):
+                print(f"  {name}: no saved results at {results_path}, skipping")
+                continue
+            with open(results_path, "rb") as f:
+                stats = pickle.load(f)
+            all_stats[name] = stats
+            print_summary(stats)
+        sys.exit(0)
+
+    os.makedirs(save_dir, exist_ok=True)
+    seedSet = np.genfromtxt(SEEDS_PATH)
 
     all_stats = {}
     for name in names_to_run:

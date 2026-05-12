@@ -52,11 +52,12 @@ def compute_dataset_descriptors(max_lag: int = 100, n_bins: int = 16) -> pd.Data
     rows = []
     for name, fn in dataset_funcs:
         try:
-            trainX, trainY, valX, valY, testX, testY = fn()
-        except Exception:
-            # Fallback to older signature if necessary
-            _, trainY, _, _, _, _ = fn()
-            trainX = None
+            result = fn()
+            if len(result) < 2:
+                raise ValueError(f"{name} loader returned {len(result)} values")
+            trainX, trainY = result[0], result[1]
+        except Exception as exc:
+            raise RuntimeError(f"Failed to load dataset {name}") from exc
         y = trainY
         if y is None:
             continue
