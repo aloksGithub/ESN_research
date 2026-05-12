@@ -93,7 +93,7 @@ def run_experiment(dataset_name, data_loader, num_repeats=5,
                    n_init=30, n_iter=2000, bo_patience=100,
                    epochs=200, patience=20, base_seed=0,
                    save_dir='results/lstm', nrmse_func=None, device='cpu',
-                   val_noise_sigma=0.0):
+                   val_noise_sigma=0.0, start_rep=0):
     """Run LSTM BO search + evaluation on one dataset.
 
     Each repeat runs an independent full BO search and takes the best
@@ -133,13 +133,34 @@ def run_experiment(dataset_name, data_loader, num_repeats=5,
     print(f"  BO: {n_init} init + up to {n_iter} iter (patience={bo_patience}), "
           f"Repeats: {num_repeats}")
 
-    nrmse_scores = []
-    r2_scores = []
-
     dataset_dir = os.path.join(save_dir, dataset_name)
     os.makedirs(dataset_dir, exist_ok=True)
 
-    for rep in range(num_repeats):
+    nrmse_path = os.path.join(dataset_dir, 'nrmse_scores.npy')
+    r2_path = os.path.join(dataset_dir, 'r2_scores.npy')
+
+    if start_rep > 0:
+        if not (os.path.exists(nrmse_path) and os.path.exists(r2_path)):
+            raise FileNotFoundError(
+                f"--start-rep {start_rep} requires existing {nrmse_path} "
+                f"and {r2_path}")
+        per_rep = len(test_in) if is_autoregressive else 1
+        expected = start_rep * per_rep
+        nrmse_scores = np.load(nrmse_path).tolist()
+        r2_scores = np.load(r2_path).tolist()
+        if len(nrmse_scores) != expected or len(r2_scores) != expected:
+            raise ValueError(
+                f"{dataset_name}: existing scores have "
+                f"{len(nrmse_scores)} entries, expected "
+                f"{expected} ({start_rep} reps x {per_rep} per rep). "
+                f"Refusing to resume from inconsistent state.")
+        print(f"  Resuming from rep {start_rep} "
+              f"({len(nrmse_scores)} prior scores loaded)")
+    else:
+        nrmse_scores = []
+        r2_scores = []
+
+    for rep in range(start_rep, num_repeats):
         seed = base_seed + rep
         set_global_seed(seed)
         start = time.time()
@@ -212,8 +233,8 @@ def run_experiment(dataset_name, data_loader, num_repeats=5,
         }
         with open(os.path.join(dataset_dir, f'repeat_{rep}.pkl'), 'wb') as f:
             pickle.dump(repeat_data, f)
-        np.save(os.path.join(dataset_dir, 'nrmse_scores.npy'), np.array(nrmse_scores))
-        np.save(os.path.join(dataset_dir, 'r2_scores.npy'), np.array(r2_scores))
+        np.save(nrmse_path, np.array(nrmse_scores))
+        np.save(r2_path, np.array(r2_scores))
         print(f"  Checkpoint saved to {dataset_dir}/ ({rep + 1}/{num_repeats} repeats)")
 
     # --- Summary ---
@@ -270,6 +291,10 @@ if __name__ == '__main__':
                         help='Skip training; load saved models and evaluate only')
     parser.add_argument('--datasets', nargs='+', default=None,
                         help='Specific datasets to run (default: all)')
+    parser.add_argument('--start-rep', type=int, default=0,
+                        help='Skip reps [0, N); preload existing npy '
+                             'and resume from rep N. Applies to every '
+                             'dataset selected.')
     args = parser.parse_args()
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -324,6 +349,7 @@ if __name__ == '__main__':
                 nrmse_func=nrmse_fn, device=device,
                 val_noise_sigma=VAL_NOISE_SIGMA.get(name, 0.0),
                 n_init=N_INIT.get(name, DEFAULT_N_INIT),
+                start_rep=args.start_rep,
             )
         all_results[name] = {'nrmse': nrmses, 'r2': r2s}
 
