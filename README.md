@@ -221,7 +221,3 @@ envs\lstm\Scripts\python experiments\lstm.py
 - Saved external-baseline checkpoints are stored under
   `results/{lcnn,ge_desn,grid_search,lstm}/`.
 - The precomputed datasets needed by the experiments are included in `data/`.
-
-## License
-
-This project is released under the terms of the license in `LICENSE`.
