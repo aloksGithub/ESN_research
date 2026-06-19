@@ -1,5 +1,6 @@
 from reservoirpy.jax.nodes import Reservoir, NVAR, RLS, LMS, Ridge, Input
 from src.nodes.jax.ipreservoir import IPReservoir
+from src.mat_gen_v03 import bernoulli as bernoulli_v03, normal as normal_v03, uniform as uniform_v03
 from reservoirpy.observables import nrmse
 import numpy as np
 import random
@@ -351,11 +352,21 @@ def constructModel(architecture):
     for nodeData in architecture["nodes"]:
         node_type = nodeData["type"]
         node_params = nodeData["params"].copy()
-        
+
         # In reservoirpy v0.4.1+, Input node doesn't accept input_dim as constructor arg
         # It's inferred during initialization from data
         if node_type == "Input":
             node_params.pop("input_dim", None)
+
+        # Use v0.3 weight initialization for reservoir nodes (v0.4 changed the
+        # algorithm producing different matrices from the same seed)
+        if node_type in ("Reservoir", "IPReservoir"):
+            node_params.setdefault("Win", bernoulli_v03)
+            node_params.setdefault("bias", bernoulli_v03)
+            if node_type == "Reservoir":
+                node_params.setdefault("W", normal_v03)
+            else:
+                node_params.setdefault("W", uniform_v03)
         
         # Assign unique names to nodes (required in v0.4 for models with multiple trainable nodes)
         if node_type not in node_type_counts:

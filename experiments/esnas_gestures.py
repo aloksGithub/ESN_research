@@ -161,7 +161,7 @@ def run_esnas_gestures():
     all_test_f1s = []
     all_test_accs = []
 
-    for idx in [3, 4]:
+    for idx in range(5):
         print(f"\n======================== Fold {idx+1}/5 ========================")
         inputFiles = files[:idx] + files[idx+1:]
         testFiles = files[idx:idx+1]

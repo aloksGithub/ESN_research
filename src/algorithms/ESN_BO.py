@@ -5,7 +5,6 @@ import dill
 import os
 import time
 from ..algorithms.types import EvalParams, ExperimentData
-from ..parallel_processing import executeParallelThreaded
 from ..utils import (
     evaluateArchitecture,
     nodeParameterRanges,
@@ -43,6 +42,8 @@ class ESN_BO:
             for param in node["params"]:
                 if param == "output_dim" or param == "fb_connectivity":
                     continue
+                if param not in nodeParameterRanges.get(node["type"], {}):
+                    continue
                 lowerLimit = nodeParameterRanges[node["type"]][param]["lower"]
                 upperLimit = nodeParameterRanges[node["type"]][param]["upper"]
                 self.pbounds[str(i + 1) + "_" + param] = (lowerLimit, upperLimit)
@@ -63,50 +64,20 @@ class ESN_BO:
         directory = os.path.dirname(self.saveLocation)
         os.makedirs(directory, exist_ok=True)
 
-    def evaluateArchitecture(self, individual):
-        """
-        Instantiate random models using given architecture, then train and evaluate them
-        on one step ahead prediction using errorMetrics on valX and valY.
-        """
-        _, errors, model = evaluateArchitecture(
+    def evaluate(self, individual):
+        start = time.time()
+
+        _, errors, bestModel = evaluateArchitecture(
             individual,
             self.experimentData.trainX,
             self.experimentData.trainY,
             self.experimentData.valX,
             self.experimentData.valY,
-            1,
+            self.evalParams.numEvals,
             self.evalParams.errorMetrics,
             self.evalParams.defaultErrors,
             self.evalParams.isAutoRegressive,
         )
-        return errors, model
-
-    def evaluate(self, individual):
-        start = time.time()
-        # Temporarily clear bestModel so self can be pickled for spawn
-        saved_model = self.bestModel
-        self.bestModel = None
-        results = executeParallelThreaded(
-            self.evaluateArchitecture,
-            [(individual,) for _ in range(self.evalParams.numEvals)],
-            self.evalParams.numEvals,
-            self.evalParams.timeout,
-        )
-        self.bestModel = saved_model
-
-        valid_results = [res for res in results if res is not None]
-        if not valid_results:
-            errors = self.evalParams.defaultErrors
-            bestModel = None
-        else:
-            main_errors = [res[0][0] for res in valid_results]
-            best_error_index = (
-                np.argmin(main_errors)
-                if self.evalParams.minimizeFitness
-                else np.argmax(main_errors)
-            )
-            errors = valid_results[best_error_index][0]
-            bestModel = valid_results[best_error_index][1]
 
         self.paramsTested.append(individual)
         self.performances.append(errors)
@@ -140,6 +111,10 @@ class ESN_BO:
         return -errors[0]
 
     def run(self):
+        import jax
+        jax.config.update("jax_enable_x64", True)
+        os.environ.setdefault("XLA_PYTHON_CLIENT_PREALLOCATE", "false")
+
         optimizer = BayesianOptimization(
             f=self.black_box,
             pbounds=self.pbounds,
