@@ -1,4 +1,9 @@
+"""Build motif-analysis tables from EESNAS search-time validation fitnesses.
 
+This script intentionally uses ``ga.fitnesses`` from the saved search logs.
+Those values are validation objectives used by EESNAS during optimization, not
+held-out test scores from the final evaluation pipeline.
+"""
 import sys
 import os
 
@@ -85,7 +90,7 @@ def extract_model_stats(architecture, ga: ESN_GA):
         'has_ip': has_ip,
         'two_stage_readout': two_stage_readout,
         'sr_subcritical': spectral_radius_max < 1 and spectral_radius_max > 0,
-        'sr_bin': 'super' if spectral_radius_max > 1 else 'near' if spectral_radius_max < 1 else 'sub',
+        'sr_bin': 'super' if spectral_radius_max > 1 else 'sub' if spectral_radius_max < 1 else 'near',
         'sr_supercritical': spectral_radius_max > 1,
         'high_order_nvar': nvar_order_max >= 4,
     }
@@ -97,6 +102,7 @@ def build_model_dataset():
         for i in range(5):
             ga: ESN_GA = pickle.load(open("{}/{}/backup_{}.obj".format('results/esnas', dataset, i), "rb"))
             architectures = ga.architectures
+            # Search-time validation objectives; do not interpret as held-out test scores.
             fitnesses = [errors[0] for errors in ga.fitnesses]
             sorted_architectures = [x for _, x in sorted(zip(fitnesses, architectures), key=lambda pair: pair[0])]
             sorted_fitnesses = sorted(ga.fitnesses, key=lambda pair: pair[0])
