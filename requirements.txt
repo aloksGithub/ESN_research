@@ -7,8 +7,8 @@ networkx==3.2.1
 numpy==2.4.1
 pandas>=2.0.0,<2.3.0
 reservoirpy>=0.4.1
-jax==0.8.2
-jaxlib>=0.7.1
+jax[cuda13]==0.8.2
+jaxlib>=0.8.2
 ruptures==1.1.10
 scikit-learn==1.6.1
 scipy>=1.11.4
