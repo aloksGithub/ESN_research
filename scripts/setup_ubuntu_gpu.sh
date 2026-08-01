@@ -6,7 +6,7 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 VENV_DIR="${REPO_ROOT}/.venv"
 CUDA_VARIANT="auto"
-INSTALL_SYSTEM_PACKAGES=1
+INSTALL_SYSTEM_PACKAGES=0
 
 usage() {
     cat <<'EOF'
@@ -18,7 +18,8 @@ verify that JAX can execute on an NVIDIA GPU.
 Options:
   --cuda auto|12|13          Select the JAX CUDA wheel (default: auto).
   --venv PATH                Virtual environment path (default: .venv).
-  --skip-system-packages     Do not install Ubuntu packages with apt.
+  --install-system-packages  Install build tools with apt (requires sudo/root).
+  --skip-system-packages     Kept for compatibility; this is now the default.
   -h, --help                 Show this help text.
 EOF
 }
@@ -42,6 +43,10 @@ while (($# > 0)); do
             ;;
         --skip-system-packages)
             INSTALL_SYSTEM_PACKAGES=0
+            shift
+            ;;
+        --install-system-packages)
+            INSTALL_SYSTEM_PACKAGES=1
             shift
             ;;
         -h|--help)
@@ -86,7 +91,6 @@ if ((INSTALL_SYSTEM_PACKAGES)); then
     "${APT_PREFIX[@]}" apt-get install -y ca-certificates curl build-essential
 fi
 
-command -v curl >/dev/null 2>&1 || die "curl is required"
 command -v nvidia-smi >/dev/null 2>&1 || die "nvidia-smi is unavailable; install/attach the NVIDIA driver first"
 
 printf '\n==> NVIDIA devices\n'
@@ -138,7 +142,13 @@ elif [[ -x "${HOME}/.local/bin/uv" ]]; then
     UV_BIN="${HOME}/.local/bin/uv"
 else
     printf '\n==> Installing uv\n'
-    curl -LsSf https://astral.sh/uv/install.sh | sh
+    if command -v curl >/dev/null 2>&1; then
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+    elif command -v wget >/dev/null 2>&1; then
+        wget -qO- https://astral.sh/uv/install.sh | sh
+    else
+        die "installing uv requires curl or wget; ask the VM administrator to provide one of them"
+    fi
     UV_BIN="${HOME}/.local/bin/uv"
 fi
 [[ -x "${UV_BIN}" ]] || die "uv installation failed"
