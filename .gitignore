@@ -112,6 +112,11 @@ env.bak/
 venv.bak/
 envs
 
+# Singularity images and Slurm logs
+containers/*.sif
+logs/*.out
+logs/*.err
+
 # Spyder project settings
 .spyderproject
 .spyproject
