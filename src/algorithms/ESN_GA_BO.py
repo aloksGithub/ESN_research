@@ -1,9 +1,14 @@
+import os
+
+# Must precede all JAX imports.  Each search batch has its own process, so JAX
+# preallocation would otherwise reserve most of the GPU once per process.
+os.environ.setdefault("XLA_PYTHON_CLIENT_PREALLOCATE", "false")
+
 from bayes_opt import BayesianOptimization
 from deap import creator
 import dill
 import copy
 import time
-import os
 
 import jax
 import jax.numpy as jnp
@@ -47,9 +52,15 @@ class ESNAS(GA_Base):
 
         self.bo_init = bo_init
         self.bo_iter = bo_iter
-        self.individualsPerGeneration = self.gaParams.populationSize * (
-            self.bo_init + self.bo_iter
+        # probe(defaultParams) is an evaluation in addition to the random and
+        # optimization iterations performed by maximize().
+        self.bo_evaluations = 1 + self.bo_init + self.bo_iter
+        self.individualsPerGeneration = (
+            self.gaParams.populationSize * self.bo_evaluations
         )
+        # Workers return this opaque payload instead of a live JAX model.  It
+        # prevents dill.load() in the parent from device_put()-ing every model.
+        self.bestModelSerialized = None
 
     def calculateBounds(self, individual):
         pbounds = {}
@@ -78,7 +89,7 @@ class ESNAS(GA_Base):
             if self.evalParams.minimizeFitness
             else -self.evalParams.defaultErrors[0]
         )
-        bestModel = None
+        bestModelSerialized = None
 
         def black_box(**params):
             modifiedArchitecture = copy.deepcopy(individual)
@@ -116,14 +127,19 @@ class ESNAS(GA_Base):
             individualErrors.append(errors)
 
             nonlocal bestError
-            nonlocal bestModel
+            nonlocal bestModelSerialized
             if (
                 errors[0] < bestError
                 and self.evalParams.minimizeFitness
                 or (errors[0] > bestError and not self.evalParams.minimizeFitness)
             ):
                 bestError = errors[0]
-                bestModel = model
+                # Serializing in the GPU worker copies device arrays to an
+                # opaque byte string.  The parent can store it without creating
+                # a JAX device buffer or CUDA context.
+                bestModelSerialized = dill.dumps(model) if model is not None else None
+
+            del model
 
             return -errors[0]
 
@@ -139,33 +155,48 @@ class ESNAS(GA_Base):
             init_points=self.bo_init,
             n_iter=self.bo_iter,
         )
-        return (individuals, individualErrors, bestModel)
+        return (individuals, individualErrors, bestModelSerialized)
 
     def evaluateParallel(self, population):
         print("Evaluating population")
         startTime = time.time()
         # Temporarily clear bestModel so self can be pickled for spawn
         saved_model = self.bestModel
+        saved_model_serialized = getattr(self, "bestModelSerialized", None)
         self.bestModel = None
-        results = executeParallelThreaded(
-            self.bo,
-            [(individual,) for individual in population],
-            self.n_jobs,
-            self.evalParams.timeout * self.evalParams.numEvals * (self.bo_init + self.bo_iter),
-        )
-        self.bestModel = saved_model
+        self.bestModelSerialized = None
+        try:
+            results = executeParallelThreaded(
+                self.bo,
+                [(individual,) for individual in population],
+                self.n_jobs,
+                self.evalParams.timeout
+                * self.evalParams.numEvals
+                * self.bo_evaluations,
+            )
+        finally:
+            self.bestModel = saved_model
+            self.bestModelSerialized = saved_model_serialized
         
         for i in range(len(results)):
             if results[i] is None:
                 results[i] = (
-                    [population[i]] * (self.bo_iter + self.bo_init),
-                    [self.evalParams.defaultErrors] * (self.bo_iter + self.bo_init),
+                    [population[i]] * self.bo_evaluations,
+                    [self.evalParams.defaultErrors] * self.bo_evaluations,
                     None,
                 )
 
         new_individuals = []
         for result in results:
-            individuals, individualErrors, bestModel = result
+            individuals, individualErrors, bestModelSerialized = result
+            previous_best = None
+            if self.fitnesses:
+                objective = [elem[0] for elem in self.fitnesses]
+                previous_best = (
+                    min(objective)
+                    if self.evalParams.minimizeFitness
+                    else max(objective)
+                )
             for i, individual in enumerate(individuals):
                 ga_individual = creator.Individual(individual)
                 ga_individual.fitness.values = (individualErrors[i][0],)
@@ -173,18 +204,40 @@ class ESNAS(GA_Base):
 
             self.architectures += individuals
             self.fitnesses += individualErrors
-            bestBoError = min([elem[0] for elem in individualErrors])
-
-            bestOverallError = min([elem[0] for elem in self.fitnesses])
-            if bestBoError <= bestOverallError or len(self.fitnesses) == 0:
-                self.bestModel = bestModel
+            bo_objective = [elem[0] for elem in individualErrors]
+            bestBoError = (
+                min(bo_objective)
+                if self.evalParams.minimizeFitness
+                else max(bo_objective)
+            )
+            is_new_best = (
+                previous_best is None
+                or (
+                    self.evalParams.minimizeFitness
+                    and bestBoError <= previous_best
+                )
+                or (
+                    not self.evalParams.minimizeFitness
+                    and bestBoError >= previous_best
+                )
+            )
+            if is_new_best and bestModelSerialized is not None:
+                self.bestModelSerialized = bestModelSerialized
+                self.bestModel = None
         print("evaluated in", time.time() - startTime)
         return [
             fitness[0]
             for fitness in self.fitnesses[
-                -len(population) * (self.bo_iter + self.bo_init) :
+                -len(population) * self.bo_evaluations :
             ]
         ], new_individuals
+
+    def materializeBestModel(self):
+        """Deserialize the winning model only when it is actually needed."""
+        serialized = getattr(self, "bestModelSerialized", None)
+        if self.bestModel is None and serialized is not None:
+            self.bestModel = dill.loads(serialized)
+        return self.bestModel
 
     def generationRun(self, gen):
         startTime = time.time()
@@ -246,8 +299,8 @@ class ESNAS(GA_Base):
         self.generationTimes.append(time.time() - startTime)
         print("Time taken:", time.time() - startTime)
 
-        file = open(self.saveLocation, "wb")
-        dill.dump(self, file)
+        with open(self.saveLocation, "wb") as file:
+            dill.dump(self, file)
 
     @staticmethod
     def loadPredict(export_path):
@@ -281,5 +334,9 @@ class ESNAS(GA_Base):
         for gen in range(self.generation, self.gaParams.generations + 1):
             self.generationRun(gen)
 
-        file = open(self.saveLocation, "rb")
-        return dill.load(file)
+        # No GPU worker remains at this point, so it is safe to reconstruct the
+        # single overall winner for inference and the final checkpoint.
+        self.materializeBestModel()
+        with open(self.saveLocation, "wb") as file:
+            dill.dump(self, file)
+        return self

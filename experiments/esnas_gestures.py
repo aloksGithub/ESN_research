@@ -1,4 +1,10 @@
 import os
+
+# JAX reads its allocator configuration when the GPU backend is first created.
+# Keep this before reservoirpy/JAX imports so search workers grow on demand
+# instead of reserving 75% of the GPU in every process.
+os.environ.setdefault("XLA_PYTHON_CLIENT_PREALLOCATE", "false")
+
 import reservoirpy as rpy
 import numpy as np
 import sys
@@ -7,7 +13,6 @@ import traceback
 import sklearn.metrics
 import dill
 from deap import base, creator
-import jax
 import torch
 
 # Filter warnings and set reservoirpy verbosity
@@ -105,7 +110,7 @@ def gesture_acc_metric(y_true, y_pred):
     
     return np.mean(acc_scores)
 
-def print_saved_fold_results(idx):
+def print_saved_fold_results(idx, ga=None):
     """Evaluate a single saved fold using the jax.export artifact."""
     save_folder = 'results/esnas_gestures/global1'
 
@@ -126,13 +131,23 @@ def print_saved_fold_results(idx):
     if not hasattr(creator, "Individual"):
         creator.create("Individual", dict, fitness=creator.Fitness)
 
-    # Load dill backup to get the save path, then load jax.export for inference
-    with open(os.path.join(fold_save_loc, 'esnas_backup.obj'), "rb") as f:
-        ga = dill.load(f)
+    # Reuse a just-completed run when available. Loading its checkpoint would
+    # reconstruct a second copy of the same JAX model on the GPU.
+    if ga is None:
+        with open(os.path.join(fold_save_loc, 'esnas_backup.obj'), "rb") as f:
+            ga = dill.load(f)
     
     # model = trainModel(ga.bestModel, trainX, trainY)
 
-    f1, acc = testESN(ga.bestModel, testFiles)
+    # In-progress checkpoints keep the winning model serialized so loading a
+    # checkpoint does not allocate GPU memory until inference is requested.
+    best_model = ga.materializeBestModel()
+    if best_model is None:
+        raise RuntimeError(
+            "The saved ESNAS run does not contain a trained best model."
+        )
+
+    f1, acc = testESN(best_model, testFiles)
     print(f1, acc)
     return f1, acc
 
@@ -214,7 +229,7 @@ def run_esnas_gestures():
         )
         
         modelParams = ModelParams(
-            num_nodes_range=(1, 2),
+            num_nodes_range=(1, 4),
         )
 
         fold_save_loc = os.path.join(save_folder, f'fold_{idx}')
@@ -230,12 +245,12 @@ def run_esnas_gestures():
             n_jobs=20,
             saveLocation=os.path.join(fold_save_loc, 'esnas_backup.obj'),
             bo_init=0,
-            bo_iter=5
+            bo_iter=10
         )
         
         ga.run()
 
-        test_f1, test_acc = print_saved_fold_results(idx)
+        test_f1, test_acc = print_saved_fold_results(idx, ga=ga)
         all_test_f1s.append(test_f1)
         all_test_accs.append(test_acc)
 
@@ -247,4 +262,4 @@ def run_esnas_gestures():
         print("No results to report.")
 
 if __name__ == "__main__":
-    print_saved_results()
+    run_esnas_gestures()

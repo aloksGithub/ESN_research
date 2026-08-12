@@ -84,7 +84,7 @@ def executeParallelImproved(func, args, n_jobs, timeout, log_level=2):
     return results
 
 
-def _batch_worker(func, batch_args, max_workers, per_job_timeout, result_file):
+def _batch_worker(func, batch_args, max_workers, batch_timeout, result_file):
     """Runs inside a child process. Uses threads for JAX GPU parallelism.
 
     All threads share a single CUDA context within this process.
@@ -103,7 +103,7 @@ def _batch_worker(func, batch_args, max_workers, per_job_timeout, result_file):
         future = executor.submit(func, *arg)
         future_to_idx[future] = i
 
-    done, not_done = wait(future_to_idx.keys(), timeout=per_job_timeout)
+    done, not_done = wait(future_to_idx.keys(), timeout=batch_timeout)
 
     for future in done:
         idx = future_to_idx[future]
@@ -116,17 +116,23 @@ def _batch_worker(func, batch_args, max_workers, per_job_timeout, result_file):
 
     executor.shutdown(wait=False, cancel_futures=True)
 
-    with open(result_file, 'wb') as f:
-        dill.dump({
-            'results': batch_results,
-            'errors': errors,
-            'timed_out': timed_out_indices,
-        }, f)
+    try:
+        with open(result_file, 'wb') as f:
+            dill.dump({
+                'results': batch_results,
+                'errors': errors,
+                'timed_out': timed_out_indices,
+            }, f)
+    finally:
+        # ThreadPoolExecutor cannot stop a function that is already running.
+        # Exit the isolated worker after persisting completed results so timed-
+        # out threads and their CUDA context are released immediately.
+        os._exit(0)
 
 
-def executeParallelThreaded(func, args, max_workers, per_job_timeout, log_level=2):
+def executeParallelThreaded(func, args, max_workers, batch_timeout, log_level=2):
     """
-    Execute functions in parallel using threads with per-job timeouts.
+    Execute functions in parallel using threads with a batch deadline.
     Each batch runs in an isolated child process that is terminated afterward
     to fully free GPU memory.
 
@@ -135,14 +141,16 @@ def executeParallelThreaded(func, args, max_workers, per_job_timeout, log_level=
     - Process isolation between batches guarantees GPU memory cleanup
     - Uses 'spawn' start method (safe for CUDA on Linux/WSL)
 
-    Example: 1000 jobs, max_workers=10, per_job_timeout=10s
+    Example: 1000 jobs, max_workers=10, batch_timeout=10s
         -> 100 batches x 10s = ~1000s total
 
     Args:
         func: Function to call. Must be importable (top-level). Called as func(*arg).
         args: List of argument tuples. Must be picklable.
         max_workers: Number of concurrent threads and batch size.
-        per_job_timeout: Timeout in seconds for each job (applied per batch).
+        batch_timeout: Shared deadline in seconds for the concurrently-started
+            jobs in one batch. Running Python threads cannot be forcefully
+            cancelled, so the outer process is terminated after this deadline.
         log_level: 0=silent, 1=errors only, 2=verbose.
 
     Returns:
@@ -168,10 +176,10 @@ def executeParallelThreaded(func, args, max_workers, per_job_timeout, log_level=
 
         proc = ctx.Process(
             target=_batch_worker,
-            args=(func, batch_args, max_workers, per_job_timeout, result_file),
+            args=(func, batch_args, max_workers, batch_timeout, result_file),
         )
         proc.start()
-        proc.join(timeout=per_job_timeout + grace_seconds)
+        proc.join(timeout=batch_timeout + grace_seconds)
 
         if proc.is_alive():
             proc.terminate()
@@ -199,7 +207,7 @@ def executeParallelThreaded(func, args, max_workers, per_job_timeout, log_level=
                     if log_level >= 2:
                         print(
                             f"Warning: Job {batch_start + idx} timed out "
-                            f"after {per_job_timeout}s"
+                            f"after {batch_timeout}s"
                         )
                 completed_count += batch_completed
             except Exception as e:

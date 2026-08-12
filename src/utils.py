@@ -1,3 +1,9 @@
+import os
+
+# This module imports reservoirpy's JAX backend below.  Configure allocation
+# first so callers that do not use an experiment entry point are safe too.
+os.environ.setdefault("XLA_PYTHON_CLIENT_PREALLOCATE", "false")
+
 from reservoirpy.jax.nodes import Reservoir, NVAR, RLS, LMS, Ridge, Input
 from src.nodes.jax.ipreservoir import IPReservoir
 from src.mat_gen_v03 import bernoulli as bernoulli_v03, normal as normal_v03, uniform as uniform_v03
@@ -307,14 +313,17 @@ def evaluateArchitecture(
     jax.config.update("jax_enable_x64", True)
     os.environ.setdefault("XLA_PYTHON_CLIENT_PREALLOCATE", "false")
 
-    errors = []
-    models = []
+    best_errors = None
+    best_model = None
+    minimize = defaultErrors[0] != 0
 
     try:
         for _ in range(numEvals):
             try:
                 model = constructModel(individual)
                 model = trainModel(model, trainX, trainY)
+                # Preserve the trained state from before validation mutates the
+                # model, but retain at most one such snapshot across attempts.
                 model_copy = copy.deepcopy(model)
 
                 if isAutoRegressive:
@@ -329,17 +338,26 @@ def evaluateArchitecture(
                     preds = runModel(model, valX)
 
                 modelErrors = [metric(valY, preds) for metric in errorMetrics]
-                errors.append(modelErrors)
-                models.append(model_copy)
+                is_better = (
+                    best_errors is None
+                    or (minimize and modelErrors[0] < best_errors[0])
+                    or (not minimize and modelErrors[0] > best_errors[0])
+                )
+                if is_better:
+                    best_errors = modelErrors
+                    best_model = model_copy
+
+                # Drop the validation model and any non-winning copy promptly.
+                # The worker process boundary releases JAX's allocator pool.
+                del model
+                if not is_better:
+                    del model_copy
             except Exception:
-                errors.append(defaultErrors)
-                models.append(None)
+                continue
 
-        # Select best attempt w.r.t. the first error metric
-        error0 = [e[0] for e in errors]
-        best_idx = error0.index(min(error0)) if defaultErrors[0] != 0 else error0.index(max(error0))
-
-        return individual, errors[best_idx], models[best_idx]
+        if best_errors is None:
+            return individual, defaultErrors, None
+        return individual, best_errors, best_model
 
     except Exception:
         # Any unexpected failure -> signal default error

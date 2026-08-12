@@ -118,12 +118,7 @@ if ((INSIDE_CONTAINER == 0)); then
     fi
 
     printf '\n==> Submitting the GPU setup and JAX validation job\n'
-    SBATCH_OPTIONS=(--parsable)
-    if ((WAIT_FOR_JOB)); then
-        SBATCH_OPTIONS+=(--wait)
-    fi
-
-    JOB_ID="$(sbatch "${SBATCH_OPTIONS[@]}" scripts/setup_ubuntu_gpu.sbatch "${REPO_ROOT}" "${IMAGE_PATH}" "${CUDA_VARIANT}")"
+    JOB_ID="$(sbatch --parsable scripts/setup_ubuntu_gpu.sbatch "${REPO_ROOT}" "${IMAGE_PATH}" "${CUDA_VARIANT}")"
     JOB_ID="${JOB_ID%%;*}"
 
     cat <<EOF
@@ -138,6 +133,27 @@ The setup is complete when that log ends with "GPU setup completed successfully"
 After it succeeds, submit the experiment with:
   sbatch scripts/run_esnas_gestures.sbatch
 EOF
+
+    if ((WAIT_FOR_JOB)); then
+        printf '\nWaiting for Slurm job %s. Queue-state changes will be shown below.\n' "${JOB_ID}"
+        LAST_STATUS=""
+        while true; do
+            CURRENT_STATUS="$(squeue --noheader --job "${JOB_ID}" --format='%T | %R' 2>/dev/null || true)"
+            [[ -n "${CURRENT_STATUS}" ]] || break
+            if [[ "${CURRENT_STATUS}" != "${LAST_STATUS}" ]]; then
+                printf '  %s\n' "${CURRENT_STATUS}"
+                LAST_STATUS="${CURRENT_STATUS}"
+            fi
+            sleep 10
+        done
+
+        printf 'Slurm job %s has left the queue. Final log output:\n' "${JOB_ID}"
+        if [[ -f "${REPO_ROOT}/logs/setup-gpu.${JOB_ID}.out" ]]; then
+            tail -n 25 "${REPO_ROOT}/logs/setup-gpu.${JOB_ID}.out"
+        else
+            printf '  No output log was created. Check logs/setup-gpu.%s.err and sacct -j %s.\n' "${JOB_ID}" "${JOB_ID}"
+        fi
+    fi
     exit 0
 fi
 
