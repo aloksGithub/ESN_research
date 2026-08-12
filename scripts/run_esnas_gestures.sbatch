@@ -6,7 +6,7 @@
 #SBATCH --output=logs/esnas-gestures.%j.out
 #SBATCH --error=logs/esnas-gestures.%j.err
 #SBATCH --job-name=esnas-gestures
-#SBATCH --time=2-00:00:00
+#SBATCH --time=12:00:00
 #SBATCH --mem=32G
 
 set -Eeuo pipefail
