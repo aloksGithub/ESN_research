@@ -20,7 +20,7 @@ IMAGE_PATH="${REPO_ROOT}/containers/python312-bookworm.sif"
     printf 'ERROR: Singularity image not found: %s\n' "${IMAGE_PATH}" >&2
     exit 1
 }
-[[ -x "${REPO_ROOT}/venv/bin/python" ]] || {
+[[ -f "${REPO_ROOT}/venv/bin/activate" ]] || {
     printf 'ERROR: Run bash scripts/setup_ubuntu_gpu.sh and wait for it to finish first.\n' >&2
     exit 1
 }
