@@ -213,7 +213,7 @@ def run_esnas_gestures():
             numEvals=3,
             errorMetrics=errorMetrics,
             defaultErrors=[1.0, 0.0],
-            timeout=20,
+            timeout=40,
             memoryLimit=756,
             minimizeFitness=True,
             isAutoRegressive=False,
@@ -242,7 +242,7 @@ def run_esnas_gestures():
             evalParams,
             gaParams,
             modelParams,
-            n_jobs=20,
+            n_jobs=10,
             saveLocation=os.path.join(fold_save_loc, 'esnas_backup.obj'),
             bo_init=0,
             bo_iter=10
