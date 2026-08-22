@@ -1,12 +1,12 @@
 #!/bin/bash -l
 
-# Keep this equal to n_jobs=10 in experiments/esnas_gestures.py.
-#SBATCH --cpus-per-task=10
+# Keep this equal to n_jobs=5 in experiments/esnas_gestures.py.
+#SBATCH --cpus-per-task=5
 #SBATCH --gres=gpu:7g.80gb:1
 #SBATCH --output=logs/esnas-gestures.%j.out
 #SBATCH --error=logs/esnas-gestures.%j.err
 #SBATCH --job-name=esnas-gestures
-#SBATCH --time=12:00:00
+#SBATCH --time=3-00:00:00
 #SBATCH --mem=32G
 
 set -Eeuo pipefail
@@ -37,7 +37,7 @@ singularity exec \
         export XLA_PYTHON_CLIENT_PREALLOCATE=false
 
         echo "Allocated CPUs: ${SLURM_CPUS_PER_TASK}"
-        echo "ESNAS n_jobs is configured manually as 10"
+        echo "ESNAS n_jobs is configured manually as 5"
         nvidia-smi
 
         python -u -c \
