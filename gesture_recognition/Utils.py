@@ -30,7 +30,13 @@ def runningAverage(inputData, width):
     return target
 
 
-def createData(inputFiles, testFiles, dataDir='dataSets/', learnThreshold=False):
+def createData(
+    inputFiles,
+    testFiles,
+    dataDir='dataSets/',
+    learnThreshold=False,
+    nFolds=4,
+):
     trainset = UniHHIMUGestures(dataDir=dataDir, 
                                 train=True, 
                                 inputFiles=inputFiles,
@@ -38,6 +44,7 @@ def createData(inputFiles, testFiles, dataDir='dataSets/', learnThreshold=False)
                                 useNormalized=2, 
                                 learnTreshold=learnThreshold,
                                 shuffle=True,
+                                nFolds=nFolds,
                                )
 
     testset = UniHHIMUGestures(dataDir=dataDir, 
@@ -46,7 +53,8 @@ def createData(inputFiles, testFiles, dataDir='dataSets/', learnThreshold=False)
                                testFiles=testFiles,
                                useNormalized=2, 
                                learnTreshold=learnThreshold,
-                               shuffle=True
+                               shuffle=True,
+                               nFolds=nFolds,
                               
                               )
 

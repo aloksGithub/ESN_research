@@ -11,7 +11,7 @@ from reservoirpy.observables import nrmse
 import numpy as np
 import random
 import networkx as nx
-import copy
+import dill
 import traceback
 from .memory_estimator import estimateMemory
 
@@ -313,18 +313,18 @@ def evaluateArchitecture(
     jax.config.update("jax_enable_x64", True)
     os.environ.setdefault("XLA_PYTHON_CLIENT_PREALLOCATE", "false")
 
-    best_errors = None
-    best_model = None
-    minimize = defaultErrors[0] != 0
+    attempts = []
 
     try:
         for _ in range(numEvals):
+            model = None
             try:
                 model = constructModel(individual)
                 model = trainModel(model, trainX, trainY)
-                # Preserve the trained state from before validation mutates the
-                # model, but retain at most one such snapshot across attempts.
-                model_copy = copy.deepcopy(model)
+                # Preserve the trained state before validation mutates it. Keep
+                # snapshots as host-side bytes so multiple attempts do not
+                # retain multiple live JAX models on the GPU.
+                model_serialized = dill.dumps(model)
 
                 if isAutoRegressive:
                     prevOutput = valX[0]
@@ -338,26 +338,41 @@ def evaluateArchitecture(
                     preds = runModel(model, valX)
 
                 modelErrors = [metric(valY, preds) for metric in errorMetrics]
-                is_better = (
-                    best_errors is None
-                    or (minimize and modelErrors[0] < best_errors[0])
-                    or (not minimize and modelErrors[0] > best_errors[0])
-                )
-                if is_better:
-                    best_errors = modelErrors
-                    best_model = model_copy
-
-                # Drop the validation model and any non-winning copy promptly.
-                # The worker process boundary releases JAX's allocator pool.
-                del model
-                if not is_better:
-                    del model_copy
+                attempts.append((modelErrors, model_serialized))
             except Exception:
-                continue
+                # Failed initializations must affect the aggregate fitness;
+                # otherwise one lucky success can hide repeated failures.
+                attempts.append((list(defaultErrors), None))
+            finally:
+                if model is not None:
+                    del model
 
-        if best_errors is None:
+        if not attempts:
             return individual, defaultErrors, None
-        return individual, best_errors, best_model
+
+        # Fitness represents typical performance across random initializations
+        # instead of the most validation-favourable initialization.
+        mean_errors = np.mean(
+            np.asarray([errors for errors, _ in attempts], dtype=float), axis=0
+        ).tolist()
+
+        successful_attempts = [
+            (errors, serialized)
+            for errors, serialized in attempts
+            if serialized is not None
+        ]
+        if not successful_attempts:
+            return individual, mean_errors, None
+
+        # Save a representative initialization rather than the best validation
+        # initialization. With three successful attempts this is the median.
+        successful_attempts.sort(key=lambda attempt: attempt[0][0])
+        _, representative_serialized = successful_attempts[
+            len(successful_attempts) // 2
+        ]
+        representative_model = dill.loads(representative_serialized)
+
+        return individual, mean_errors, representative_model
 
     except Exception:
         # Any unexpected failure -> signal default error

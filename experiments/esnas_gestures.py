@@ -41,7 +41,12 @@ def testESN(esn, testFiles, fixed_threshold=0.4):
     testF1MaxApps = []
     testAccuracies = []
     
-    _, _, trainloader, testloader = createData(inputFiles=testFiles, testFiles=testFiles, dataDir=data_dir)
+    _, _, trainloader, testloader = createData(
+        inputFiles=testFiles,
+        testFiles=testFiles,
+        dataDir=data_dir,
+        nFolds=len(testFiles),
+    )
 
     for test_inputs, test_targets in trainloader:
         inputs = test_inputs[0].numpy()
