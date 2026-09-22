@@ -4,7 +4,8 @@ import os
 # first so callers that do not use an experiment entry point are safe too.
 os.environ.setdefault("XLA_PYTHON_CLIENT_PREALLOCATE", "false")
 
-from reservoirpy.jax.nodes import Reservoir, NVAR, RLS, LMS, Ridge, Input
+from reservoirpy.jax.nodes import Reservoir, RLS, LMS, Ridge, Input
+from src.nodes.jax.nvar import NVAR
 from src.nodes.jax.ipreservoir import IPReservoir
 from src.mat_gen_v03 import bernoulli as bernoulli_v03, normal as normal_v03, uniform as uniform_v03
 from reservoirpy.observables import nrmse
@@ -38,7 +39,7 @@ nodeParameterRanges = {
         "lr": {"lower": 0.2, "upper": 1, "intOnly": False},
         "sr": {"lower": 0.5, "upper": 1, "intOnly": False},
         "mu": {"lower": -0.2, "upper": 0.2, "intOnly": False},
-        "sigma": {"lower": 0, "upper": 2, "intOnly": False},
+        "sigma": {"lower": 0.001, "upper": 2, "intOnly": False},
         "learning_rate": {"lower": 0, "upper": 0.01, "intOnly": False},
         "input_connectivity": {"lower": 0.05, "upper": 0.5, "intOnly": False},
         "rc_connectivity": {"lower": 0.05, "upper": 0.5, "intOnly": False},

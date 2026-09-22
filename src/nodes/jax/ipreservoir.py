@@ -16,9 +16,13 @@ These fixed versions extend the plain ``Node`` base class so the Model treats
 them as regular (non-trainable) nodes.  Intrinsic-plasticity training happens
 automatically on the first ``run()`` call, or can be triggered explicitly via
 ``train_ip()``.
+
+Adaptive a/b parameters are carried in dynamic JAX state. Training uses a
+compiled scan; resetting clears only recurrent activity, not learned a/b.
 """
 
 from functools import partial
+import math
 from typing import Callable, Literal, Optional, Sequence, Union
 
 from reservoirpy.type import (
@@ -31,7 +35,6 @@ from reservoirpy.type import (
     is_multiseries,
 )
 from reservoirpy.utils.data_validation import check_node_input
-from reservoirpy.utils.random import rand_generator
 import jax
 import jax.numpy as jnp
 from numpy.random import Generator
@@ -93,6 +96,10 @@ class IPReservoir(NodeJAX):
         warmup: int = 0,
         name=None,
     ):
+        if not math.isfinite(sigma) or sigma <= 0:
+            raise ValueError("sigma must be finite and strictly positive")
+        if activation == "sigmoid" and (not math.isfinite(mu) or mu <= 0):
+            raise ValueError("sigmoid IP requires finite, strictly positive mu")
         self.units = units
         self.sr = sr
         self.lr = lr
@@ -188,14 +195,50 @@ class IPReservoir(NodeJAX):
                 seed=bias_rng,
             )
 
-        self.a = jnp.ones((self.output_dim,))
-        self.b = jnp.zeros((self.output_dim,))
-
         self.state = dict(
-            internal=jnp.zeros((self.output_dim,)),
-            out=jnp.zeros((self.output_dim,)),
+            internal=jnp.zeros((self.output_dim,), dtype=self.dtype),
+            out=jnp.zeros((self.output_dim,), dtype=self.dtype),
+            a=jnp.ones((self.output_dim,), dtype=self.dtype),
+            b=jnp.zeros((self.output_dim,), dtype=self.dtype),
         )
         self.initialized = True
+
+    # Adaptive parameters belong to dynamic JAX state, not static self.
+    # Properties keep the public a/b API while ensuring Model._step and scans
+    # receive the current learned parameters on every execution.
+    @property
+    def a(self):
+        return self.state["a"]
+
+    @a.setter
+    def a(self, value):
+        self.state = {**self.state, "a": jnp.asarray(value, dtype=self.dtype)}
+
+    @property
+    def b(self):
+        return self.state["b"]
+
+    @b.setter
+    def b(self, value):
+        self.state = {**self.state, "b": jnp.asarray(value, dtype=self.dtype)}
+
+    def reset(self):
+        previous = self.state
+        self.state = {**previous,
+                      "internal": jnp.zeros_like(previous["internal"]),
+                      "out": jnp.zeros_like(previous["out"])}
+        return previous
+
+    def __setstate__(self, attributes):
+        # Older repository checkpoints stored a/b as plain attributes.
+        attributes = attributes.copy()
+        old_a = attributes.pop("a", None)
+        old_b = attributes.pop("b", None)
+        self.__dict__.update(attributes)
+        if old_a is not None:
+            self.a = old_a
+        if old_b is not None:
+            self.b = old_b
 
     # -- forward pass -------------------------------------------------------
 
@@ -210,13 +253,13 @@ class IPReservoir(NodeJAX):
 
         next_state = W @ external + Win @ x + bias
         next_state = (1 - lr) * internal + lr * next_state
-        next_external = f(self.a * next_state + self.b)
+        next_external = f(state["a"] * next_state + state["b"])
 
-        return {"internal": next_state, "out": next_external}
+        return {**state, "internal": next_state, "out": next_external}
 
     # -- intrinsic-plasticity training --------------------------------------
 
-    def train_ip(self, x: NodeInput, warmup: int = 0) -> "IPReservoirJAXFixed":
+    def train_ip(self, x: NodeInput, warmup: int = 0) -> "IPReservoir":
         """Train intrinsic-plasticity parameters *a* and *b*.
 
         Parameters
@@ -228,10 +271,12 @@ class IPReservoir(NodeJAX):
 
         Returns
         -------
-        IPReservoirJAXFixed
+        IPReservoir
             The node with updated IP parameters.
         """
         check_node_input(x, expected_dim=self.input_dim)
+        if warmup < 0:
+            raise ValueError("warmup must be nonnegative")
 
         if not self.initialized:
             self.initialize(x)
@@ -241,29 +286,34 @@ class IPReservoir(NodeJAX):
                 for seq in x:
                     # Run warmup to advance state before IP training
                     if warmup > 0:
-                        for u in seq[:warmup]:
-                            self.step(u)
+                        self.state = self._warmup_ip(self.state, jnp.asarray(seq[:warmup], dtype=self.dtype))
                     self._partial_fit_ip(seq[warmup:])
             else:
                 # Run warmup to advance state before IP training
                 if warmup > 0:
-                    for u in x[:warmup]:
-                        self.step(u)
+                    self.state = self._warmup_ip(self.state, jnp.asarray(x[:warmup], dtype=self.dtype))
                 self._partial_fit_ip(x[warmup:])
 
         self._ip_trained = True
         return self
 
     def _partial_fit_ip(self, x: Timeseries):
-        for u in x:
-            post_state = self.step(u)
-            pre_state = self.state["internal"]
+        self.state = self._train_scan(self.state, jnp.asarray(x, dtype=self.dtype))
 
-            delta_a, delta_b = self.gradient(
-                x=pre_state.T, y=post_state.T, a=self.a
-            )
-            self.a += self.learning_rate * delta_a
-            self.b += self.learning_rate * delta_b
+    @partial(jax.jit, static_argnums=(0,))
+    def _warmup_ip(self, state, x):
+        def advance(carry, u):
+            return self._step(carry, u), None
+        return jax.lax.scan(advance, state, x)[0]
+
+    @partial(jax.jit, static_argnums=(0,))
+    def _train_scan(self, state, x):
+        def learn(carry, u):
+            post = self._step(carry, u)
+            da, db = self.gradient(x=post["internal"], y=post["out"], a=carry["a"])
+            return {**post, "a": carry["a"] + self.learning_rate * da,
+                    "b": carry["b"] + self.learning_rate * db}, None
+        return jax.lax.scan(learn, state, x)[0]
 
     # -- run (with auto IP training) ----------------------------------------
 
