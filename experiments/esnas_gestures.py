@@ -249,8 +249,8 @@ def run_esnas_gestures():
             modelParams,
             n_jobs=5,
             saveLocation=os.path.join(fold_save_loc, 'esnas_backup.obj'),
-            bo_init=0,
-            bo_iter=5
+            bo_init=3,
+            bo_iter=8
         )
         
         ga.run()
