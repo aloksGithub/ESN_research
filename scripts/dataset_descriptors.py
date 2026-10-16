@@ -7,27 +7,15 @@ from statsmodels.tsa.stattools import adfuller, kpss
 current_dir = os.path.abspath(os.path.dirname(__file__))
 parent_dir = os.path.dirname(current_dir)
 sys.path.insert(0, parent_dir)
-import pickle
-from src.algorithms.ESN_GA import ESN_GA
-from src.datasets import getDataLaser, getDataMGS, getDataLorenz, getDataDDE, getDataSunspots, getDataWater
 import numpy as np
-import reservoirpy as rpy
 import pandas as pd
-import json
 import antropy as ant
 from hurst import compute_Hc
 import ruptures as rpt
-from scipy import stats
-from statsmodels.stats.multitest import multipletests
-import statsmodels.api as sm
-import traceback
-
-from src.utils import constructModel, runModel
-rpy.verbosity(0)
 import warnings
 warnings.filterwarnings("ignore")
 
-def compute_dataset_descriptors(max_lag: int = 100, n_bins: int = 16) -> pd.DataFrame:
+def compute_dataset_descriptors(max_lag: int = 100, n_bins: int = 16, dataset_funcs=None) -> pd.DataFrame:
     """Compute dataset-level descriptors for all datasets.
 
     Returns a DataFrame with one row per dataset containing:
@@ -38,16 +26,23 @@ def compute_dataset_descriptors(max_lag: int = 100, n_bins: int = 16) -> pd.Data
     - change_point_count (if ruptures available)
     - snr_ma (variance ratio using moving-average residual)
     - series_length, num_variables
+
+    Optional dataset_funcs contains (name, loader) pairs. Each loader returns
+    (inputs, signal_to_describe); the second item is used, as for forecasting
+    targets in the original benchmarks. Gesture analysis supplies sensor inputs
+    there explicitly, rather than describing one-hot class labels.
     """
 
-    dataset_funcs = [
-        ("laser", getDataLaser),
-        ("mgs", getDataMGS),
-        ("lorenz", getDataLorenz),
-        ("dde", getDataDDE),
-        ("sunspots", getDataSunspots),
-        ("water", getDataWater),
-    ]
+    if dataset_funcs is None:
+        from src.datasets import getDataLaser, getDataMGS, getDataLorenz, getDataDDE, getDataSunspots, getDataWater
+        dataset_funcs = [
+            ("laser", getDataLaser),
+            ("mgs", getDataMGS),
+            ("lorenz", getDataLorenz),
+            ("dde", getDataDDE),
+            ("sunspots", getDataSunspots),
+            ("water", getDataWater),
+        ]
 
     rows = []
     for name, fn in dataset_funcs:
@@ -206,11 +201,29 @@ def _seasonality_strength_and_period(P: np.ndarray, freq: np.ndarray) -> tuple:
 def _change_points_count(x: np.ndarray) -> float:
     """Heuristic change-point count via ruptures if available."""
     n = len(x)
-    model = rpt.Pelt(model="rbf").fit(x)
+    model = rpt.Pelt(custom_cost=_CachedRbfCost()).fit(x)
     pen = 3.0 * np.log(n)
     bkps = model.predict(pen=pen)
     # bkps includes end index
     return float(max(0, len(bkps) - 1))
+
+
+class _CachedRbfCost(rpt.costs.CostRbf):
+    """Same RBF segment cost with O(1) sums after O(n^2) preprocessing."""
+
+    def fit(self, signal):
+        super().fit(signal)
+        gram = self.gram
+        self._sum = np.pad(gram.cumsum(axis=0).cumsum(axis=1), ((1, 0), (1, 0)))
+        self._diag = np.r_[0.0, np.cumsum(np.diag(gram))]
+        return self
+
+    def error(self, start, end):
+        if end - start < self.min_size:
+            raise rpt.exceptions.NotEnoughPoints
+        total = (self._sum[end, end] - self._sum[start, end]
+                 - self._sum[end, start] + self._sum[start, start])
+        return float(self._diag[end] - self._diag[start] - total / (end - start))
 
 def _snr_moving_average(x: np.ndarray) -> float:
     """Variance ratio var(x)/var(x - MA(x)) as a crude SNR proxy."""
