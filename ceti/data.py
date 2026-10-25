@@ -134,10 +134,16 @@ def load_segments(root, records, frames, expected_columns=None, dtype=np.float64
 
 def prepare_subset(dataset_root, manifest_path, train_per_class=40, val_per_class=10,
                    frames=20, seed=1234123123, val_subjects=10):
+    """Prepare disjoint subjects; val_per_class=0 uses every validation segment."""
+    if val_per_class < 0:
+        raise ValueError("Validation segments per class must be nonnegative (0 means all).")
     root, subjects, records = inventory(dataset_root)
     split = subject_split(subjects, manifest_path, seed, val_subjects=val_subjects)
     train = sample_segments(records, set(split["train"]), train_per_class, seed + 1)
-    val = sample_segments(records, set(split["validation"]), val_per_class, seed + 2)
+    if val_per_class == 0:
+        val = [record for record in records if record["subject"] in set(split["validation"])]
+    else:
+        val = sample_segments(records, set(split["validation"]), val_per_class, seed + 2)
     train_x, train_labels, columns, train_lengths = load_segments(root, train, frames)
     val_x, val_labels, _, val_lengths = load_segments(root, val, frames, columns)
     metadata = {
@@ -148,6 +154,8 @@ def prepare_subset(dataset_root, manifest_path, train_per_class=40, val_per_clas
         "inventory_segments": len(records), "inventory_subjects": len(subjects),
         "inventory_class_counts": dict(Counter(r["activity"] for r in records)),
         "train_records": train, "validation_records": val,
+        "validation_selection": "all" if val_per_class == 0 else "balanced_subset",
+        "validation_class_counts": dict(Counter(r["activity"] for r in val)),
         "train_source_lengths": train_lengths, "validation_source_lengths": val_lengths,
         "test_contents_loaded": False,
     }
@@ -214,7 +222,7 @@ def load_svm_test(dataset_root, metadata):
 
 
 def load_search_inputs(dataset_root, manifest_path, frames=20, seed=1234123123,
-                       train_per_class=40, val_per_class=10, feature_set="all"):
+                       train_per_class=40, val_per_class=0, feature_set="all"):
     """Flattened arrays for ESNAS bookkeeping, with explicit segment boundaries."""
     from src.algorithms.types import ExperimentData
 

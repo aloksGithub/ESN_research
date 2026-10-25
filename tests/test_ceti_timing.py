@@ -40,7 +40,8 @@ def test_sampling_preserves_classes_and_spreads_subjects():
         assert {r["subject"] for r in selected} == {"a", "b", "c"}
 
 
-def test_preparation_never_reads_test_motion_files(tmp_path, monkeypatch):
+@pytest.mark.parametrize("val_per_class", [1, 0])
+def test_preparation_never_reads_test_motion_files(tmp_path, monkeypatch, val_per_class):
     root = tmp_path / "CeTI-Locomotion" / "derivatives" / "cut_sequences"
     root.mkdir(parents=True)
     subjects = [f"sub-K{i}" for i in range(24)]
@@ -68,9 +69,13 @@ def test_preparation_never_reads_test_motion_files(tmp_path, monkeypatch):
 
     monkeypatch.setattr(Path, "open", guarded_open)
     arrays, metadata = prepare_subset(tmp_path / "CeTI-Locomotion", split_path,
-                                      train_per_class=2, val_per_class=1, frames=4)
+                                      train_per_class=2, val_per_class=val_per_class, frames=4)
     assert arrays["train_x"].shape == (10, 4, 6)
-    assert arrays["val_x"].shape == (5, 4, 6)
+    assert arrays["val_x"].shape == (5 if val_per_class else 50, 4, 6)
+    assert metadata["validation_selection"] == ("balanced_subset" if val_per_class else "all")
+    if val_per_class == 0:
+        assert {r["subject"] for r in metadata["validation_records"]} == set(split["validation"])
+        assert metadata["validation_class_counts"] == dict.fromkeys(ACTIVITIES, 10)
     assert metadata["test_contents_loaded"] is False
     assert set(arrays["train_labels"]) == set(range(5))
     assert not ({r["subject"] for r in metadata["train_records"]} &

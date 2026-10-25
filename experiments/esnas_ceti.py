@@ -53,7 +53,8 @@ def main(argv=None):
     parser.add_argument("--output-dir", type=Path)
     parser.add_argument("--seed", type=int, default=1234123123)
     parser.add_argument("--train-per-class", type=int, default=40)
-    parser.add_argument("--val-per-class", type=int, default=10)
+    parser.add_argument("--val-per-class", type=int, default=0,
+                        help="Validation segments/class; 0 (default) uses all validation-subject segments.")
     parser.add_argument("--feature-set", default="all", help="all, leg6 or comma-separated exact column names.")
     parser.add_argument("--warmup", type=int, default=3)
     parser.add_argument("--ridge-passes", type=int, choices=(1, 2), default=2)
@@ -61,8 +62,10 @@ def main(argv=None):
     parser.add_argument("--population", type=int, default=20)
     parser.add_argument("--bo-init", type=int, default=0)
     parser.add_argument("--bo-iter", type=int, default=3)
-    parser.add_argument("--num-evals", type=int, default=3)
-    parser.add_argument("--repeats", type=int, default=5)
+    parser.add_argument("--num-evals", type=int, default=3,
+                        help="Fixed initializations/candidate; architecture fitness averages their metrics.")
+    parser.add_argument("--repeats", type=int, default=1,
+                        help="Independent complete searches; default 1 for exploration.")
     parser.add_argument("--timeout", type=float, default=60,
                         help="Seconds/initialization budget, multiplied across each BO worker's evaluations.")
     parser.add_argument("--memory-limit", type=float, default=756)
@@ -74,9 +77,12 @@ def main(argv=None):
     if args.smoke_test:
         args.generations, args.population, args.bo_init, args.bo_iter = 1, 4, 0, 0
         args.num_evals, args.repeats, args.n_jobs = 1, 1, 2
+        args.val_per_class = 10 if args.val_per_class == 0 else min(args.val_per_class, 10)
     if not 0 <= args.warmup < args.frames or args.frames < 2:
         parser.error("Require 0 <= warmup < frames, frames >= 2.")
-    if min(args.n_jobs, args.train_per_class, args.val_per_class, args.population,
+    if args.val_per_class < 0:
+        parser.error("--val-per-class must be nonnegative; 0 means all validation segments.")
+    if min(args.n_jobs, args.train_per_class, args.population,
            args.num_evals, args.repeats, args.timeout, args.memory_limit, args.min_nodes) <= 0:
         parser.error("Counts and budgets must be positive.")
     if args.population < 4 or min(args.generations, args.bo_init, args.bo_iter) < 0 or args.max_nodes < args.min_nodes:
@@ -85,7 +91,8 @@ def main(argv=None):
     output.mkdir(parents=True, exist_ok=False)
     config = {key: str(value) if isinstance(value, Path) else value for key, value in vars(args).items()}
     config.update(backend="NumPy/SciPy; all main-branch node types available",
-                  selection="Minimum validation 1 - macro F1; main's best-of-num_evals initialization policy.")
+                  selection="Mean validation 1 - macro F1 across fixed initializations; all must succeed.",
+                  selected_model="First predetermined initialization of the winning architecture; no seed selection.")
     (output / "config.json").write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
     data, metadata = load_search_inputs(args.data_dir, args.split_manifest, args.frames, args.seed,
         args.train_per_class, args.val_per_class, args.feature_set)
@@ -127,11 +134,25 @@ def main(argv=None):
         # are evaluated on every segment of the saved ten-subject holdout.
         if test_x is None:
             test_x, test_y, test_records = load_search_test(args.data_dir, metadata)
+        validation_x = data.valX.reshape(-1, args.frames, data.valX.shape[-1])
+        validation_y = data.valY.reshape(-1, args.frames, 5)[:, 0].argmax(axis=1)
+        validation_predicted, _ = predict_segments(ga.bestModel, validation_x, args.warmup)
+        validation_metrics = classification_metrics(validation_y, validation_predicted)
+        validation_subjects = np.asarray([record["subject"] for record in metadata["validation_records"]])
+        validation_by_subject = {
+            subject: classification_metrics(validation_y[validation_subjects == subject],
+                                            validation_predicted[validation_subjects == subject])
+            for subject in sorted(set(validation_subjects.tolist()))}
         predicted, _ = predict_segments(ga.bestModel, test_x, args.warmup)
         best_index = min(range(len(ga.fitnesses)), key=lambda i: ga.fitnesses[i][0])
         result = {"repeat": repeat, "seed": repeat_seed, "search_seconds": elapsed,
-                  "validation_macro_f1": 1.0 - ga.bestFitness[0],
-                  "validation_accuracy": ga.bestFitness[1],
+                  "selection_mean_validation_macro_f1": 1.0 - ga.bestFitness[0],
+                  "selection_mean_validation_accuracy": ga.bestFitness[1],
+                  "validation_macro_f1": validation_metrics["macro_f1"],
+                  "validation_accuracy": validation_metrics["accuracy"],
+                  "validation_segments": len(validation_y),
+                  "validation_by_subject": validation_by_subject,
+                  "selected_model_seed": repeat_seed,
                   "test_metrics": classification_metrics(test_y, predicted),
                   "test_segments": len(test_y), "evaluated_candidates": len(ga.fitnesses),
                   "best_architecture": ga.architectures[best_index]}
@@ -147,7 +168,9 @@ def main(argv=None):
                   "mean_test_macro_f1": float(np.mean([r["test_metrics"]["macro_f1"] for r in results])),
                   "mean_test_accuracy": float(np.mean([r["test_metrics"]["accuracy"] for r in results]))}
         (output / "report.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
-        print(f"Repeat {repeat}: validation F1={result['validation_macro_f1']:.4f}; "
+        print(f"Repeat {repeat}: mean-initialization validation F1="
+              f"{result['selection_mean_validation_macro_f1']:.4f}; "
+              f"selected-model validation F1={result['validation_macro_f1']:.4f}; "
               f"test {result['test_metrics']}", flush=True)
     print(f"Results: {output}")
     return 0

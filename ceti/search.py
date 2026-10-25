@@ -28,6 +28,7 @@ class CetiESNAS(ESNAS):
         train_y = list(data.trainY.reshape(-1, self.frames, 5))
         val_x = data.valX.reshape(-1, self.frames, data.valX.shape[-1])
         attempts = []
+        first_model = None
         for index in range(self.evalParams.numEvals):
             try:
                 rpy.verbosity(0)
@@ -35,15 +36,21 @@ class CetiESNAS(ESNAS):
                 np.random.seed(self.run_seed + index)
                 model = construct_sequence_model(individual)
                 fit_sequences(model, train_x, train_y, self.warmup, self.ridge_passes)
-                snapshot = copy.deepcopy(model)
+                # Retain a predetermined seed, never the luckiest validation
+                # initialization. Snapshot before validation changes its state.
+                if index == 0:
+                    first_model = copy.deepcopy(model)
                 predictions = sequence_scores(model, val_x)
                 errors = [metric(data.valY, predictions) for metric in self.evalParams.errorMetrics]
-                attempts.append((errors, snapshot))
+                if not np.isfinite(errors).all():
+                    raise ValueError("Non-finite validation metrics.")
+                attempts.append(errors)
             except Exception:
-                attempts.append((list(self.evalParams.defaultErrors), None))
-        # Preserve main's best-initialization selection policy.
-        errors, model = min(attempts, key=lambda attempt: attempt[0][0])
-        return individual, errors, model
+                # A fragile architecture must not win through its successful
+                # seeds alone. Every requested initialization must succeed.
+                return individual, list(self.evalParams.defaultErrors), None
+        errors = np.mean(attempts, axis=0).tolist()
+        return individual, errors, first_model
 
     def evaluateParallel(self, population):
         # The default BO point is an additional evaluation, including when

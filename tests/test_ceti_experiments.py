@@ -95,3 +95,42 @@ def test_initial_node_count_range_survives_invalid_architecture_retry(monkeypatc
     architecture = utils.generateRandomArchitectureOld(5, np.zeros((20, 6)), num_nodes_range=(1, 1))
     assert len(attempts) == 2
     assert len(architecture["nodes"]) == 3  # Input, one intermediate node, readout.
+
+
+@pytest.mark.parametrize("failure_at", [None, 0, 1, 2])
+def test_search_averages_initializations_and_keeps_predetermined_seed(monkeypatch, failure_at):
+    from types import SimpleNamespace
+    from ceti import search
+
+    ga = search.CetiESNAS.__new__(search.CetiESNAS)
+    ga.frames, ga.warmup, ga.ridge_passes, ga.run_seed = 2, 0, 1, 42
+    ga.experimentData = SimpleNamespace(trainX=np.zeros((2, 1)), trainY=np.zeros((2, 5)),
+                                        valX=np.zeros((2, 1)), valY=np.zeros((2, 5)))
+    ga.evalParams = SimpleNamespace(numEvals=3, defaultErrors=[1.0, 0.0],
+                                    errorMetrics=[lambda y, p: p, lambda y, p: 1 - p])
+    constructed = []
+
+    def construct(architecture):
+        model = {"index": len(constructed), "validated": False}
+        constructed.append(model)
+        return model
+
+    def scores(model, inputs):
+        if model["index"] == failure_at:
+            raise ValueError("Simulated initialization failure")
+        model["validated"] = True
+        return [0.1, 0.4, 0.7][model["index"]]
+
+    monkeypatch.setattr(search, "construct_sequence_model", construct)
+    monkeypatch.setattr(search, "fit_sequences", lambda *args: None)
+    monkeypatch.setattr(search, "sequence_scores", scores)
+    architecture = {"nodes": [], "edges": []}
+    returned, errors, model = ga.evaluateArchitecture(architecture)
+    assert returned is architecture
+    if failure_at is None:
+        np.testing.assert_allclose(errors, [0.4, 0.6])
+        assert model == {"index": 0, "validated": False}
+        assert len(constructed) == 3
+    else:
+        assert errors == [1.0, 0.0]
+        assert model is None

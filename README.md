@@ -270,22 +270,37 @@ Initial ESNAS defaults (all exposed as CLI options):
 |---|---:|
 | Frames per segment | 20 |
 | Workers (`--n-jobs`) | 20 |
-| Training / validation segments per class | 40 / 10 |
-| Training / validation timestep rows | 4,000 / 1,000 |
+| Training segments per class / validation segments | 40 / all validation-subject segments (964 with the saved split) |
+| Training / validation timestep rows | 4,000 / 19,280 with the saved split |
 | Input columns / one-hot output columns | 102 / 5 |
 | Generations / population | 10 / 20 |
 | BO initial random points / iterations | 0 / 3 |
-| Initializations per candidate / experiment repeats | 3 / 5 |
+| Initializations per candidate / experiment repeats | 3 / 1 |
 | Initial intermediate-node range | 1–2 |
 | Warmup / terminal Ridge fitting passes | 3 / 2 |
 | Time budget per initialization / memory estimate limit | 60 seconds / 756 MiB |
 
 These parameters are initial guesses. All main-branch node types remain
 available, subject to existing validity and memory checks. Fitness minimizes
-`1 - segment macro-F1`, with mean output activity after warmup choosing one
-class per segment. The evaluator resets state and auxiliary history between
-recordings, supports native multiprocessing/checkpoint pickling, and preserves
-main's best-initialization policy. Time budgets are combined across each BO
+the mean `1 - segment macro-F1` across three fixed initializations, with mean
+output activity after warmup choosing one class per segment. All initializations
+must succeed. The saved model uses the first predetermined initialization of
+the winning architecture; validation does not select a lucky seed. Reports
+distinguish the mean search score from that model's own validation score and
+include validation scores per subject. This CeTI policy differs from main's
+best-initialization policy for other experiments.
+
+Validation now uses every recording from the same ten validation subjects,
+instead of just 50 recordings. Training remains at 200 segments and the test
+subject split stays fixed. `--val-per-class 0` selects full validation (the
+default); a positive value restores a smaller balanced subset. The larger
+validation set costs more inference time for each candidate, without increasing
+training rows. It reduces selection noise but cannot guarantee unseen-subject
+performance or eliminate overfitting from repeated searches. The default is one
+complete search; use `--repeats 5` when measuring variability for a settled setup.
+
+The evaluator resets state and auxiliary history between recordings and supports
+native multiprocessing/checkpoint pickling. Time budgets are combined across each BO
 worker's `num_evals * (1 + bo_init + bo_iter)` initializations, including the
 default BO probe. This is a worker-level deadline, not a separate hard timer
 for each individual fit. Test data is loaded after model selection.
@@ -306,7 +321,8 @@ envs\main\Scripts\python experiments\esnas_ceti.py --prepare-only
 envs\main\Scripts\python experiments\svm_ceti.py --frames 20 --smoke-test
 envs\main\Scripts\python experiments\svm_ceti.py --frames 100 --smoke-test
 
-# One generation, four tiny seed architectures, two workers, one repeat.
+# One generation, four tiny seed architectures, two workers, one repeat,
+# with a capped validation subset of 10 segments per class.
 envs\main\Scripts\python experiments\esnas_ceti.py --smoke-test
 ```
 
