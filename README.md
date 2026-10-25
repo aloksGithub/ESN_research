@@ -213,6 +213,211 @@ envs\grid_search\Scripts\python experiments\grid_search.py
 envs\lstm\Scripts\python experiments\lstm.py
 ```
 
+## CeTI-Locomotion SVM and ESNAS experiments
+
+Keep the external dataset at `ceti/CeTI-Locomotion/` (ignored by Git). Copy it
+separately when setting up another PC. Shared data formatting, subject splits,
+sequence handling, and the paper SVM pipeline live in the `ceti/` package:
+
+```text
+ceti/
+  CeTI-Locomotion/    External data and supplied scripts; gitignored
+  data.py            Subject splits, interpolation, flattened/sequence inputs
+  models.py          ESN sequence training, state reset and segment metrics
+  search.py          Sequence evaluator for the existing GA + BO ESNAS engine
+  svm.py             Supplied paper SVM pipeline and fold selection
+```
+
+Use native Windows Python with the main branch dependencies, for example:
+
+```powershell
+py -3.11 -m venv envs\main
+envs\main\Scripts\python -m pip install -r requirements.txt
+```
+
+Run the SVM at either temporal resolution:
+
+```powershell
+envs\main\Scripts\python experiments\svm_ceti.py --frames 20
+envs\main\Scripts\python experiments\svm_ceti.py --frames 100
+```
+
+`--sampling-rate` is an alias for `--frames`: this is the number of interpolated
+frames **per complete motion segment, not Hz**. The SVM preserves the supplied
+`MaxAbsScaler -> PCA() -> SVC(probability=True)` pipeline, stratified ten-fold
+cross-validation by segment, selection by maximum fold balanced accuracy, and
+testing of that fitted fold estimator without refitting. It reads TSV values
+as float32 before interpolation, like the supplied code. Default training uses
+all segments from the 40 non-test subjects. Use `--training-subset small` to
+train on the same class/subject-balanced subset used by ESNAS. `--n-jobs`
+controls SVM CV workers and defaults to one, like the supplied code.
+
+The shared test subjects come from the explicit manifest at
+`results/ceti_timing/subject_split.json`; copy that file to the other PC to
+preserve the split. If absent, the loader creates it deterministically. These
+are our saved test IDs, not the paper's undocumented original selection.
+Neither the SVM pipeline nor the ESNAS search fits preprocessing using tests.
+
+The ESNAS entry point is intended for the experiment PC:
+
+```powershell
+envs\main\Scripts\python experiments\esnas_ceti.py
+```
+
+Initial ESNAS defaults (all exposed as CLI options):
+
+| Parameter | Default |
+|---|---:|
+| Frames per segment | 20 |
+| Workers (`--n-jobs`) | 20 |
+| Training / validation segments per class | 40 / 10 |
+| Training / validation timestep rows | 4,000 / 1,000 |
+| Input columns / one-hot output columns | 102 / 5 |
+| Generations / population | 10 / 20 |
+| BO initial random points / iterations | 0 / 3 |
+| Initializations per candidate / experiment repeats | 3 / 5 |
+| Initial intermediate-node range | 1–2 |
+| Warmup / terminal Ridge fitting passes | 3 / 2 |
+| Time budget per initialization / memory estimate limit | 60 seconds / 756 MiB |
+
+These parameters are initial guesses. All main-branch node types remain
+available, subject to existing validity and memory checks. Fitness minimizes
+`1 - segment macro-F1`, with mean output activity after warmup choosing one
+class per segment. The evaluator resets state and auxiliary history between
+recordings, supports native multiprocessing/checkpoint pickling, and preserves
+main's best-initialization policy. Time budgets are combined across each BO
+worker's `num_evals * (1 + bo_init + bo_iter)` initializations, including the
+default BO probe. This is a worker-level deadline, not a separate hard timer
+for each individual fit. Test data is loaded after model selection.
+
+Outputs are saved in new directories under `results/svm_ceti/` and
+`results/esnas_ceti/`. ESNAS writes per-repeat checkpoints, validation/test
+metrics, best architectures and predictions. The SVM writes fold scores,
+selected-fold metadata and test predictions; `--save-model` also saves its
+selected pipeline.
+
+Use these explicitly bounded checks rather than launching the full search:
+
+```powershell
+# Data/configuration only; constructs no ESNAS population or models.
+envs\main\Scripts\python experiments\esnas_ceti.py --prepare-only
+
+# Two CV folds on 20 training segments; not a baseline result.
+envs\main\Scripts\python experiments\svm_ceti.py --frames 20 --smoke-test
+envs\main\Scripts\python experiments\svm_ceti.py --frames 100 --smoke-test
+
+# One generation, four tiny seed architectures, two workers, one repeat.
+envs\main\Scripts\python experiments\esnas_ceti.py --smoke-test
+```
+
+## CeTI-Locomotion CPU timing pilot
+
+`experiments/ceti_esn_timing.py` measures a bounded set of ESN profiles without
+running GA/BO search or evaluating test subjects. It uses the main branch's
+NumPy/SciPy backend and constructors, including Reservoir, IPReservoir, NVAR,
+Ridge, LMS, and RLS. Use the native Windows environment `envs/main` (Python
+3.11.9, with this branch's pinned `requirements.txt`); the existing WSL `.venv`
+belongs to a different backend.
+
+```powershell
+envs\main\Scripts\python experiments\ceti_esn_timing.py --repeats 1 --timeout 20 --max-seconds 180
+```
+
+Defaults select 40 complete segments per activity for training and 10 per
+activity for validation, resampled to 20 frames: **4,000 training and 1,000
+validation timesteps**, with five one-hot targets. Sampling spreads segments
+across subjects. The full 102 input columns and the six bilateral hip/knee/ankle
+angles (`leg6`) use the same segments. Scaling is fitted only on training data.
+The first run saves explicit subject IDs in
+`results/ceti_timing/subject_split.json`: 30 training, 10 validation, and 10
+reserved test subjects. This reproducible split is **not claimed to reproduce
+the paper's test IDs**. Subsequent runs reuse it. Test motion contents are not
+loaded.
+
+Each trial runs in a separate process with a wall-clock timeout. Reports record
+construction, fitting (including lazy initialization), model-copy, validation,
+and process times; validation accuracy/F1 are sanity checks on this tiny subset.
+State is reset per segment, including the auxiliary NVAR/IP history that
+ReservoirPy 0.3's ordinary reset does not clear. The timing adapter preserves
+main's two terminal-Ridge fitting passes, with a three-frame warmup appropriate
+for these short recordings. Existing training functions are not modified.
+
+Useful variations:
+
+```powershell
+# Check only the subset/split, without constructing models.
+envs\main\Scripts\python experiments\ceti_esn_timing.py --prepare-only
+
+# Measure worker contention, with two initializations per profile.
+envs\main\Scripts\python experiments\ceti_esn_timing.py --workers 4 --repeats 2
+
+# Include heavier IP, RLS, Ridge and nonlinear-expansion profiles.
+envs\main\Scripts\python experiments\ceti_esn_timing.py --cases ip512_ridge ip1500_ridge reservoir2000_ridge reservoir400_rls nvar3_ridge --workers 4 --repeats 1
+
+# Keep six channels and increase the data budget to 10,000 / 2,000 timesteps.
+envs\main\Scripts\python experiments\ceti_esn_timing.py --feature-sets leg6 --train-per-class 100 --val-per-class 20
+
+# Select exact channels, or retain only particular profiles.
+envs\main\Scripts\python experiments\ceti_esn_timing.py --feature-sets LeftHip_flexion,RightHip_flexion --cases nvar_ridge reservoir256_rls
+```
+
+Each run creates a new directory under `results/ceti_timing/` containing
+`config.json`, `subset.json`, `subset.npz`, `trials.jsonl`, `timings.csv`, and
+`report.json`. The subset manifest identifies every selected segment. Reports
+retain failed/timed-out cases, and preflight skips allocations exceeding the
+existing ESNAS memory/readout-width limits (notably NVAR on all 102 channels).
+The nominal search projection includes the initial population, the default BO
+probe, all initialization attempts, and five repeats. Its ideal parallel times
+exclude overhead, contention, stagnation resets, and unmeasured architectures;
+they are illustrative rather than a full-search runtime prediction. Increase
+`--timeout` for censored cases before drawing conclusions about their speed.
+
+The supplied SVM code actually selects the best scoring inner-fold estimator,
+without refitting. Its subject split uses `list(set(participant_ids))`, so the
+NumPy seed alone does not identify a portable paper test split. The pilot does
+not execute that cross-validation pipeline or attempt to recover undocumented
+test IDs.
+
+Focused checks:
+
+```powershell
+envs\main\Scripts\python -m pytest tests\test_ceti_timing.py -q --basetemp .cache\ceti-tests
+```
+
+The native environment's resolved dependency versions are recorded in
+`envs/main/requirements.freeze.txt`, and each timing run records its core package
+versions and Python executable in `config.json`.
+
+## CeTI-Locomotion full-holdout feasibility check
+
+After the timing pilot, train fixed slower profiles on exactly the saved
+4,000-row training subset and evaluate every segment of the reserved subjects:
+
+```powershell
+envs\main\Scripts\python experiments\ceti_esn_test.py
+```
+
+Defaults are five random initializations each of Reservoir 2000 + Ridge and
+IPReservoir 1500 + Ridge, all 102 input columns, and four CPU workers. The
+training subset, scaling, three-frame warmup, two Ridge passes and 20-frame
+segment representation come from `results/ceti_timing/stress_pilot`. No
+validation examples are added to training. The same explicit ten-subject
+holdout is used; all of its motion segments are loaded, not a small test sample.
+Training has a 60-second timeout per model, with a separate 180-second allowance
+for full-test inference. A ten-minute overall budget bounds the batch.
+
+Profiles and seeds are saved before test motions are loaded. The report keeps
+every model, per-class metrics, per-subject metrics and per-segment predictions;
+it does not choose the best test-scoring model. This is a feasibility check,
+not an ESNAS search or reproduction of the paper's undocumented test IDs.
+Any subsequent optimization should use validation, not these test scores.
+
+Outputs under `results/ceti_test/` include `plan.json`, the exact subset and
+holdout manifest, `models.csv`, `report.json`, `summary.txt`, and a `predictions/`
+folder. Training-data fractions use complete segments as well as timestep
+counts at the same resampling resolution, avoiding confusion between the
+pilot's 20 frames and the supplied SVM's 100 frames per segment.
+
 ## Notes
 
 - Commands assume the current working directory is the repository root.

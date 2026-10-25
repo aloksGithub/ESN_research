@@ -360,7 +360,7 @@ def generateRandomArchitectureOld(
         return architecture
     else:
         return generateRandomArchitectureOld(
-            outputDim, sampleInput, memoryLimit
+            outputDim, sampleInput, memoryLimit, num_nodes_range=num_nodes_range
         )
 
 def evaluateArchitecture(

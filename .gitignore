@@ -131,3 +131,6 @@ dmypy.json
 
 grid_search/dataverse_files/MG2021
 pat_test
+
+# Raw and processed external CeTI-Locomotion data (at any folder depth).
+CeTI-Locomotion/

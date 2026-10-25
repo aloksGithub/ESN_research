@@ -8,7 +8,6 @@ from ..algorithms.GA_Base import GA_Base
 from ..algorithms.types import EvalParams, ExperimentData, GAParams, ModelParams
 from ..parallel_processing import executeParallelBatch
 from ..utils import (
-    evaluateArchitecture,
     isValidArchitecture,
     nodeParameterRanges,
 )
@@ -91,17 +90,9 @@ class ESNAS(GA_Base):
             )
 
             if is_valid:
-                currIndividual, errors, model = evaluateArchitecture(
-                    modifiedArchitecture,
-                    self.experimentData.trainX,
-                    self.experimentData.trainY,
-                    self.experimentData.valX,
-                    self.experimentData.valY,
-                    self.evalParams.numEvals,
-                    self.evalParams.errorMetrics,
-                    self.evalParams.defaultErrors,
-                    self.evalParams.isAutoRegressive,
-                )
+                # GA_Base supplies the existing evaluator. Dataset adapters
+                # can override it without duplicating the BO search logic.
+                currIndividual, errors, model = self.evaluateArchitecture(modifiedArchitecture)
             else:
                 currIndividual = modifiedArchitecture
                 errors = self.evalParams.defaultErrors
