@@ -52,7 +52,8 @@ def main(argv=None):
     parser.add_argument("--split-manifest", type=Path, default=DEFAULT_SPLIT)
     parser.add_argument("--output-dir", type=Path)
     parser.add_argument("--seed", type=int, default=1234123123)
-    parser.add_argument("--train-per-class", type=int, default=40)
+    parser.add_argument("--train-per-class", type=int, default=100,
+                        help="Training segments/class; default 100 gives 10,000 rows at 20 frames.")
     parser.add_argument("--val-per-class", type=int, default=0,
                         help="Validation segments/class; 0 (default) uses all validation-subject segments.")
     parser.add_argument("--feature-set", default="all", help="all, leg6 or comma-separated exact column names.")
@@ -77,6 +78,7 @@ def main(argv=None):
     if args.smoke_test:
         args.generations, args.population, args.bo_init, args.bo_iter = 1, 4, 0, 0
         args.num_evals, args.repeats, args.n_jobs = 1, 1, 2
+        args.train_per_class = min(args.train_per_class, 40)
         args.val_per_class = 10 if args.val_per_class == 0 else min(args.val_per_class, 10)
     if not 0 <= args.warmup < args.frames or args.frames < 2:
         parser.error("Require 0 <= warmup < frames, frames >= 2.")

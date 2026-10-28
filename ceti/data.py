@@ -222,7 +222,7 @@ def load_svm_test(dataset_root, metadata):
 
 
 def load_search_inputs(dataset_root, manifest_path, frames=20, seed=1234123123,
-                       train_per_class=40, val_per_class=0, feature_set="all"):
+                       train_per_class=100, val_per_class=0, feature_set="all"):
     """Flattened arrays for ESNAS bookkeeping, with explicit segment boundaries."""
     from src.algorithms.types import ExperimentData
 

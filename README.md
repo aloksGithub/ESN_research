@@ -264,14 +264,14 @@ The ESNAS entry point is intended for the experiment PC:
 envs\main\Scripts\python experiments\esnas_ceti.py
 ```
 
-Initial ESNAS defaults (all exposed as CLI options):
+Current ESNAS defaults (all exposed as CLI options):
 
 | Parameter | Default |
 |---|---:|
 | Frames per segment | 20 |
 | Workers (`--n-jobs`) | 20 |
-| Training segments per class / validation segments | 40 / all validation-subject segments (964 with the saved split) |
-| Training / validation timestep rows | 4,000 / 19,280 with the saved split |
+| Training segments per class / validation segments | 100 / all validation-subject segments (964 with the saved split) |
+| Training / validation timestep rows | 10,000 / 19,280 with the saved split |
 | Input columns / one-hot output columns | 102 / 5 |
 | Generations / population | 10 / 20 |
 | BO initial random points / iterations | 0 / 3 |
@@ -291,8 +291,12 @@ include validation scores per subject. This CeTI policy differs from main's
 best-initialization policy for other experiments.
 
 Validation now uses every recording from the same ten validation subjects,
-instead of just 50 recordings. Training remains at 200 segments and the test
-subject split stays fixed. `--val-per-class 0` selects full validation (the
+instead of just 50 recordings. Training now uses 500 segments, following the
+fixed-ESN learning curve's runtime check at 10,000 rows; the test subject split
+stays fixed. The fixed 2,000-unit Reservoir + Ridge averaged about 22 seconds
+to fit at this size with one worker. Search architectures and 20-worker
+contention can change that timing. `--train-per-class 40` restores the earlier
+200-segment setup. `--val-per-class 0` selects full validation (the
 default); a positive value restores a smaller balanced subset. The larger
 validation set costs more inference time for each candidate, without increasing
 training rows. It reduces selection noise but cannot guarantee unseen-subject
@@ -433,6 +437,38 @@ holdout manifest, `models.csv`, `report.json`, `summary.txt`, and a `predictions
 folder. Training-data fractions use complete segments as well as timestep
 counts at the same resampling resolution, avoiding confusion between the
 pilot's 20 frames and the supplied SVM's 100 frames per segment.
+
+## CeTI fixed-ESN validation learning curve
+
+To check whether more training data helps before paying for another ESNAS
+search, run the fixed Reservoir 2000 + Ridge profile from the feasibility pilot:
+
+```powershell
+envs\main\Scripts\python experiments\ceti_esn_learning_curve.py
+```
+
+Defaults are 40, 100 and 200 complete segments per class (4,000, 10,000 and
+20,000 training timesteps at 20 frames/segment), all 102 input columns, and
+three paired reservoir seeds. The smallest subset matches the pilot sampler;
+larger subsets retain those recordings and append balanced additions. Every
+model is evaluated on all 964 validation segments from the existing ten
+validation subjects. Scaling uses the corresponding training subset only.
+No test motion data is read and no architecture or hyperparameter search runs.
+
+One worker runs at a time by default for comparable fitting times. Each complete
+trial has a 180-second timeout, and the trial batch has a 20-minute wall-clock
+budget. This fixed-profile experiment allows 2,048 MiB estimated memory: the
+20,000-row profile needs about 1,347 MiB under the existing estimator, exceeding
+ESNAS's current 756 MiB default. The report flags that difference and counts
+fits completing within 60 seconds. These are local timings, not projections
+for 20 concurrent workers.
+
+Options include `--train-sizes 40 100 200`, `--repeats 3`, `--workers 1`,
+`--timeout 180`, and `--prepare-only`. Outputs under `results/ceti_learning_curve/`
+contain exact subset manifests and caches, per-trial timing/validation results,
+paired score changes, `report.json`, and `summary.txt`. Validation scores here
+must not be compared directly with earlier test scores; seed variation does
+not measure uncertainty across subject splits.
 
 ## Notes
 
