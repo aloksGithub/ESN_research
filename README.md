@@ -282,8 +282,8 @@ Current ESNAS defaults (all exposed as CLI options):
 | Training / validation timestep rows | 10,000 / 19,280 with the saved split |
 | Input columns / one-hot output columns | 102 / 5 |
 | Generations / population | 10 / 20 |
-| BO initial random points / iterations | 0 / 3 |
-| Initializations per candidate / experiment repeats | 3 / 1 |
+| BO initial random points / iterations | 0 / 6 |
+| Initializations per candidate / experiment repeats | 3 / 5 |
 | Initial intermediate-node range | 1–2 |
 | Warmup / terminal Ridge fitting passes | 3 / 2 |
 | Time budget per initialization / memory estimate limit | 60 seconds / 756 MiB |
@@ -308,8 +308,13 @@ contention can change that timing. `--train-per-class 40` restores the earlier
 default); a positive value restores a smaller balanced subset. The larger
 validation set costs more inference time for each candidate, without increasing
 training rows. It reduces selection noise but cannot guarantee unseen-subject
-performance or eliminate overfitting from repeated searches. The default is one
-complete search; use `--repeats 5` when measuring variability for a settled setup.
+performance or eliminate overfitting from repeated searches. The default is now
+five complete independent searches with six BO iterations each, following the
+reported 0.79 test F1 from the earlier one-search, three-iteration setup.
+The default probe makes seven BO evaluations per architecture instead of four.
+Together with five repeats this is 8.75 times the nominal model-fit budget of
+the earlier run; actual runtime depends on failures, contention and search
+overhead. Use `--bo-iter 3 --repeats 1` to restore that earlier search budget.
 
 The evaluator resets state and auxiliary history between recordings and supports
 native multiprocessing/checkpoint pickling. Time budgets are combined across each BO

@@ -62,11 +62,12 @@ def main(argv=None):
     parser.add_argument("--generations", type=int, default=10)
     parser.add_argument("--population", type=int, default=20)
     parser.add_argument("--bo-init", type=int, default=0)
-    parser.add_argument("--bo-iter", type=int, default=3)
+    parser.add_argument("--bo-iter", type=int, default=6,
+                        help="BO iterations after the default probe and random initial points.")
     parser.add_argument("--num-evals", type=int, default=3,
                         help="Fixed initializations/candidate; architecture fitness averages their metrics.")
-    parser.add_argument("--repeats", type=int, default=1,
-                        help="Independent complete searches; default 1 for exploration.")
+    parser.add_argument("--repeats", type=int, default=5,
+                        help="Independent complete searches; default 5 to measure variability.")
     parser.add_argument("--timeout", type=float, default=60,
                         help="Seconds/initialization budget, multiplied across each BO worker's evaluations.")
     parser.add_argument("--memory-limit", type=float, default=756)

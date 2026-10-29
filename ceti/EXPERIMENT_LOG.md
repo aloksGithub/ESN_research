@@ -25,7 +25,8 @@ have not been collected in this workspace. Approximate numbers remain approximat
 | Fixed ESN learning curve, middle set | 500 segments, 10,000 rows | All 964 validation segments | 0.8187 +/- 0.0090 | Local, three seeds |
 | Fixed ESN learning curve, largest set | 1,000 segments, 20,000 rows | All 964 validation segments | 0.8492 +/- 0.0035 | Local, three seeds |
 | ESNAS with 10,000 training rows | 500 segments | Our complete test holdout | Approximately 0.79 | User-reported, one search; raw report not collected |
-| SVM, matched 500-segment pool | 500-segment pool, 20 frames/segment | Planned complete test holdout | **Pending** | New defaults configured; no benchmark result yet |
+| ESNAS, increased BO and five searches | 500 segments, 10,000 rows | Planned complete test holdout | **Pending** | Six BO iterations, five complete searches; preparation only |
+| SVM, matched 500-segment pool | 500-segment pool, 20 frames/segment | Our complete test holdout | 0.813951 | User-provided console screenshot; selected fold 6 |
 
 Values with `+/-` are means and sample standard deviations across reservoir
 initializations, not confidence intervals or uncertainty across subject splits.
@@ -371,8 +372,11 @@ and [data manifest](../results/esnas_ceti/ten_thousand_rows_prepare/data.json).
 Run on the experiment PC:
 
 ```powershell
-python experiments/esnas_ceti.py
+python experiments/esnas_ceti.py --bo-iter 3 --repeats 1
 ```
+
+The explicit flags preserve this historical search budget after the later
+default change described in entry 9.
 
 **User-reported outcome:** the new ESNAS experiment achieved macro-F1 **0.79**,
 reported in the context of the test comparison. Its full remote report,
@@ -389,11 +393,12 @@ across runs, not paired estimates of a causal improvement.
 **Finding:** the larger-training ESNAS run is more promising. However, it uses
 more recordings than the earlier 200-segment SVM and fixed-ESN test experiments.
 The fixed-ESN learning curve at 500 segments measured validation, not test F1.
-An SVM and fixed ESN using the same 500 training recordings are needed to
-separate the benefit of architecture search from the benefit of more data.
-One search also does not establish variability across search seeds.
+The matched-pool SVM comparison is now recorded in entry 8; a fixed-ESN test
+comparison using the same 500 training recordings remains outstanding. These
+controls help separate the benefit of architecture search from the benefit of
+more data. One search also does not establish variability across search seeds.
 
-## 8. Next SVM comparison: same 500-segment pool as ESNAS
+## 8. Matched 500-segment SVM: test macro-F1 0.813951
 
 After clarification, only the SVM experiment was changed for the next run;
 ESNAS already uses 500 training segments and remains at that size. SVM script
@@ -422,11 +427,77 @@ python experiments/svm_ceti.py --training-subset full --frames 20
 python experiments/svm_ceti.py --training-subset small --train-per-class 40 --frames 20
 ```
 
-**Status:** this 500-segment SVM benchmark has no reported result yet. No new
-full SVM benchmark or full ESNAS search was launched during this update.
 Local [data-only preparation](../results/svm_ceti/matched_500_prepare/data.json)
 confirmed `(500, 2040)` SVM inputs; its training records exactly matched the
 saved 10,000-row ESNAS preparation manifest, and test contents remained unread.
+
+**User-provided result, 2026-10-30:** a console screenshot from the experiment
+PC confirms 500 input segments, 2,040 features, 20 frames per segment, and
+evaluation on all 915 held-out test segments. The selected fold was **6**
+(one-based console numbering).
+
+| Metric | Reported value |
+|---|---:|
+| Selected-fold validation balanced accuracy | 0.9200 |
+| Test accuracy | 0.8010928961748633 |
+| Test balanced accuracy | 0.814394675552499 |
+| Test macro-F1 | **0.8139508398439534** |
+
+The validation score is balanced accuracy on the selected CV fold, not
+macro-F1 on ESNAS's 964-segment validation set. It must not be compared
+directly with ESNAS's validation F1.
+
+The screenshot identifies the remote results directory as
+`C:\Users\admin\Desktop\ESN_research\results\svm_ceti\20261030_050631_389745`.
+Its raw `config.json`, `report.json`, and predictions have not been copied
+into this workspace; exact metrics above were transcribed from the console.
+Matching of the remote recording IDs still depends on the shared configuration;
+the local preparation check alone does not verify the remote manifest.
+
+**Finding:** the SVM's test macro-F1 is approximately **0.024 higher** than the
+reported ESNAS score of 0.79, at the same configured 500-segment pool size and
+20-frame representation. This is a close exploratory comparison, but there
+is no demonstrated ESNAS advantage yet. The SVM retains a 450-segment fold
+estimator; ESNAS fits all 500 segments and uses a separate subject-disjoint
+validation cohort. The stronger-BO, five-search ESNAS experiment in entry 9
+is the next planned comparison; no results from that budget have been reported.
+
+## 9. Increased BO budget and five independent searches
+
+Following the 0.79 result, the requested next ESNAS experiment increases BO
+iterations from **3 to 6** and complete independent searches from **1 to 5**.
+These are now the defaults in [esnas_ceti.py](../experiments/esnas_ceti.py).
+
+```powershell
+python experiments/esnas_ceti.py
+
+# Equivalent explicit search-budget settings:
+python experiments/esnas_ceti.py --bo-iter 6 --repeats 5
+```
+
+Training remains 100 segments/class (500 segments; 10,000 timestep rows), with
+20 frames, all 102 inputs, all 964 validation segments, the same test subject
+split, 20 workers, population 20, 10 generations, and three initializations per
+candidate. Initialization losses are still averaged, and the first prescribed
+initialization of the winning architecture is saved. The nominal per-fit time
+budget and estimated-memory limit remain 60 seconds and 756 MiB.
+
+BO still uses zero random initial points. Including the default probe, each
+architecture gets seven BO evaluations instead of four. Five searches therefore
+use **8.75 times the nominal model-fit budget** of the earlier single search;
+this is a budget ratio, not a measured runtime prediction. Worker deadlines
+automatically scale to `60 * 3 * 7 = 1260` seconds across each worker's requested
+initializations and BO evaluations. The five searches use seeds `1234123123`,
+`1234124123`, `1234125123`, `1234126123`, and `1234127123`; training/validation
+recordings are shared across repeats.
+
+**Status:** configured for the experiment PC. No completed results for this
+expanded budget have been reported, and no full search was launched locally.
+Data-only preparation verified the new defaults and preserved the existing
+training and validation recordings:
+[configuration](../results/esnas_ceti/bo6_five_repeats_prepare/config.json) and
+[data manifest](../results/esnas_ceti/bo6_five_repeats_prepare/data.json).
+The historical 0.79 result remains a single-search result at three BO iterations.
 
 ## Implementation checks, separate from scientific results
 
@@ -462,7 +533,9 @@ not establish Python 3.9 compatibility.
    fixed-ESN validation curve. Different validation procedures, representations,
    and subject cohorts prevent attributing the entire gap to data size alone.
 4. The 10,000-row search now has a user-reported test macro-F1 of 0.79.
-   The next SVM comparison uses the same 500-segment pool and is pending.
+   The SVM comparison at the same configured 500-segment pool size achieved
+   test macro-F1 0.813951, approximately 0.024 higher. The six-BO-iteration,
+   five-search ESNAS experiment remains pending.
    A fixed-ESN test comparison at that size also remains outstanding. Repeated use
    of this test holdout for development means these scores are exploratory,
    rather than a fresh untouched final evaluation.
