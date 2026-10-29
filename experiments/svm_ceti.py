@@ -23,15 +23,17 @@ from ceti.svm import classification_metrics, fit_paper_svm, paper_pipeline
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--frames", "--sampling-rate", type=int, default=100,
+    parser.add_argument("--frames", "--sampling-rate", type=int, default=20,
                         help="Interpolated frames per complete motion, not Hz (paper: 100).")
     parser.add_argument("--data-dir", type=Path, default=DEFAULT_DATA_DIR)
     parser.add_argument("--split-manifest", type=Path, default=DEFAULT_SPLIT)
     parser.add_argument("--output-dir", type=Path)
     parser.add_argument("--seed", type=int, default=1234123123)
     parser.add_argument("--n-jobs", type=int, default=1, help="Parallel CV folds; default serial like supplied code.")
-    parser.add_argument("--training-subset", choices=("full", "small"), default="full")
-    parser.add_argument("--train-per-class", type=int, default=40, help="Only used with --training-subset small.")
+    parser.add_argument("--training-subset", choices=("full", "small"), default="small",
+                        help="small (default): ESNAS's sampled training pool; full: all 40 non-test subjects.")
+    parser.add_argument("--train-per-class", type=int, default=100,
+                        help="Segments/class for small mode; default 100 gives the same 500-segment pool as ESNAS.")
     parser.add_argument("--cv-folds", type=int, default=10)
     parser.add_argument("--prepare-only", action="store_true")
     parser.add_argument("--save-model", action="store_true")
@@ -65,6 +67,7 @@ def main(argv=None):
     report.update(test_seconds=time.perf_counter() - start,
                   test_metrics=classification_metrics(test_y, predicted),
                   test_segments=len(test_y), train_segments=len(train_y),
+                  selected_model_fit_segments=int(model["clf"].shape_fit_[0]),
                   pca_components=int(model["pca"].n_components_),
                   qualification="Shared explicit holdout, not the recovered paper test IDs. "
                     "20-frame runs change only temporal representation; full mode keeps the paper's 40-subject pool.")
