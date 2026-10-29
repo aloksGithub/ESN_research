@@ -235,11 +235,15 @@ py -3.11 -m venv envs\main
 envs\main\Scripts\python -m pip install -r requirements.txt
 ```
 
-Run the SVM at either temporal resolution:
+The SVM now defaults to the same 500-segment training pool and 20 frames per
+segment as the latest ESNAS experiment:
 
 ```powershell
-envs\main\Scripts\python experiments\svm_ceti.py --frames 20
-envs\main\Scripts\python experiments\svm_ceti.py --frames 100
+envs\main\Scripts\python experiments\svm_ceti.py
+
+# Earlier full-cohort baseline, at either temporal resolution:
+envs\main\Scripts\python experiments\svm_ceti.py --training-subset full --frames 20
+envs\main\Scripts\python experiments\svm_ceti.py --training-subset full --frames 100
 ```
 
 `--sampling-rate` is an alias for `--frames`: this is the number of interpolated
@@ -248,8 +252,12 @@ frames **per complete motion segment, not Hz**. The SVM preserves the supplied
 cross-validation by segment, selection by maximum fold balanced accuracy, and
 testing of that fitted fold estimator without refitting. It reads TSV values
 as float32 before interpolation, like the supplied code. Default training uses
-all segments from the 40 non-test subjects. Use `--training-subset small` to
-train on the same class/subject-balanced subset used by ESNAS. `--n-jobs`
+100 segments per class from the 30 training subjects (500 segments total),
+sampled with the same seed and rule as ESNAS. The pool therefore has 500
+flattened sample rows and 2,040 input columns; each CV fold fits 450 segments,
+and the selected estimator is not refitted on all 500. Use
+`--training-subset small --train-per-class 40` for the earlier 200-segment
+comparison or `--training-subset full` for all 40 non-test subjects. `--n-jobs`
 controls SVM CV workers and defaults to one, like the supplied code.
 
 The shared test subjects come from the explicit manifest at

@@ -1,6 +1,6 @@
 # CeTI-Locomotion experiment log
 
-Last updated: 2026-10-29.
+Last updated: 2026-10-30.
 
 This log records the experiments run during the CeTI investigation, their
 results, and the changes made in response. Entries follow the order of the
@@ -24,7 +24,8 @@ have not been collected in this workspace. Approximate numbers remain approximat
 | Fixed ESN learning curve, smallest set | 200 segments, 4,000 rows | All 964 validation segments | 0.7700 +/- 0.0124 | Local, three seeds |
 | Fixed ESN learning curve, middle set | 500 segments, 10,000 rows | All 964 validation segments | 0.8187 +/- 0.0090 | Local, three seeds |
 | Fixed ESN learning curve, largest set | 1,000 segments, 20,000 rows | All 964 validation segments | 0.8492 +/- 0.0035 | Local, three seeds |
-| ESNAS with 10,000 training rows | 500 segments | Data preparation only | **No search result yet** | Local preparation verified |
+| ESNAS with 10,000 training rows | 500 segments | Our complete test holdout | Approximately 0.79 | User-reported, one search; raw report not collected |
+| SVM, matched 500-segment pool | 500-segment pool, 20 frames/segment | Planned complete test holdout | **Pending** | New defaults configured; no benchmark result yet |
 
 Values with `+/-` are means and sample standard deviations across reservoir
 initializations, not confidence intervals or uncertainty across subject splits.
@@ -223,10 +224,12 @@ without a final refit. Scaling and PCA are fitted inside each fold.
 ### Full development cohort
 
 ```powershell
-python experiments/svm_ceti.py --frames 20
+python experiments/svm_ceti.py --training-subset full --frames 20
 ```
 
-Uses all 3,757 segments from the 40 non-test subjects as the CV pool, including
+The original run used `--frames 20` while full-cohort mode was the default.
+The explicit command above reproduces that choice after the default change.
+It uses all 3,757 segments from the 40 non-test subjects as the CV pool, including
 the ten subjects used as separate validation subjects by ESNAS. Each fold fits
 approximately 90% of that pool. The selected fold estimator evaluates all
 915 held-out test segments.
@@ -329,12 +332,12 @@ the existing estimator; it would be rejected by the current search limit.
 Memory estimates are not measured peak RAM. Single-worker timings do not
 predict timings or total memory with 20 concurrent workers.
 
-## 7. Current ESNAS configuration: prepared, search result pending
+## 7. ESNAS with 10,000 training rows: reported macro-F1 0.79
 
 Following the learning curve, defaults in
 [esnas_ceti.py](../experiments/esnas_ceti.py) and its data loader were updated:
 
-| Setting | Current default |
+| Setting | Script defaults provided for this run |
 |---|---|
 | Training | 100 segments/class; 500 total; 10,000 timestep rows |
 | Validation | All 964 segments from the ten validation subjects; 19,280 rows |
@@ -371,9 +374,59 @@ Run on the experiment PC:
 python experiments/esnas_ceti.py
 ```
 
-**Status:** the 10,000-row ESNAS search has been configured and prepared, but
-no completed result has been reported in this log. No full 20-worker ESNAS
-search was launched on the local PC.
+**User-reported outcome:** the new ESNAS experiment achieved macro-F1 **0.79**,
+reported in the context of the test comparison. Its full remote report,
+validation score, selected architecture, runtime, and effective configuration
+have not been collected locally. The settings above describe the script
+provided for this run, rather than independently verified remote overrides.
+No full 20-worker ESNAS search was launched on the local PC.
+
+This is approximately 0.108 above the preceding 4,000-row run (0.682), 0.074
+above the original five-search mean (approximately 0.716), and 0.06 below the
+full-cohort SVM result (approximately 0.85). These are exploratory comparisons
+across runs, not paired estimates of a causal improvement.
+
+**Finding:** the larger-training ESNAS run is more promising. However, it uses
+more recordings than the earlier 200-segment SVM and fixed-ESN test experiments.
+The fixed-ESN learning curve at 500 segments measured validation, not test F1.
+An SVM and fixed ESN using the same 500 training recordings are needed to
+separate the benefit of architecture search from the benefit of more data.
+One search also does not establish variability across search seeds.
+
+## 8. Next SVM comparison: same 500-segment pool as ESNAS
+
+After clarification, only the SVM experiment was changed for the next run;
+ESNAS already uses 500 training segments and remains at that size. SVM script
+and loader defaults are now `--frames 20 --training-subset small
+--train-per-class 100`. Both use the same subject split, sampling rule and seed.
+
+```powershell
+python experiments/svm_ceti.py
+```
+
+The SVM receives 500 rows of 2,040 flattened features, representing the same
+10,000 timestep rows used by ESNAS. It keeps the supplied SVM pipeline and
+best-fold selection: ten-fold CV trains 450 segments per fold and retains the
+selected fold model without refitting. This matches the available recording
+pool, but not the exact fitted sample count or validation procedure of ESNAS.
+Reports now include `selected_model_fit_segments` to make that difference
+explicit. Test evaluation still uses all 915 held-out segments.
+
+To rerun the earlier controls with the new defaults:
+
+```powershell
+# Full non-test cohort, matching the reported approximately 0.85 result:
+python experiments/svm_ceti.py --training-subset full --frames 20
+
+# Earlier 200-segment pool, matching the reported approximately 0.74 result:
+python experiments/svm_ceti.py --training-subset small --train-per-class 40 --frames 20
+```
+
+**Status:** this 500-segment SVM benchmark has no reported result yet. No new
+full SVM benchmark or full ESNAS search was launched during this update.
+Local [data-only preparation](../results/svm_ceti/matched_500_prepare/data.json)
+confirmed `(500, 2040)` SVM inputs; its training records exactly matched the
+saved 10,000-row ESNAS preparation manifest, and test contents remained unread.
 
 ## Implementation checks, separate from scientific results
 
@@ -408,10 +461,11 @@ not establish Python 3.9 compatibility.
 3. More training data helped both the reported SVM test comparison and the
    fixed-ESN validation curve. Different validation procedures, representations,
    and subject cohorts prevent attributing the entire gap to data size alone.
-4. The next configured search uses 10,000 training rows. Its validation and
-   test outcomes remain to be measured; repeated use of this test holdout for
-   development means future scores are exploratory, rather than a fresh
-   untouched final evaluation.
+4. The 10,000-row search now has a user-reported test macro-F1 of 0.79.
+   The next SVM comparison uses the same 500-segment pool and is pending.
+   A fixed-ESN test comparison at that size also remains outstanding. Repeated use
+   of this test holdout for development means these scores are exploratory,
+   rather than a fresh untouched final evaluation.
 5. Collect the remote SVM and ESNAS `config.json`, `report.json`, and prediction
    files to replace approximate numbers and verify exact settings. Local
    artifact links depend on keeping the corresponding `results/` directories;

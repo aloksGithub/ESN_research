@@ -185,11 +185,11 @@ def select_and_scale(arrays, columns, feature_set):
     return train_x / scale, val_x / scale, selected, scale
 
 
-def load_svm_inputs(dataset_root, manifest_path, frames=100, seed=1234123123,
-                    training_subset="full", train_per_class=40):
+def load_svm_inputs(dataset_root, manifest_path, frames=20, seed=1234123123,
+                    training_subset="small", train_per_class=100):
     """Paper-format flattened segments, unscaled: scaling belongs inside CV.
 
-    Full mode uses all 40 non-test subjects. Small mode reuses the pilot's
+    Full mode uses all 40 non-test subjects. Small mode reuses ESNAS's
     class/subject-balanced training subset from 30 training subjects.
     """
     root, subjects, records = inventory(dataset_root)
